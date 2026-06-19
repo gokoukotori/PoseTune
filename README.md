@@ -34,7 +34,9 @@ PoseTune は VRChat の PC / Android 両方のビルド対象で使用するこ�
 
 ### VPM / VCC で導入する場合
 
-VPM package として取り込む場合は、VCC または互換 package manager から `com.gokoukotori.posetune` を project に追加してください。依存 package は `package.json` の `vpmDependencies` に定義されています。
+PoseTune は VPM repository [https://vpm.gokoukotori.com/](https://vpm.gokoukotori.com/) からインストールできます。
+
+VPM package として取り込む場合は、VCC または互換 package manager にこの repository を追加し、`com.gokoukotori.posetune` を project に追加してください。依存 package は `package.json` の `vpmDependencies` に定義されています。
 
 ### ローカル package として導入する場合
 
