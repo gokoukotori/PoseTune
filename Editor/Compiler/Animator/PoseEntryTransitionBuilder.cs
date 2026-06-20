@@ -78,11 +78,11 @@ namespace Gokoukotori.PoseTune.Editor
                         if (group.Exclusive && exclusiveResetTargets.Count > 0)
                         {
                             desktopCommit ??= CreateExclusiveCommitState(layer, group, pose, desktopLowerBodyState,
-                                duplicateStateBaseNames,
-                                exclusiveResetTargets, poseActiveParameters, controlsActionPlayable,
-                                activeParameter, true, x + 420, y,
-                                PoseStateVariantRules.DesktopLowerBodyTrackingPolicy(pose.TrackingPolicy), "_Desktop",
-                                variants.DesktopLowerBodyTrackingContextId);
+                            duplicateStateBaseNames,
+                            exclusiveResetTargets, poseActiveParameters, controlsActionPlayable,
+                            activeParameter, true, x + 420, y,
+                            "_Desktop",
+                            variants.DesktopLowerBodyTrackingContextId);
                             desktopTarget = desktopCommit;
                         }
 
@@ -129,11 +129,11 @@ namespace Gokoukotori.PoseTune.Editor
                         if (group.Exclusive && exclusiveResetTargets.Count > 0)
                         {
                             fbtCommit ??= CreateExclusiveCommitState(layer, group, pose, fbtState,
-                                duplicateStateBaseNames,
-                                exclusiveResetTargets, poseActiveParameters, controlsActionPlayable,
-                                activeParameter, !needsPoseSpaceVrVariant, x + 560, y,
-                                pose.FullBodyTrackingPolicy, "_FBT",
-                                variants.FullBodyTrackingContextId);
+                            duplicateStateBaseNames,
+                            exclusiveResetTargets, poseActiveParameters, controlsActionPlayable,
+                            activeParameter, !needsPoseSpaceVrVariant, x + 560, y,
+                            "_FBT",
+                            variants.FullBodyTrackingContextId);
                             fbtTarget = fbtCommit;
                         }
 

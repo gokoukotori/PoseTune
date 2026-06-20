@@ -30,6 +30,10 @@ namespace Gokoukotori.PoseTune.Editor
                     .Saved()
                     .LocalOnly()
                     .DefaultValue(graph.Options != null && graph.Options.locomotionLock ? 1f : 0f);
+            }
+
+            if (NeedsTrackingContext(graph))
+            {
                 builder.AddNotSyncedInt(PoseTuneNames.TrackingContext)
                     .LocalOnly()
                     .AnimatorOnly();
@@ -183,6 +187,13 @@ namespace Gokoukotori.PoseTune.Editor
                    (graph.HeightAdjust.applyMode != HeightApplyMode.Disabled ||
                     graph.Poses.Any(pose => pose.MotionTime != null &&
                                             pose.MotionTime.mode == MotionTimeMode.UseGeneratedHeightParameter));
+        }
+
+        internal static bool NeedsTrackingContext(PoseGraph graph)
+        {
+            return graph != null &&
+                   (graph.HasPoseOptions ||
+                    graph.Poses.Any(pose => pose.EmitTrackingControl));
         }
 
     }

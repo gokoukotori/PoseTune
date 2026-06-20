@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- Auto pose 時に pose の tracking option が頭/手/足ロックを上書きする問題を修正
+
 ## [0.1.1] - 2026-06-20
 
 ### Changed

@@ -137,7 +137,6 @@ namespace Gokoukotori.PoseTune.Editor
             state.motion = motionResult.Motion;
             ApplyMotionTime(state, graph, pose);
             state.writeDefaultValues = WriteDefaultsForPose(graph.RootComponent);
-            AddPoseTrackingBehavior(state, pose, trackingPolicy);
             if (enterPoseSpace)
             {
                 PoseSpaceCompiler.AddEnterPoseSpaceBehavior(state, pose.PoseSpace);
@@ -159,12 +158,17 @@ namespace Gokoukotori.PoseTune.Editor
 
         private static int TrackingContextId(PoseGraph graph, PoseDefinition pose, TrackingPolicyData policy)
         {
-            if (graph == null || !graph.HasPoseOptions)
+            if (graph == null || !ParameterAllocator.NeedsTrackingContext(graph) || pose == null)
             {
                 return 0;
             }
 
-            var effectivePolicy = pose != null && pose.EmitTrackingControl
+            if (!pose.EmitTrackingControl && !graph.HasPoseOptions)
+            {
+                return 0;
+            }
+
+            var effectivePolicy = pose.EmitTrackingControl
                 ? policy
                 : TrackingPolicyUtility.NoChange();
             return graph.TrackingContexts.GetOrAdd(effectivePolicy);
@@ -223,15 +227,5 @@ namespace Gokoukotori.PoseTune.Editor
             }
         }
 
-        private static void AddPoseTrackingBehavior(
-            AnimatorState state,
-            PoseDefinition pose,
-            TrackingPolicyData policy)
-        {
-            if (pose != null && pose.EmitTrackingControl)
-            {
-                TrackingCompiler.AddTrackingBehavior(state, policy);
-            }
-        }
     }
 }

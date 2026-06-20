@@ -10,8 +10,15 @@ namespace Gokoukotori.PoseTune.Editor
     {
         public static void Compile(AnimatorBuildResult result, PoseGraph graph)
         {
-            CreateTrackingOptionsLayer(result, graph);
-            CreateLocomotionLockLayer(result, graph);
+            if (ParameterAllocator.NeedsTrackingContext(graph))
+            {
+                CreateTrackingOptionsLayer(result, graph);
+            }
+
+            if (graph.HasPoseOptions)
+            {
+                CreateLocomotionLockLayer(result, graph);
+            }
         }
 
         private static void CreateTrackingOptionsLayer(AnimatorBuildResult result, PoseGraph graph)
@@ -29,7 +36,8 @@ namespace Gokoukotori.PoseTune.Editor
             for (var contextIndex = 0; contextIndex < contexts.Count; contextIndex++)
             {
                 var context = contexts[contextIndex];
-                for (var mask = 0; mask < 8; mask++)
+                var maskCount = graph.HasPoseOptions ? 8 : 1;
+                for (var mask = 0; mask < maskCount; mask++)
                 {
                     var state = layer.stateMachine.AddState(
                         "C" + context.Id + "_" + TrackingOptionStateName(mask),
@@ -43,7 +51,10 @@ namespace Gokoukotori.PoseTune.Editor
                     enter.canTransitionToSelf = true;
                     AddPoseTuneEnabledCondition(enter, graph);
                     AddTrackingContextCondition(enter, context.Id);
-                    AddTrackingOptionConditions(enter, graph, mask);
+                    if (graph.HasPoseOptions)
+                    {
+                        AddTrackingOptionConditions(enter, graph, mask);
+                    }
                 }
             }
 

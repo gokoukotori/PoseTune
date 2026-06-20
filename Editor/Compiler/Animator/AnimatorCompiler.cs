@@ -34,7 +34,7 @@ namespace Gokoukotori.PoseTune.Editor
             }
 
             CompileTrackingResetLayer(result);
-            if (graph.HasPoseOptions)
+            if (ParameterAllocator.NeedsTrackingContext(graph))
             {
                 PoseOptionsLayerCompiler.Compile(result, graph);
             }

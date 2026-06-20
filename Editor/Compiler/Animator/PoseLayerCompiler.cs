@@ -29,17 +29,18 @@ namespace Gokoukotori.PoseTune.Editor
             layer.stateMachine.defaultState = idle;
 
             var emitTrackingControl = poses.Any(pose => pose.EmitTrackingControl);
+            var controlsTrackingContext = ParameterAllocator.NeedsTrackingContext(graph);
             var exclusiveResetTargets = ExclusiveResetTargets(graph, group);
             var poseActiveParameters = NeedsManualCommitGuard(graph.RootComponent, group, exclusiveResetTargets)
                 ? poses.Select(PoseTuneNames.PoseActiveParameter).Distinct().ToList()
                 : new List<string>();
             var reset = CreateCleanupState(result, layer, group, "ResetTracking", layerName + "_ResetHold",
                 new Vector3(520, 80), emitTrackingControl, controlsActionPlayable, activeParameter,
-                poseActiveParameters, graph.HasPoseOptions);
+                poseActiveParameters, controlsTrackingContext);
             var noResetCleanup = poses.Any(pose => !pose.GenerateResetOnExit)
                 ? CreateCleanupState(result, layer, group, "ExitCleanupNoReset", layerName + "_NoResetHold",
                     new Vector3(760, 80), false, controlsActionPlayable, activeParameter,
-                    poseActiveParameters, graph.HasPoseOptions)
+                    poseActiveParameters, controlsTrackingContext)
                 : null;
 
             var autoPose = SelectAutoPose(group);
@@ -145,7 +146,6 @@ namespace Gokoukotori.PoseTune.Editor
             bool enterPoseSpace,
             int x,
             int y,
-            TrackingPolicyData trackingPolicy = null,
             string stateNameSuffix = "",
             int trackingContextId = 0)
         {
@@ -155,10 +155,6 @@ namespace Gokoukotori.PoseTune.Editor
             CopyPoseStateSurface(destination, commit);
             ParameterDriverCompiler.ResetExclusiveGroups(commit, resetTargets);
             ParameterDriverCompiler.ResetPoseActiveParameters(commit, poseActiveParameters);
-            if (pose != null && pose.EmitTrackingControl)
-            {
-                TrackingCompiler.AddTrackingBehavior(commit, trackingPolicy ?? pose.TrackingPolicy);
-            }
             if (enterPoseSpace)
             {
                 PoseSpaceCompiler.AddEnterPoseSpaceBehavior(commit, pose.PoseSpace);
