@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased]
+## [0.1.1] - 2026-06-20
 
 ### Changed
 
@@ -22,6 +22,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - PoseHeightAdjust、root menu 上限、local-only parameter、BlendTree parameter、空 condition parameter の validation 漏れを修正
 - `LocomotionLock` parameter の保存挙動を他の lock option と同じ Saved に統一
 
-## 0.1.0 - 2026-06-19
+## [0.1.0] - 2026-06-19
 
 - 初回リリース
