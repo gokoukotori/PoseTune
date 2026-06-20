@@ -152,6 +152,7 @@ root / group / pose の effective tracking policy を補助する component で�
 ### PoseCondition
 
 GameObject 単位で条件をまとめる component です。条件は `And` / `Or` で合成できます。group conditions と pose conditions は Animator transition 条件に反映されます。
+同じ GameObject に複数の `PoseCondition` component がある場合、それぞれは OR branch として扱われます。
 
 ### PoseOption
 

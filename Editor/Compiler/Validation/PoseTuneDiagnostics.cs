@@ -55,6 +55,7 @@ namespace Gokoukotori.PoseTune.Editor
         public static readonly PoseTuneDiagnosticDescriptor MotionTimeGeneratedHeightConflict = new("PT-C008");
         public static readonly PoseTuneDiagnosticDescriptor HeightRuntimeAutoCorrectionRequiresVerification = new("PT-H001");
         public static readonly PoseTuneDiagnosticDescriptor HeightMaxAutoOffsetLarge = new("PT-H002");
+        public static readonly PoseTuneDiagnosticDescriptor MultipleHeightAdjust = new("PT-H003");
         public static readonly PoseTuneDiagnosticDescriptor ParameterNameConflict = new("PT-P001");
         public static readonly PoseTuneDiagnosticDescriptor ParameterSyncedBudgetExceeded = new(
             "PT-P002",
@@ -172,6 +173,7 @@ namespace Gokoukotori.PoseTune.Editor
             MotionTimeGeneratedHeightConflict,
             HeightRuntimeAutoCorrectionRequiresVerification,
             HeightMaxAutoOffsetLarge,
+            MultipleHeightAdjust,
             ParameterNameConflict,
             ParameterSyncedBudgetExceeded,
             ParameterNameEmpty,

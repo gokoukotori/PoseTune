@@ -23,26 +23,35 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
         private static void ValidateMenuControlLimit(PoseTuneValidationContext context, ValidationReport report)
         {
             var graph = context.Graph;
-            if (graph.Menu == null || graph.Menu.installMode == MenuInstallMode.None)
+            var installMode = graph.Menu != null ? graph.Menu.installMode : MenuInstallMode.AppendToRoot;
+            if (installMode == MenuInstallMode.None)
             {
                 return;
             }
 
             var menu = context.Menu;
-            if (graph.Menu.installMode == MenuInstallMode.InlineAtRoot)
+            var existingRootControlCount = ExistingRootMenuControlCount(graph);
+            if (installMode == MenuInstallMode.InlineAtRoot)
             {
-                var existingRootControlCount = ExistingRootMenuControlCount(graph);
                 var generatedInlineControlCount = menu.Root.Children.Count;
                 if (existingRootControlCount + generatedInlineControlCount > VRCExpressionsMenu.MAX_CONTROLS)
                 {
                     report.Error(PoseTuneDiagnostics.MenuControlLimitExceeded.Code,
                         $"InlineAtRoot では既存 Avatar root menu の {existingRootControlCount} controls と PoseTune の {generatedInlineControlCount} controls の合計が 8 を超えます。",
-                        graph.Menu);
+                        graph.Menu != null ? graph.Menu : graph.RootComponent);
                     return;
                 }
             }
+            else if (existingRootControlCount + 1 > VRCExpressionsMenu.MAX_CONTROLS)
+            {
+                report.Error(PoseTuneDiagnostics.MenuControlLimitExceeded.Code,
+                    $"AppendToRoot では既存 Avatar root menu の {existingRootControlCount} controls に PoseTune submenu 1 つを追加するため、合計が 8 を超えます。",
+                    graph.Menu != null ? graph.Menu : graph.RootComponent);
+                return;
+            }
 
-            if (graph.Menu.autoSplitMenu)
+            var autoSplitMenu = graph.Menu == null || graph.Menu.autoSplitMenu;
+            if (autoSplitMenu)
             {
                 return;
             }
@@ -53,7 +62,7 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
                 {
                     report.Error(PoseTuneDiagnostics.MenuControlLimitExceeded.Code,
                         "autoSplitMenu が無効な状態で、PoseTune メニューが 8 コントロールを超えています。",
-                        graph.Menu);
+                        graph.Menu != null ? graph.Menu : graph.RootComponent);
                     return;
                 }
             }

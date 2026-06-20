@@ -35,7 +35,7 @@ namespace Gokoukotori.PoseTune.Editor
             {
                 var options = branch
                     .Where(condition => !string.IsNullOrWhiteSpace(condition.parameter))
-                    .Select(PoseTuneConditionUtility.Invert)
+                    .Select(PoseTuneConditionUtility.InvertForAutoContextExit)
                     .Where(condition => condition != null)
                     .ToList();
                 if (options.Count == 0)

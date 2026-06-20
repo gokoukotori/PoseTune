@@ -38,6 +38,7 @@ namespace Gokoukotori.PoseTune.Editor
             AnimatorState commit = null;
             AnimatorState desktopCommit = null;
             AnimatorState vrCommit = null;
+            AnimatorState fbtCommit = null;
             foreach (var branch in conditionBranches)
             {
                 if (AllowsManualEntry(graph.RootComponent, group))
@@ -124,12 +125,25 @@ namespace Gokoukotori.PoseTune.Editor
 
                     if (fbtState != null)
                     {
-                        var fbtEnter = layer.stateMachine.AddAnyStateTransition(fbtState);
+                        var fbtTarget = fbtState;
+                        if (group.Exclusive && exclusiveResetTargets.Count > 0)
+                        {
+                            fbtCommit ??= CreateExclusiveCommitState(layer, group, pose, fbtState,
+                                duplicateStateBaseNames,
+                                exclusiveResetTargets, poseActiveParameters, controlsActionPlayable,
+                                activeParameter, !needsPoseSpaceVrVariant, x + 560, y,
+                                pose.FullBodyTrackingPolicy, "_FBT",
+                                variants.FullBodyTrackingContextId);
+                            fbtTarget = fbtCommit;
+                        }
+
+                        var fbtEnter = layer.stateMachine.AddAnyStateTransition(fbtTarget);
                         fbtEnter.hasExitTime = false;
                         fbtEnter.duration = 0f;
                         fbtEnter.canTransitionToSelf = false;
                         AddManualModeEntryCondition(fbtEnter, graph.RootComponent);
                         fbtEnter.AddCondition(AnimatorConditionMode.Equals, pose.SelectionValue(graph.RootComponent), group.ParameterName);
+                        AddManualCommitReentryGuard(fbtEnter, fbtTarget, fbtState, poseActiveParameter);
                         AddFbtEntryCondition(fbtEnter, graph.RootComponent, pose, true);
                         AddPoseSpaceScopeCondition(fbtEnter, pose, needsPoseSpaceVrVariant);
                         AddConditions(fbtEnter, branch);

@@ -1,4 +1,5 @@
 using Gokoukotori.PoseTune;
+using System.Collections.Generic;
 using System.Linq;
 using UnityEditor.Animations;
 
@@ -23,7 +24,7 @@ namespace Gokoukotori.PoseTune.Editor
             {
                 foreach (var bucket in PoseTuneLayerNaming.LayerBuckets(group))
                 {
-                    ValidateGroupLayer(graph, controller, bucket.LayerName, bucket.Poses, report);
+                    ValidateGroupLayer(graph, controller, bucket.LayerName, bucket.Poses.ToList(), report);
                 }
             }
 
@@ -34,7 +35,7 @@ namespace Gokoukotori.PoseTune.Editor
             PoseGraph graph,
             AnimatorController controller,
             string layerName,
-            System.Collections.Generic.IEnumerable<PoseDefinition> poses,
+            List<PoseDefinition> poses,
             ValidationReport report)
         {
             var layer = controller.layers.FirstOrDefault(l => l.name == layerName);
@@ -44,9 +45,10 @@ namespace Gokoukotori.PoseTune.Editor
             }
 
             var resetState = FindState(layer, "ResetTracking");
+            var duplicateStateBaseNames = PoseStateNaming.DuplicateBaseNames(poses);
             foreach (var pose in poses)
             {
-                var poseState = FindState(layer, StateNameFor(pose));
+                var poseState = FindState(layer, PoseStateNaming.Name(pose, duplicateStateBaseNames));
                 if (poseState == null)
                 {
                     continue;
@@ -81,13 +83,6 @@ namespace Gokoukotori.PoseTune.Editor
             return layer.stateMachine.states
                 .Select(s => s.state)
                 .FirstOrDefault(s => s != null && s.name.Contains(stateName));
-        }
-
-        private static string StateNameFor(PoseDefinition pose)
-        {
-            return pose.Clip != null && !string.IsNullOrWhiteSpace(pose.Clip.name)
-                ? pose.Clip.name
-                : pose.DisplayName;
         }
 
         private static bool HasFbtGuard(AnimatorStateTransition transition)

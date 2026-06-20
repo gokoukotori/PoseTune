@@ -27,6 +27,7 @@ namespace Gokoukotori.PoseTune.Editor
                     .LocalOnly()
                     .DefaultValue(graph.Options != null && graph.Options.lockFeet ? 1f : 0f);
                 builder.AddBool(graph.RootComponent.Parameter(PoseTuneNames.LocomotionLock))
+                    .Saved()
                     .LocalOnly()
                     .DefaultValue(graph.Options != null && graph.Options.locomotionLock ? 1f : 0f);
                 builder.AddNotSyncedInt(PoseTuneNames.TrackingContext)

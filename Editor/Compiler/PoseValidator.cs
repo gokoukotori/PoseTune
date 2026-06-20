@@ -32,10 +32,7 @@ namespace Gokoukotori.PoseTune.Editor
                     continue;
                 }
 
-                if (pose.Clip != null)
-                {
-                    PoseTuneClipValidator.Validate(pose, report);
-                }
+                PoseTuneClipValidator.ValidateMotion(pose, report);
 
                 PoseTuneMotionTimeValidator.Validate(graph, pose, report);
                 PoseTuneTrackingValidator.ValidatePose(graph, pose, report);

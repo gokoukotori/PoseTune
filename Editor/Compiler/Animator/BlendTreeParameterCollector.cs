@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor.Animations;
 using UnityEngine;
 
@@ -6,10 +7,20 @@ namespace Gokoukotori.PoseTune.Editor
 {
     internal static class BlendTreeParameterCollector
     {
+        public readonly struct ParameterReference
+        {
+            public ParameterReference(string name)
+            {
+                Name = name != null ? name.Trim() : "";
+            }
+
+            public string Name { get; }
+        }
+
         public static IEnumerable<string> Collect(Motion motion)
         {
             var seen = new HashSet<string>();
-            foreach (var parameter in CollectRecursive(motion))
+            foreach (var parameter in CollectParameterReferences(motion).Select(reference => reference.Name))
             {
                 if (!string.IsNullOrWhiteSpace(parameter) && seen.Add(parameter))
                 {
@@ -18,35 +29,47 @@ namespace Gokoukotori.PoseTune.Editor
             }
         }
 
-        private static IEnumerable<string> CollectRecursive(Motion motion)
+        public static IEnumerable<ParameterReference> CollectParameterReferences(Motion motion)
         {
             if (motion is not BlendTree tree)
             {
                 yield break;
             }
 
-            if (!string.IsNullOrWhiteSpace(tree.blendParameter))
+            if (UsesBlendParameter(tree))
             {
-                yield return tree.blendParameter.Trim();
+                yield return new ParameterReference(tree.blendParameter);
             }
 
-            if (!string.IsNullOrWhiteSpace(tree.blendParameterY))
+            if (UsesBlendParameterY(tree))
             {
-                yield return tree.blendParameterY.Trim();
+                yield return new ParameterReference(tree.blendParameterY);
             }
 
             foreach (var child in tree.children)
             {
-                if (!string.IsNullOrWhiteSpace(child.directBlendParameter))
+                if (tree.blendType == BlendTreeType.Direct)
                 {
-                    yield return child.directBlendParameter.Trim();
+                    yield return new ParameterReference(child.directBlendParameter);
                 }
 
-                foreach (var nested in CollectRecursive(child.motion))
+                foreach (var nested in CollectParameterReferences(child.motion))
                 {
                     yield return nested;
                 }
             }
+        }
+
+        private static bool UsesBlendParameter(BlendTree tree)
+        {
+            return tree.blendType != BlendTreeType.Direct;
+        }
+
+        private static bool UsesBlendParameterY(BlendTree tree)
+        {
+            return tree.blendType == BlendTreeType.SimpleDirectional2D ||
+                   tree.blendType == BlendTreeType.FreeformCartesian2D ||
+                   tree.blendType == BlendTreeType.FreeformDirectional2D;
         }
     }
 }

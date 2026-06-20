@@ -87,11 +87,11 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Hashing
 
         private static void AppendMenu(StringBuilder builder, PoseMenu menu)
         {
-            Append(builder, "menu.rootMenuName", menu != null ? menu.rootMenuName : "");
+            Append(builder, "menu.rootMenuName", menu != null ? menu.rootMenuName : "PoseTune");
             Append(builder, "menu.installMode", menu != null ? menu.installMode.ToString() : MenuInstallMode.AppendToRoot.ToString());
-            Append(builder, "menu.autoSplitMenu", menu != null && menu.autoSplitMenu);
-            Append(builder, "menu.generateIcons", menu != null && menu.generateIcons);
-            Append(builder, "menu.useSubMenusPerGroup", menu != null && menu.useSubMenusPerGroup);
+            Append(builder, "menu.autoSplitMenu", menu == null || menu.autoSplitMenu);
+            Append(builder, "menu.generateIcons", menu == null || menu.generateIcons);
+            Append(builder, "menu.useSubMenusPerGroup", menu == null || menu.useSubMenusPerGroup);
             Append(builder, "menu.lyingMenuLayout", menu != null ? menu.lyingMenuLayout.ToString() : LyingMenuLayout.CombinedLyingMenu.ToString());
         }
 

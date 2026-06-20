@@ -7,6 +7,13 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
     {
         public static void Validate(PoseGraph graph, ValidationReport report)
         {
+            if (graph.HeightAdjustCount > 1)
+            {
+                report.Error(PoseTuneDiagnostics.MultipleHeightAdjust.Code,
+                    "ビルド対象の PoseHeightAdjust が複数あります。1 つだけ有効にしてください。",
+                    graph.RootComponent);
+            }
+
             var height = graph.HeightAdjust;
             if (height == null || height.autoCorrectionMode == HeightAutoCorrectionMode.Disabled)
             {

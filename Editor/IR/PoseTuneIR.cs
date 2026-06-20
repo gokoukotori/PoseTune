@@ -14,6 +14,7 @@ namespace Gokoukotori.PoseTune.Editor
         public List<PoseDefinition> Poses = new();
         public PoseMenu Menu;
         public PoseHeightAdjust HeightAdjust;
+        public int HeightAdjustCount;
         public PoseTuneGoroneSystemExCompatibility GoroneSystemExCompatibility;
         public int GoroneSystemExCompatibilityCount;
         public PoseTuneOptions Options = new();

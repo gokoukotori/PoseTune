@@ -11,6 +11,7 @@ namespace Gokoukotori.PoseTune.Editor
         {
             var options = CollectOptions(root, out var hasPoseOptions);
             var goroneCompatibilities = CollectGoroneSystemExCompatibilities(root);
+            var heightAdjusts = CollectHeightAdjusts(root);
             var graph = new PoseGraph
             {
                 RootComponent = root,
@@ -19,7 +20,8 @@ namespace Gokoukotori.PoseTune.Editor
                     ? root.GetComponentsInChildren<PoseMenu>(true)
                         .FirstOrDefault(PoseTuneAuthoringInclusion.ComponentEnabled)
                     : null,
-                HeightAdjust = root != null ? root.GetComponentInChildren<PoseHeightAdjust>(true) : null,
+                HeightAdjust = heightAdjusts.FirstOrDefault(),
+                HeightAdjustCount = heightAdjusts.Count,
                 GoroneSystemExCompatibility = goroneCompatibilities.FirstOrDefault(),
                 GoroneSystemExCompatibilityCount = goroneCompatibilities.Count,
                 Options = options,
@@ -84,6 +86,15 @@ namespace Gokoukotori.PoseTune.Editor
                     .ThenBy(component => component.transform.GetSiblingIndex())
                     .ToList()
                 : new List<PoseTuneGoroneSystemExCompatibility>();
+        }
+
+        private static List<PoseHeightAdjust> CollectHeightAdjusts(PoseTuneRoot root)
+        {
+            return root != null
+                ? root.GetComponentsInChildren<PoseHeightAdjust>(true)
+                    .Where(PoseTuneAuthoringInclusion.Includes)
+                    .ToList()
+                : new List<PoseHeightAdjust>();
         }
     }
 }

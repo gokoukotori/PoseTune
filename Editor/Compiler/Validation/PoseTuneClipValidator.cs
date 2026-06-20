@@ -1,6 +1,7 @@
 using System.Linq;
 using Gokoukotori.PoseTune.Editor;
 using UnityEditor;
+using UnityEditor.Animations;
 using UnityEngine;
 
 namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
@@ -33,6 +34,24 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
             }
         }
 
+        public static void ValidateMotion(PoseDefinition pose, ValidationReport report)
+        {
+            if (pose?.SourceMotion is BlendTree tree)
+            {
+                foreach (var clip in MotionTreeCloneUtility.EnumerateMotions(tree).OfType<AnimationClip>())
+                {
+                    Validate(ClipPose(pose, clip), report);
+                }
+
+                return;
+            }
+
+            if (pose?.Clip != null)
+            {
+                Validate(pose, report);
+            }
+        }
+
         private static bool IsRootTransformCurve(EditorCurveBinding binding)
         {
             if (!string.IsNullOrEmpty(binding.path))
@@ -51,12 +70,28 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
                 return false;
             }
 
+            if (binding.type == typeof(SkinnedMeshRenderer) &&
+                binding.propertyName.StartsWith("blendShape."))
+            {
+                return false;
+            }
+
             return true;
         }
 
         private static bool IsUnsupportedObjectReferenceBinding(EditorCurveBinding binding)
         {
             return binding.type != typeof(Transform);
+        }
+
+        private static PoseDefinition ClipPose(PoseDefinition source, AnimationClip clip)
+        {
+            return new PoseDefinition
+            {
+                Clip = clip,
+                Source = source?.Source,
+                Loop = source != null && source.Loop
+            };
         }
     }
 }
