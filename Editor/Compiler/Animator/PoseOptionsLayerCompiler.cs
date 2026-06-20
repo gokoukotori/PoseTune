@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Gokoukotori.PoseTune;
 using UnityEditor.Animations;
 using UnityEngine;
@@ -18,6 +19,7 @@ namespace Gokoukotori.PoseTune.Editor
             var layer = AnimatorLayerFactory.NewLayer("PT_TrackingOptions");
             var empty = AnimatorLayerFactory.EmptyClip("PT_TrackingOptions_Empty");
             result.GeneratedAssets.Add(empty);
+            var activePoseParameters = PoseTuneLayerNaming.GroupActiveParameters(graph).ToList();
             var states = new Dictionary<int, AnimatorState>();
             for (var mask = 0; mask < 8; mask++)
             {
@@ -35,12 +37,26 @@ namespace Gokoukotori.PoseTune.Editor
 
             foreach (var pair in states)
             {
-                var enter = layer.stateMachine.AddAnyStateTransition(pair.Value);
-                enter.hasExitTime = false;
-                enter.duration = 0f;
-                enter.canTransitionToSelf = pair.Key != 0;
-                AddTrackingOptionConditions(enter, graph, pair.Key);
+                if (pair.Key == 0)
+                {
+                    var enterOffWhenLocksDisabled = layer.stateMachine.AddAnyStateTransition(pair.Value);
+                    enterOffWhenLocksDisabled.hasExitTime = false;
+                    enterOffWhenLocksDisabled.duration = 0f;
+                    enterOffWhenLocksDisabled.canTransitionToSelf = false;
+                    AddTrackingOptionConditions(enterOffWhenLocksDisabled, graph, pair.Key);
+                    continue;
+                }
+
+                AddAnyPoseSelectedTransitions(layer, pair.Value, graph, activePoseParameters, pair.Key);
             }
+
+            var enterOffWhenPoseTuneOff = layer.stateMachine.AddAnyStateTransition(states[0]);
+            enterOffWhenPoseTuneOff.hasExitTime = false;
+            enterOffWhenPoseTuneOff.duration = 0f;
+            enterOffWhenPoseTuneOff.canTransitionToSelf = false;
+            AddPoseTuneOffCondition(enterOffWhenPoseTuneOff, graph);
+
+            AddNoPoseSelectedTransition(layer, states[0], activePoseParameters);
 
             result.TargetController.AddLayer(layer);
         }
@@ -50,6 +66,7 @@ namespace Gokoukotori.PoseTune.Editor
             var layer = AnimatorLayerFactory.NewLayer("PT_LocomotionLock");
             var empty = AnimatorLayerFactory.EmptyClip("PT_LocomotionLock_Empty");
             result.GeneratedAssets.Add(empty);
+            var activePoseParameters = PoseTuneLayerNaming.GroupActiveParameters(graph).ToList();
 
             var enable = layer.stateMachine.AddState("LocomotionEnable", new Vector3(240, 80));
             enable.motion = empty;
@@ -67,11 +84,24 @@ namespace Gokoukotori.PoseTune.Editor
             enterEnable.canTransitionToSelf = false;
             enterEnable.AddCondition(AnimatorConditionMode.IfNot, 0f, parameter);
 
-            var enterDisable = layer.stateMachine.AddAnyStateTransition(disable);
-            enterDisable.hasExitTime = false;
-            enterDisable.duration = 0f;
-            enterDisable.canTransitionToSelf = false;
-            enterDisable.AddCondition(AnimatorConditionMode.If, 0f, parameter);
+            foreach (var activePoseParameter in activePoseParameters)
+            {
+                var enterDisable = layer.stateMachine.AddAnyStateTransition(disable);
+                enterDisable.hasExitTime = false;
+                enterDisable.duration = 0f;
+                enterDisable.canTransitionToSelf = false;
+                enterDisable.AddCondition(AnimatorConditionMode.If, 0f, parameter);
+                AddPoseTuneEnabledCondition(enterDisable, graph);
+                AddPoseSelectedCondition(enterDisable, activePoseParameter);
+            }
+
+            var enterEnableWhenPoseTuneOff = layer.stateMachine.AddAnyStateTransition(enable);
+            enterEnableWhenPoseTuneOff.hasExitTime = false;
+            enterEnableWhenPoseTuneOff.duration = 0f;
+            enterEnableWhenPoseTuneOff.canTransitionToSelf = false;
+            AddPoseTuneOffCondition(enterEnableWhenPoseTuneOff, graph);
+
+            AddNoPoseSelectedTransition(layer, enable, activePoseParameters);
 
             result.TargetController.AddLayer(layer);
         }
@@ -134,6 +164,71 @@ namespace Gokoukotori.PoseTune.Editor
         private static void AddBoolCondition(AnimatorStateTransition transition, string parameter, bool value)
         {
             transition.AddCondition(value ? AnimatorConditionMode.If : AnimatorConditionMode.IfNot, 0f, parameter);
+        }
+
+        private static void AddAnyPoseSelectedTransitions(
+            AnimatorControllerLayer layer,
+            AnimatorState state,
+            PoseGraph graph,
+            IReadOnlyCollection<string> activePoseParameters,
+            int mask)
+        {
+            foreach (var activePoseParameter in activePoseParameters)
+            {
+                var enter = layer.stateMachine.AddAnyStateTransition(state);
+                enter.hasExitTime = false;
+                enter.duration = 0f;
+                enter.canTransitionToSelf = true;
+                AddTrackingOptionConditions(enter, graph, mask);
+                AddPoseTuneEnabledCondition(enter, graph);
+                AddPoseSelectedCondition(enter, activePoseParameter);
+            }
+        }
+
+        private static void AddNoPoseSelectedTransition(
+            AnimatorControllerLayer layer,
+            AnimatorState state,
+            IReadOnlyCollection<string> activePoseParameters)
+        {
+            if (activePoseParameters.Count == 0)
+            {
+                return;
+            }
+
+            var enter = layer.stateMachine.AddAnyStateTransition(state);
+            enter.hasExitTime = false;
+            enter.duration = 0f;
+            enter.canTransitionToSelf = false;
+            foreach (var activePoseParameter in activePoseParameters)
+            {
+                AddPoseDeselectedCondition(enter, activePoseParameter);
+            }
+        }
+
+        private static void AddPoseSelectedCondition(AnimatorStateTransition transition, string parameter)
+        {
+            transition.AddCondition(AnimatorConditionMode.Greater, 0.5f, parameter);
+        }
+
+        private static void AddPoseDeselectedCondition(AnimatorStateTransition transition, string parameter)
+        {
+            transition.AddCondition(AnimatorConditionMode.Less, 0.5f, parameter);
+        }
+
+        private static void AddPoseTuneEnabledCondition(AnimatorStateTransition transition, PoseGraph graph)
+        {
+            transition.AddCondition(
+                AnimatorConditionMode.NotEqual,
+                0f,
+                graph.RootComponent.Parameter(PoseTuneNames.Mode));
+        }
+
+        private static void AddPoseTuneOffCondition(AnimatorStateTransition transition, PoseGraph graph)
+        {
+            transition.AddCondition(
+                AnimatorConditionMode.Equals,
+                0f,
+                graph.RootComponent.Parameter(PoseTuneNames.Mode));
         }
 
     }

@@ -54,7 +54,7 @@ namespace Gokoukotori.PoseTune.Editor
                         .DefaultValue(group.Poses.FirstOrDefault(p => p.Initial)?.SelectionValue(graph.RootComponent) ?? 0);
                 }
 
-                if (PoseTuneCompilerRules.ControlsActionPlayable(graph.RootComponent))
+                if (PoseTuneCompilerRules.ControlsActionPlayable(graph.RootComponent) || graph.HasPoseOptions)
                 {
                     foreach (var parameterName in PoseTuneLayerNaming.GroupActiveParameters(group))
                     {

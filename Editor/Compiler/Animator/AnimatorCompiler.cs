@@ -18,12 +18,13 @@ namespace Gokoukotori.PoseTune.Editor
         private static void CreateActionPoseLayers(AnimatorBuildResult result, PoseGraph graph)
         {
             var controlsActionPlayable = PoseTuneCompilerRules.ControlsActionPlayable(graph.RootComponent);
+            var tracksGroupActivity = controlsActionPlayable || graph.HasPoseOptions;
             foreach (var group in PoseGraphBuildFilter.BuildableGroups(graph))
             {
                 foreach (var bucket in PoseTuneLayerNaming.LayerBuckets(group))
                 {
                     CreateActionPoseLayer(result, graph, group, bucket.Poses, bucket.LayerName, bucket.BlendMode,
-                        controlsActionPlayable, PoseTuneNames.GroupActiveParameter(group, bucket.BlendMode));
+                        tracksGroupActivity, PoseTuneNames.GroupActiveParameter(group, bucket.BlendMode));
                 }
             }
 

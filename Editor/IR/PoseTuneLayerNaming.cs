@@ -48,6 +48,7 @@ namespace Gokoukotori.PoseTune.Editor
         {
             return "PTI/PoseActive/" + ShortGuid(pose != null ? pose.Id : "");
         }
+
     }
 
     internal sealed class PoseLayerBucketDefinition
@@ -116,6 +117,13 @@ namespace Gokoukotori.PoseTune.Editor
         public static IEnumerable<string> GroupActiveParameters(PoseGroupDefinition group)
         {
             return LayerBuckets(group).Select(bucket => PoseTuneNames.GroupActiveParameter(group, bucket.BlendMode));
+        }
+
+        public static IEnumerable<string> GroupActiveParameters(PoseGraph graph)
+        {
+            return PoseGraphBuildFilter.BuildableGroups(graph)
+                .SelectMany(GroupActiveParameters)
+                .Distinct();
         }
     }
 }
