@@ -28,13 +28,27 @@ namespace Gokoukotori.PoseTune.Editor
                 pose)
                 ? PoseStateVariantRules.DesktopLowerBodyTrackingPolicy(pose.TrackingPolicy)
                 : pose.TrackingPolicy;
+            var desktopLowerBodyTrackingPolicy =
+                PoseStateVariantRules.DesktopLowerBodyTrackingPolicy(pose.TrackingPolicy);
             var motionResult = BuildMotion(result, graph, pose);
             result.GeneratedAssets.AddRange(motionResult.GeneratedAssets);
+            var hasFullBodyTrackingVariant = pose.HasFullBodyTrackingOverride &&
+                                             graph.RootComponent.advancedSettings.allowFullBodyTracking;
 
             var variants = new PoseStateVariants
             {
                 NeedsPoseSpaceVrVariant = needsPoseSpaceVrVariant,
-                NeedsDesktopLowerBodyLockVariant = needsDesktopLowerBodyLockVariant
+                NeedsDesktopLowerBodyLockVariant = needsDesktopLowerBodyLockVariant,
+                BaseTrackingContextId = TrackingContextId(graph, pose, baseTrackingPolicy),
+                DesktopLowerBodyTrackingContextId = needsDesktopLowerBodyLockVariant
+                    ? TrackingContextId(graph, pose, desktopLowerBodyTrackingPolicy)
+                    : 0,
+                VrTrackingContextId = needsPoseSpaceVrVariant
+                    ? TrackingContextId(graph, pose, pose.TrackingPolicy)
+                    : 0,
+                FullBodyTrackingContextId = hasFullBodyTrackingVariant
+                    ? TrackingContextId(graph, pose, pose.FullBodyTrackingPolicy)
+                    : 0
             };
 
             variants.BaseState = CreateState(
@@ -48,7 +62,8 @@ namespace Gokoukotori.PoseTune.Editor
                 true,
                 controlsActionPlayable,
                 activeParameter,
-                poseActiveParameter);
+                poseActiveParameter,
+                variants.BaseTrackingContextId);
 
             if (needsDesktopLowerBodyLockVariant)
             {
@@ -59,11 +74,12 @@ namespace Gokoukotori.PoseTune.Editor
                     PoseStateNaming.Name(pose, duplicateStateBaseNames, "_Desktop"),
                     new Vector3(position.x + 280, position.y),
                     motionResult,
-                    PoseStateVariantRules.DesktopLowerBodyTrackingPolicy(pose.TrackingPolicy),
+                    desktopLowerBodyTrackingPolicy,
                     true,
                     controlsActionPlayable,
                     activeParameter,
-                    poseActiveParameter);
+                    poseActiveParameter,
+                    variants.DesktopLowerBodyTrackingContextId);
             }
 
             if (needsPoseSpaceVrVariant)
@@ -79,11 +95,11 @@ namespace Gokoukotori.PoseTune.Editor
                     false,
                     controlsActionPlayable,
                     activeParameter,
-                    poseActiveParameter);
+                    poseActiveParameter,
+                    variants.VrTrackingContextId);
             }
 
-            if (pose.HasFullBodyTrackingOverride &&
-                graph.RootComponent.advancedSettings.allowFullBodyTracking)
+            if (hasFullBodyTrackingVariant)
             {
                 variants.FullBodyState = CreateState(
                     layer,
@@ -96,7 +112,8 @@ namespace Gokoukotori.PoseTune.Editor
                     !needsPoseSpaceVrVariant,
                     controlsActionPlayable,
                     activeParameter,
-                    poseActiveParameter);
+                    poseActiveParameter,
+                    variants.FullBodyTrackingContextId);
             }
 
             return variants;
@@ -113,7 +130,8 @@ namespace Gokoukotori.PoseTune.Editor
             bool enterPoseSpace,
             bool controlsActionPlayable,
             string activeParameter,
-            string poseActiveParameter)
+            string poseActiveParameter,
+            int trackingContextId)
         {
             var state = layer.stateMachine.AddState(stateName, position);
             state.motion = motionResult.Motion;
@@ -130,8 +148,26 @@ namespace Gokoukotori.PoseTune.Editor
                 ParameterDriverCompiler.SetGroupActive(state, activeParameter, 1f);
             }
 
+            if (trackingContextId > 0)
+            {
+                ParameterDriverCompiler.SetTrackingContext(state, trackingContextId);
+            }
+
             ParameterDriverCompiler.SetPoseActive(state, poseActiveParameter, 1f);
             return state;
+        }
+
+        private static int TrackingContextId(PoseGraph graph, PoseDefinition pose, TrackingPolicyData policy)
+        {
+            if (graph == null || !graph.HasPoseOptions)
+            {
+                return 0;
+            }
+
+            var effectivePolicy = pose != null && pose.EmitTrackingControl
+                ? policy
+                : TrackingPolicyUtility.NoChange();
+            return graph.TrackingContexts.GetOrAdd(effectivePolicy);
         }
 
         private static HeightBuildResult BuildMotion(

@@ -29,6 +29,9 @@ namespace Gokoukotori.PoseTune.Editor
                 builder.AddBool(graph.RootComponent.Parameter(PoseTuneNames.LocomotionLock))
                     .LocalOnly()
                     .DefaultValue(graph.Options != null && graph.Options.locomotionLock ? 1f : 0f);
+                builder.AddNotSyncedInt(PoseTuneNames.TrackingContext)
+                    .LocalOnly()
+                    .AnimatorOnly();
             }
 
             if (NeedsSupineFlag(graph))

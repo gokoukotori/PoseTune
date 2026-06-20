@@ -17,7 +17,8 @@ namespace Gokoukotori.PoseTune.Editor
             bool addTrackingReset,
             bool controlsActionPlayable,
             string activeParameter,
-            List<string> poseActiveParameters)
+            List<string> poseActiveParameters,
+            bool controlsTrackingContext)
         {
             var state = layer.stateMachine.AddState(stateName, position);
             var hold = AnimatorLayerFactory.ResetHoldClip(clipName, CriticalStateHoldSeconds);
@@ -32,6 +33,10 @@ namespace Gokoukotori.PoseTune.Editor
             if (controlsActionPlayable)
             {
                 ParameterDriverCompiler.SetGroupActive(state, activeParameter, 0f);
+            }
+            if (controlsTrackingContext)
+            {
+                ParameterDriverCompiler.SetTrackingContext(state, 0);
             }
             ParameterDriverCompiler.ResetPoseActiveParameters(state, poseActiveParameters);
 

@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 
 - PoseTune 無効時または pose 未選択時に、tracking options と Locomotion Lock が解除されるように修正
+- VR で頭/手/足ロックを OFF にした後、ジャンプなどの再評価まで tracking が戻らない問題を修正
 
 ## 0.1.0 - 2026-06-19
 

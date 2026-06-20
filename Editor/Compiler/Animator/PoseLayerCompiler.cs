@@ -35,11 +35,11 @@ namespace Gokoukotori.PoseTune.Editor
                 : new List<string>();
             var reset = CreateCleanupState(result, layer, group, "ResetTracking", layerName + "_ResetHold",
                 new Vector3(520, 80), emitTrackingControl, controlsActionPlayable, activeParameter,
-                poseActiveParameters);
+                poseActiveParameters, graph.HasPoseOptions);
             var noResetCleanup = poses.Any(pose => !pose.GenerateResetOnExit)
                 ? CreateCleanupState(result, layer, group, "ExitCleanupNoReset", layerName + "_NoResetHold",
                     new Vector3(760, 80), false, controlsActionPlayable, activeParameter,
-                    poseActiveParameters)
+                    poseActiveParameters, graph.HasPoseOptions)
                 : null;
 
             var autoPose = SelectAutoPose(group);
@@ -146,7 +146,8 @@ namespace Gokoukotori.PoseTune.Editor
             int x,
             int y,
             TrackingPolicyData trackingPolicy = null,
-            string stateNameSuffix = "")
+            string stateNameSuffix = "",
+            int trackingContextId = 0)
         {
             var commit = layer.stateMachine.AddState(
                 "CommitExclusive_" + PoseStateNaming.Name(pose, duplicateStateBaseNames) + stateNameSuffix,
@@ -165,6 +166,10 @@ namespace Gokoukotori.PoseTune.Editor
             if (controlsActionPlayable)
             {
                 ParameterDriverCompiler.SetGroupActive(commit, activeParameter, 1f);
+            }
+            if (trackingContextId > 0)
+            {
+                ParameterDriverCompiler.SetTrackingContext(commit, trackingContextId);
             }
             var toPose = commit.AddTransition(destination);
             toPose.hasExitTime = true;

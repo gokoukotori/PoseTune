@@ -12,6 +12,7 @@ namespace Gokoukotori.PoseTune.Editor
         public const string LockFeet = "LockFeet";
         public const string LocomotionLock = "LocomotionLock";
         public const string SupineFlag = "SupineFlag";
+        public const string TrackingContext = "PTI/TrackingContext";
         public const string GeneratedRootName = "PoseTune Generated";
 
         public static string ShortGuid(string guid)

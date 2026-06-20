@@ -69,6 +69,21 @@ namespace Gokoukotori.PoseTune.Editor
             });
         }
 
+        public static void SetTrackingContext(AnimatorState state, int contextId)
+        {
+            var behavior = state.AddStateMachineBehaviour<VRCAvatarParameterDriver>();
+            behavior.localOnly = false;
+            behavior.debugString = contextId > 0
+                ? "PoseTune Set Tracking Context"
+                : "PoseTune Reset Tracking Context";
+            behavior.parameters.Add(new VRC_AvatarParameterDriver.Parameter
+            {
+                name = PoseTuneNames.TrackingContext,
+                type = VRC_AvatarParameterDriver.ChangeType.Set,
+                value = contextId
+            });
+        }
+
         public static void ResetPoseActiveParameters(AnimatorState state, IEnumerable<string> parameterNames)
         {
             var targets = parameterNames?

@@ -19,44 +19,45 @@ namespace Gokoukotori.PoseTune.Editor
             var layer = AnimatorLayerFactory.NewLayer("PT_TrackingOptions");
             var empty = AnimatorLayerFactory.EmptyClip("PT_TrackingOptions_Empty");
             result.GeneratedAssets.Add(empty);
-            var activePoseParameters = PoseTuneLayerNaming.GroupActiveParameters(graph).ToList();
-            var states = new Dictionary<int, AnimatorState>();
-            for (var mask = 0; mask < 8; mask++)
+
+            var idle = layer.stateMachine.AddState("Off", new Vector3(240, 80));
+            idle.motion = empty;
+            TrackingCompiler.AddTrackingBehavior(idle, TrackingPolicyUtility.NoChange());
+            layer.stateMachine.defaultState = idle;
+
+            var contexts = graph.TrackingContexts.Contexts.ToList();
+            for (var contextIndex = 0; contextIndex < contexts.Count; contextIndex++)
             {
-                var state = layer.stateMachine.AddState(
-                    TrackingOptionStateName(mask),
-                    new Vector3(240 + mask % 4 * 220, 80 + mask / 4 * 100));
-                state.motion = empty;
-                TrackingCompiler.AddTrackingBehavior(state, TrackingPolicyForLockMask(mask));
-                states[mask] = state;
-                if (mask == 0)
+                var context = contexts[contextIndex];
+                for (var mask = 0; mask < 8; mask++)
                 {
-                    layer.stateMachine.defaultState = state;
+                    var state = layer.stateMachine.AddState(
+                        "C" + context.Id + "_" + TrackingOptionStateName(mask),
+                        new Vector3(240 + mask % 4 * 220, 180 + contextIndex * 220 + mask / 4 * 100));
+                    state.motion = empty;
+                    TrackingCompiler.AddTrackingBehavior(state, TrackingPolicyForLockMask(context.Policy, mask));
+
+                    var enter = layer.stateMachine.AddAnyStateTransition(state);
+                    enter.hasExitTime = false;
+                    enter.duration = 0f;
+                    enter.canTransitionToSelf = true;
+                    AddPoseTuneEnabledCondition(enter, graph);
+                    AddTrackingContextCondition(enter, context.Id);
+                    AddTrackingOptionConditions(enter, graph, mask);
                 }
             }
 
-            foreach (var pair in states)
-            {
-                if (pair.Key == 0)
-                {
-                    var enterOffWhenLocksDisabled = layer.stateMachine.AddAnyStateTransition(pair.Value);
-                    enterOffWhenLocksDisabled.hasExitTime = false;
-                    enterOffWhenLocksDisabled.duration = 0f;
-                    enterOffWhenLocksDisabled.canTransitionToSelf = false;
-                    AddTrackingOptionConditions(enterOffWhenLocksDisabled, graph, pair.Key);
-                    continue;
-                }
-
-                AddAnyPoseSelectedTransitions(layer, pair.Value, graph, activePoseParameters, pair.Key);
-            }
-
-            var enterOffWhenPoseTuneOff = layer.stateMachine.AddAnyStateTransition(states[0]);
+            var enterOffWhenPoseTuneOff = layer.stateMachine.AddAnyStateTransition(idle);
             enterOffWhenPoseTuneOff.hasExitTime = false;
             enterOffWhenPoseTuneOff.duration = 0f;
             enterOffWhenPoseTuneOff.canTransitionToSelf = false;
             AddPoseTuneOffCondition(enterOffWhenPoseTuneOff, graph);
 
-            AddNoPoseSelectedTransition(layer, states[0], activePoseParameters);
+            var enterOffWhenNoTrackingContext = layer.stateMachine.AddAnyStateTransition(idle);
+            enterOffWhenNoTrackingContext.hasExitTime = false;
+            enterOffWhenNoTrackingContext.duration = 0f;
+            enterOffWhenNoTrackingContext.canTransitionToSelf = false;
+            AddNoTrackingContextCondition(enterOffWhenNoTrackingContext);
 
             result.TargetController.AddLayer(layer);
         }
@@ -129,9 +130,11 @@ namespace Gokoukotori.PoseTune.Editor
             }
         }
 
-        private static TrackingPolicyData TrackingPolicyForLockMask(int mask)
+        private static TrackingPolicyData TrackingPolicyForLockMask(TrackingPolicyData basePolicy, int mask)
         {
-            var policy = TrackingPolicyUtility.NoChange();
+            var policy = basePolicy != null
+                ? TrackingPolicyUtility.Copy(basePolicy)
+                : TrackingPolicyUtility.NoChange();
             if ((mask & 1) != 0)
             {
                 policy.head = TrackingMode.Animation;
@@ -161,28 +164,19 @@ namespace Gokoukotori.PoseTune.Editor
             AddBoolCondition(transition, graph.RootComponent.Parameter(PoseTuneNames.LockFeet), (mask & 4) != 0);
         }
 
+        private static void AddTrackingContextCondition(AnimatorStateTransition transition, int contextId)
+        {
+            transition.AddCondition(AnimatorConditionMode.Equals, contextId, PoseTuneNames.TrackingContext);
+        }
+
+        private static void AddNoTrackingContextCondition(AnimatorStateTransition transition)
+        {
+            transition.AddCondition(AnimatorConditionMode.Equals, 0f, PoseTuneNames.TrackingContext);
+        }
+
         private static void AddBoolCondition(AnimatorStateTransition transition, string parameter, bool value)
         {
             transition.AddCondition(value ? AnimatorConditionMode.If : AnimatorConditionMode.IfNot, 0f, parameter);
-        }
-
-        private static void AddAnyPoseSelectedTransitions(
-            AnimatorControllerLayer layer,
-            AnimatorState state,
-            PoseGraph graph,
-            IReadOnlyCollection<string> activePoseParameters,
-            int mask)
-        {
-            foreach (var activePoseParameter in activePoseParameters)
-            {
-                var enter = layer.stateMachine.AddAnyStateTransition(state);
-                enter.hasExitTime = false;
-                enter.duration = 0f;
-                enter.canTransitionToSelf = true;
-                AddTrackingOptionConditions(enter, graph, mask);
-                AddPoseTuneEnabledCondition(enter, graph);
-                AddPoseSelectedCondition(enter, activePoseParameter);
-            }
         }
 
         private static void AddNoPoseSelectedTransition(

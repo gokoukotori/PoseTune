@@ -48,7 +48,8 @@ namespace Gokoukotori.PoseTune.Editor
                         commit ??= CreateExclusiveCommitState(layer, group, pose, state,
                             duplicateStateBaseNames,
                             exclusiveResetTargets, poseActiveParameters, controlsActionPlayable,
-                            activeParameter, true, x + 280, y);
+                            activeParameter, true, x + 280, y,
+                            trackingContextId: variants.BaseTrackingContextId);
                         manualTarget = commit;
                     }
 
@@ -79,7 +80,8 @@ namespace Gokoukotori.PoseTune.Editor
                                 duplicateStateBaseNames,
                                 exclusiveResetTargets, poseActiveParameters, controlsActionPlayable,
                                 activeParameter, true, x + 420, y,
-                                PoseStateVariantRules.DesktopLowerBodyTrackingPolicy(pose.TrackingPolicy), "_Desktop");
+                                PoseStateVariantRules.DesktopLowerBodyTrackingPolicy(pose.TrackingPolicy), "_Desktop",
+                                variants.DesktopLowerBodyTrackingContextId);
                             desktopTarget = desktopCommit;
                         }
 
@@ -103,7 +105,8 @@ namespace Gokoukotori.PoseTune.Editor
                             vrCommit ??= CreateExclusiveCommitState(layer, group, pose, vrState,
                                 duplicateStateBaseNames,
                                 exclusiveResetTargets, poseActiveParameters, controlsActionPlayable,
-                                activeParameter, false, x + 420, y);
+                                activeParameter, false, x + 420, y,
+                                trackingContextId: variants.VrTrackingContextId);
                             vrTarget = vrCommit;
                         }
 
