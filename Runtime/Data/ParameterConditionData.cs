@@ -11,7 +11,7 @@ namespace Gokoukotori.PoseTune
         [InspectorName("値の型")]
         public ParameterValueType valueType = ParameterValueType.Float;
         [InspectorName("比較")]
-        public ConditionOperator op = ConditionOperator.Equals;
+        public ConditionOperator op = ConditionOperator.Greater;
         [InspectorName("Float 値")]
         public float floatValue;
         [InspectorName("Int 値")]

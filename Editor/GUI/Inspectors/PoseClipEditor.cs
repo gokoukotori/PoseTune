@@ -31,7 +31,6 @@ namespace Gokoukotori.PoseTune.Editor
             new("blendMode", "ブレンドモード", "Animator layer の Override / Additive 分割に使います。"),
             new("motionTime", "モーション時間"),
             new("poseSpace", "ポーズ空間"),
-            new("tracking", "トラッキング"),
             new("emitTrackingControl", "トラッキング制御を生成"),
             new("suppressIconGeneration", "アイコン生成を抑止"),
             new("clipConditions", "クリップ条件")

@@ -22,6 +22,7 @@ namespace Gokoukotori.PoseTune.Editor
         public string DisabledReason = "";
         public bool FromBlendTree;
         public List<BlendTreeChildInfo> BlendTreePath = new();
+        public bool HasTrackingBehavior;
         public TrackingPolicyData TrackingPolicy = TrackingPolicyData.DefaultForPose();
         public List<ParameterConditionData> Conditions = new();
         public List<List<ParameterConditionData>> ConditionBranches = new();

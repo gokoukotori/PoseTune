@@ -36,7 +36,7 @@ namespace Gokoukotori.PoseTune.Editor
 
             var explicitValues = new HashSet<int>();
             var nextValue = 1;
-            foreach (var clip in group.GetComponentsInChildren<PoseClip>(true)
+            foreach (var clip in PoseGroupOwnership.OwnedClips(group)
                          .Where(PoseTuneAuthoringInclusion.Includes)
                          .OrderBy(p => p.menuOrder)
                          .ThenBy(p => p.displayName)

@@ -66,10 +66,13 @@ namespace Gokoukotori.PoseTune.Editor
         public static readonly PoseTuneDiagnosticDescriptor ExistingAnimatorParameterTypeConflict = new("PT-P006");
         public static readonly PoseTuneDiagnosticDescriptor ExpressionParameterCountExceeded = new("PT-P007");
         public static readonly PoseTuneDiagnosticDescriptor ExpressionParameterCountNearLimit = new("PT-P008");
+        public static readonly PoseTuneDiagnosticDescriptor ParameterConditionInvalid = new(
+            "PT-P009",
+            "条件 parameter の値の型と比較方法を対応する組み合わせに修正してください。");
         public static readonly PoseTuneDiagnosticDescriptor UnsupportedTargetLayer = new("PT-A001");
         public static readonly PoseTuneDiagnosticDescriptor AnimatorMissingResetExitTransition = new(
             "PT-A002",
-            "生成された Animator の Pose state から ResetTracking への終了遷移を確認してください。");
+            "生成された Animator の Pose variant から専用 cleanup/handoff への終了遷移を確認してください。");
         public static readonly PoseTuneDiagnosticDescriptor AnimatorTrackingResetStateMissing = new("PT-A003");
         public static readonly PoseTuneDiagnosticDescriptor AnimatorFbtPoseEntryRisk = new(
             "PT-A004",
@@ -97,6 +100,9 @@ namespace Gokoukotori.PoseTune.Editor
         public static readonly PoseTuneDiagnosticDescriptor MissingThumbnail = new("PT-M004");
         public static readonly PoseTuneDiagnosticDescriptor DuplicateRootTrackingPolicies = new("PT-T001");
         public static readonly PoseTuneDiagnosticDescriptor TrackingResetDisabledForFbt = new("PT-T002");
+        public static readonly PoseTuneDiagnosticDescriptor LegacyInlineTrackingPolicy = new(
+            "PT-T003",
+            "PoseTrackingPolicy component へ変換してください。");
         public static readonly PoseTuneDiagnosticDescriptor FullBodyTrackingDisabled = new(
             "PT-FBT001",
             "FBT でも PoseTune を有効にしたい場合は PoseTuneRoot の Disable When Full Body Tracking を OFF にしてください。");
@@ -116,6 +122,7 @@ namespace Gokoukotori.PoseTune.Editor
         public static readonly PoseTuneDiagnosticDescriptor KawaiiThumbnailPackNotMigrated = new("PT-KI001");
         public static readonly PoseTuneDiagnosticDescriptor KawaiiMigrationOptionsInfo = new("PT-KOPT");
         public static readonly PoseTuneDiagnosticDescriptor KawaiiSourceMergeTrackingControlDisabled = new("PT-KT002");
+        public static readonly PoseTuneDiagnosticDescriptor KawaiiControllerTrackingMergeNotStrictlyMigrated = new("PT-KT003");
         public static readonly PoseTuneDiagnosticDescriptor KawaiiUnsupportedMigrationOption = new("PT-KU001");
         public static readonly PoseTuneDiagnosticDescriptor KawaiiActionLayerApproximation = new("PT-KL001");
         public static readonly PoseTuneDiagnosticDescriptor KawaiiSyncedParameterDirectGroupApproximation = new("PT-KS002");
@@ -124,6 +131,7 @@ namespace Gokoukotori.PoseTune.Editor
         public static readonly PoseTuneDiagnosticDescriptor KawaiiBlendTreePoseSkipped = new("PT-KB-SKIP");
         public static readonly PoseTuneDiagnosticDescriptor KawaiiMotionTimeParameterMissing = new("PT-KM001");
         public static readonly PoseTuneDiagnosticDescriptor KawaiiOverrideUnsupported = new("PT-KO001");
+        public static readonly PoseTuneDiagnosticDescriptor KawaiiOverrideTrackingNotStrictlyMigrated = new("PT-KO002");
         public static readonly PoseTuneDiagnosticDescriptor KawaiiSourceMotionMissing = new("PT-KC001");
         public static readonly PoseTuneDiagnosticDescriptor KawaiiSourceMotionAbsent = new("PT-KC002");
         public static readonly PoseTuneDiagnosticDescriptor KawaiiBlendTreePreviewClipMissing = new("PT-KB001");
@@ -182,6 +190,7 @@ namespace Gokoukotori.PoseTune.Editor
             ExistingAnimatorParameterTypeConflict,
             ExpressionParameterCountExceeded,
             ExpressionParameterCountNearLimit,
+            ParameterConditionInvalid,
             UnsupportedTargetLayer,
             AnimatorMissingResetExitTransition,
             AnimatorTrackingResetStateMissing,
@@ -205,6 +214,7 @@ namespace Gokoukotori.PoseTune.Editor
             MissingThumbnail,
             DuplicateRootTrackingPolicies,
             TrackingResetDisabledForFbt,
+            LegacyInlineTrackingPolicy,
             FullBodyTrackingDisabled,
             FbtOverrideRequiresCompatibilityMode,
             FbtOverrideLowerBodyAnimationRisk,
@@ -222,6 +232,7 @@ namespace Gokoukotori.PoseTune.Editor
             KawaiiThumbnailPackNotMigrated,
             KawaiiMigrationOptionsInfo,
             KawaiiSourceMergeTrackingControlDisabled,
+            KawaiiControllerTrackingMergeNotStrictlyMigrated,
             KawaiiUnsupportedMigrationOption,
             KawaiiActionLayerApproximation,
             KawaiiSyncedParameterDirectGroupApproximation,
@@ -230,6 +241,7 @@ namespace Gokoukotori.PoseTune.Editor
             KawaiiBlendTreePoseSkipped,
             KawaiiMotionTimeParameterMissing,
             KawaiiOverrideUnsupported,
+            KawaiiOverrideTrackingNotStrictlyMigrated,
             KawaiiSourceMotionMissing,
             KawaiiSourceMotionAbsent,
             KawaiiBlendTreePreviewClipMissing,

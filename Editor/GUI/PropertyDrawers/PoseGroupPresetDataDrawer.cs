@@ -21,6 +21,7 @@ namespace Gokoukotori.PoseTune.Editor
             new("autoPoseSelectionMode", "自動時のポーズ選択"),
             new("autoContextProfile", "自動コンテキストプロファイル"),
             new("emitTrackingControl", "トラッキング制御を生成"),
+            new("trackingPolicy", "トラッキングポリシー"),
             new("suppressIconGeneration", "アイコン生成を抑止"),
             new("groupConditions", "グループ条件"),
             new("poseSpace", "ポーズ空間"),

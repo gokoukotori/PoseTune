@@ -12,6 +12,16 @@ namespace Gokoukotori.PoseTune.Editor
                    group.ActivationMode != PoseGroupActivationMode.Auto;
         }
 
+        public static bool RequiresPoseSelectionParameter(PoseTuneRoot root, PoseGroupDefinition group)
+        {
+            return AllowsManualControl(root, group) ||
+                   root != null &&
+                   group != null &&
+                   root.enableAutoContextSwitch &&
+                   group.ActivationMode == PoseGroupActivationMode.Auto &&
+                   group.AutoPoseSelectionMode == AutoPoseSelectionMode.SelectedPosePerGroup;
+        }
+
         public static bool ControlsActionPlayable(PoseTuneRoot root)
         {
             return root != null &&

@@ -12,12 +12,13 @@ namespace Gokoukotori.PoseTune.Editor
             KawaiiLayerDto layer,
             KawaiiMigrationOptions options,
             KawaiiMigrationReport report,
-            string undoName)
+            string undoName,
+            IKawaiiMigrationAssetStore assetStore = null)
         {
             var groupObject = new GameObject(SafeName(layer.MenuName, "Kawaii Group " + layer.Index));
             Undo.RegisterCreatedObjectUndo(groupObject, undoName);
-            groupObject.transform.SetParent(parent, false);
-            var group = groupObject.AddComponent<PoseGroup>();
+            Undo.SetTransformParent(groupObject.transform, parent, undoName);
+            var group = Undo.AddComponent<PoseGroup>(groupObject);
             group.kind = KawaiiPosingMapper.MapGroupKind(layer);
             group.displayName = SafeName(layer.MenuName, PoseTuneTemplateFactory.DefaultDisplayName(group.kind));
             group.parameterName = options.preserveSourceParameterNames ? layer.ParameterName : "";
@@ -26,13 +27,13 @@ namespace Gokoukotori.PoseTune.Editor
             group.activationMode = PoseGroupActivationMode.ManualAndAuto;
             group.autoPoseSelectionMode = AutoPoseSelectionMode.SelectedPosePerGroup;
             group.autoContextProfile = AutoContextProfile.KawaiiHeadHeightApproximation;
-            group.emitTrackingControl = dto == null || dto.MergeTrackingControl;
+            group.emitTrackingControl = options.addTrackingPolicy;
             group.suppressIconGeneration = dto != null && dto.IsIconDisabled;
             report.Created(groupObject, "Group");
 
-            if (options.addTrackingPolicy && (dto == null || dto.MergeTrackingControl))
+            if (options.addTrackingPolicy)
             {
-                var policy = groupObject.AddComponent<PoseTrackingPolicy>();
+                var policy = Undo.AddComponent<PoseTrackingPolicy>(groupObject);
                 policy.tracking = KawaiiPosingMapper.DefaultTracking(group.kind);
                 if (options.disableWhenFullBodyTracking)
                 {
@@ -49,7 +50,8 @@ namespace Gokoukotori.PoseTune.Editor
                     options,
                     report,
                     dto != null && dto.IsIconDisabled,
-                    undoName);
+                    undoName,
+                    assetStore);
             }
         }
 

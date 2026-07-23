@@ -59,7 +59,9 @@ namespace Gokoukotori.PoseTune
         public MotionTimeSettings motionTime = new();
         [InspectorName("ポーズ空間")]
         public PoseSpacePolicy poseSpace = new();
-        [InspectorName("トラッキング")]
+        [HideInInspector]
+        [InspectorName("トラッキング (legacy)")]
+        [Tooltip("旧バージョンとの読み取り互換用です。新規編集には PoseTrackingPolicy component を使用してください。")]
         public TrackingPolicyData tracking = TrackingPolicyData.DefaultForPose();
         [InspectorName("トラッキング制御を生成")]
         public bool emitTrackingControl = true;

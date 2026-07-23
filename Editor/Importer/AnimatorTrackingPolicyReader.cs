@@ -15,7 +15,7 @@ namespace Gokoukotori.PoseTune.Editor
 
         public static TrackingPolicyData ReadTrackingPolicy(AnimatorState state)
         {
-            var policy = TrackingPolicyData.DefaultForPose();
+            var policy = TrackingPolicyUtility.NoChange();
             if (state == null)
             {
                 return policy;
@@ -23,16 +23,16 @@ namespace Gokoukotori.PoseTune.Editor
 
             foreach (var behavior in state.behaviours.Where(IsTrackingBehavior))
             {
-                policy.head = ReadTrackingField(behavior, "trackingHead", policy.head);
-                policy.leftHand = ReadTrackingField(behavior, "trackingLeftHand", policy.leftHand);
-                policy.rightHand = ReadTrackingField(behavior, "trackingRightHand", policy.rightHand);
-                policy.hip = ReadTrackingField(behavior, "trackingHip", policy.hip);
-                policy.leftFoot = ReadTrackingField(behavior, "trackingLeftFoot", policy.leftFoot);
-                policy.rightFoot = ReadTrackingField(behavior, "trackingRightFoot", policy.rightFoot);
-                policy.leftFingers = ReadTrackingField(behavior, "trackingLeftFingers", policy.leftFingers);
-                policy.rightFingers = ReadTrackingField(behavior, "trackingRightFingers", policy.rightFingers);
-                policy.eyes = ReadTrackingField(behavior, "trackingEyes", policy.eyes);
-                policy.mouth = ReadTrackingField(behavior, "trackingMouth", policy.mouth);
+                policy.head = MergeTrackingField(policy.head, behavior, "trackingHead");
+                policy.leftHand = MergeTrackingField(policy.leftHand, behavior, "trackingLeftHand");
+                policy.rightHand = MergeTrackingField(policy.rightHand, behavior, "trackingRightHand");
+                policy.hip = MergeTrackingField(policy.hip, behavior, "trackingHip");
+                policy.leftFoot = MergeTrackingField(policy.leftFoot, behavior, "trackingLeftFoot");
+                policy.rightFoot = MergeTrackingField(policy.rightFoot, behavior, "trackingRightFoot");
+                policy.leftFingers = MergeTrackingField(policy.leftFingers, behavior, "trackingLeftFingers");
+                policy.rightFingers = MergeTrackingField(policy.rightFingers, behavior, "trackingRightFingers");
+                policy.eyes = MergeTrackingField(policy.eyes, behavior, "trackingEyes");
+                policy.mouth = MergeTrackingField(policy.mouth, behavior, "trackingMouth");
             }
 
             return policy;
@@ -43,15 +43,15 @@ namespace Gokoukotori.PoseTune.Editor
             return behavior != null && behavior.GetType().Name.Contains("AnimatorTrackingControl");
         }
 
-        private static TrackingMode ReadTrackingField(
+        private static TrackingMode MergeTrackingField(
+            TrackingMode current,
             StateMachineBehaviour behavior,
-            string fieldName,
-            TrackingMode fallback)
+            string fieldName)
         {
             var field = behavior.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.Public);
             if (field == null)
             {
-                return fallback;
+                return current;
             }
 
             var value = field.GetValue(behavior)?.ToString();
@@ -62,7 +62,7 @@ namespace Gokoukotori.PoseTune.Editor
                 case "Animation":
                     return TrackingMode.Animation;
                 default:
-                    return TrackingMode.NoChange;
+                    return current;
             }
         }
     }

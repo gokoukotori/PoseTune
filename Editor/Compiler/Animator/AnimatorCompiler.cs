@@ -8,6 +8,7 @@ namespace Gokoukotori.PoseTune.Editor
 
         public AnimatorBuildResult Compile(PoseGraph graph, ParameterPlan parameters)
         {
+            graph.TrackingVotes = new TrackingVoteRegistry();
             var result = AnimatorControllerFactory.CreateBuildResult(graph, parameters);
             CreateActionPoseLayers(result, graph);
             FxAssistCompiler.Compile(result, graph);
@@ -18,7 +19,7 @@ namespace Gokoukotori.PoseTune.Editor
         private static void CreateActionPoseLayers(AnimatorBuildResult result, PoseGraph graph)
         {
             var controlsActionPlayable = PoseTuneCompilerRules.ControlsActionPlayable(graph.RootComponent);
-            var tracksGroupActivity = controlsActionPlayable || graph.HasPoseOptions;
+            const bool tracksGroupActivity = true;
             foreach (var group in PoseGraphBuildFilter.BuildableGroups(graph))
             {
                 foreach (var bucket in PoseTuneLayerNaming.LayerBuckets(group))
@@ -26,6 +27,8 @@ namespace Gokoukotori.PoseTune.Editor
                     CreateActionPoseLayer(result, graph, group, bucket.Poses, bucket.LayerName, bucket.BlendMode,
                         tracksGroupActivity, PoseTuneNames.GroupActiveParameter(group, bucket.BlendMode));
                 }
+
+                AddHigherPriorityAutoPreemptionTransitions(result.TargetController, graph, group);
             }
 
             if (controlsActionPlayable)
@@ -33,11 +36,12 @@ namespace Gokoukotori.PoseTune.Editor
                 ActionWeightLayerCompiler.Compile(result, graph);
             }
 
-            CompileTrackingResetLayer(result);
-            if (ParameterAllocator.NeedsTrackingContext(graph))
+            if (ParameterAllocator.NeedsTrackingArbiter(graph))
             {
-                PoseOptionsLayerCompiler.Compile(result, graph);
+                TrackingArbiterCompiler.Compile(result, graph);
             }
+
+            PoseOptionsLayerCompiler.Compile(result, graph);
         }
     }
 }

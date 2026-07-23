@@ -30,12 +30,12 @@ namespace Gokoukotori.PoseTune.Editor
                 {
                     if (GUILayout.Button("Merge 適用"))
                     {
-                        new PoseTunePresetApplier().Apply(root, preset, PoseTunePresetApplyMode.Merge);
+                        ApplyPosePreset(root, preset, PoseTunePresetApplyMode.Merge);
                     }
 
                     if (GUILayout.Button("Replace 適用"))
                     {
-                        new PoseTunePresetApplier().Apply(root, preset, PoseTunePresetApplyMode.Replace);
+                        ApplyPosePreset(root, preset, PoseTunePresetApplyMode.Replace);
                     }
                 }
             }
@@ -66,6 +66,49 @@ namespace Gokoukotori.PoseTune.Editor
                         }
                     }
                 }
+            }
+        }
+
+        private static void ApplyPosePreset(
+            PoseTuneRoot root,
+            PoseTunePreset preset,
+            PoseTunePresetApplyMode mode)
+        {
+            var applier = new PoseTunePresetApplier();
+            var plan = applier.CreatePlan(root, preset, mode);
+            if (!plan.IsValid)
+            {
+                foreach (var error in plan.Errors)
+                {
+                    PoseTuneLog.Error("Preset apply aborted: " + error, root);
+                }
+
+                EditorUtility.DisplayDialog(
+                    "PoseTune",
+                    "プリセットを適用できません。Console のエラーを確認してください。",
+                    "OK");
+                return;
+            }
+
+            if (mode == PoseTunePresetApplyMode.Replace &&
+                (plan.RemovedGroupCount > 0 || plan.RemovedPoseCount > 0 || plan.RemovedDependentComponentCount > 0) &&
+                !EditorUtility.DisplayDialog(
+                    "PoseTune Replace",
+                    $"プリセットにない Group {plan.RemovedGroupCount} 件、Pose {plan.RemovedPoseCount} 件を削除します。\n" +
+                    $"所有者がなくなる PoseCondition / PoseTrackingPolicy {plan.RemovedDependentComponentCount} 件も削除します。\n" +
+                    "GameObject とそれ以外の Component は保持されます。続行しますか？",
+                    "Replace",
+                    "キャンセル"))
+            {
+                return;
+            }
+
+            if (!applier.Commit(plan))
+            {
+                EditorUtility.DisplayDialog(
+                    "PoseTune",
+                    "プリセット適用中にエラーが発生したため、変更をロールバックしました。",
+                    "OK");
             }
         }
 

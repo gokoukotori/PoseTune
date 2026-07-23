@@ -134,6 +134,7 @@ namespace Gokoukotori.PoseTune.Editor
                 Motion = motion,
                 Clip = motion as AnimationClip,
                 BlendTree = motion as BlendTree,
+                PreviewImage = ObjectRef<Texture2D>(property, "previewImage"),
                 AdjustmentClip = ObjectRef<AnimationClip>(property, "adjustmentClip"),
                 StateType = StateType(property.FindPropertyRelative("stateType"))
             };

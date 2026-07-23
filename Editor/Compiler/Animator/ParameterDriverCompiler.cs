@@ -69,18 +69,53 @@ namespace Gokoukotori.PoseTune.Editor
             });
         }
 
-        public static void SetTrackingContext(AnimatorState state, int contextId)
+        public static void SetTrackingVote(AnimatorState state, PoseGroupDefinition group, int voteId)
         {
             var behavior = state.AddStateMachineBehaviour<VRCAvatarParameterDriver>();
             behavior.localOnly = false;
-            behavior.debugString = contextId > 0
-                ? "PoseTune Set Tracking Context"
-                : "PoseTune Reset Tracking Context";
+            behavior.debugString = voteId > 0
+                ? "PoseTune Set Tracking Vote"
+                : "PoseTune Clear Tracking Vote";
             behavior.parameters.Add(new VRC_AvatarParameterDriver.Parameter
             {
-                name = PoseTuneNames.TrackingContext,
+                name = PoseTuneNames.TrackingVoteParameter(group),
                 type = VRC_AvatarParameterDriver.ChangeType.Set,
-                value = contextId
+                value = voteId
+            });
+        }
+
+        public static void RequestTrackingReset(AnimatorState state, IEnumerable<TrackingPart> parts)
+        {
+            var targets = parts?.Distinct().ToList() ?? new List<TrackingPart>();
+            if (targets.Count == 0)
+            {
+                return;
+            }
+
+            var behavior = state.AddStateMachineBehaviour<VRCAvatarParameterDriver>();
+            behavior.localOnly = false;
+            behavior.debugString = "PoseTune Request Tracking Reset";
+            foreach (var part in targets)
+            {
+                behavior.parameters.Add(new VRC_AvatarParameterDriver.Parameter
+                {
+                    name = PoseTuneNames.TrackingResetParameter(part),
+                    type = VRC_AvatarParameterDriver.ChangeType.Set,
+                    value = 1f
+                });
+            }
+        }
+
+        public static void ClearTrackingReset(AnimatorState state, TrackingPart part)
+        {
+            var behavior = state.AddStateMachineBehaviour<VRCAvatarParameterDriver>();
+            behavior.localOnly = false;
+            behavior.debugString = "PoseTune Clear Tracking Reset";
+            behavior.parameters.Add(new VRC_AvatarParameterDriver.Parameter
+            {
+                name = PoseTuneNames.TrackingResetParameter(part),
+                type = VRC_AvatarParameterDriver.ChangeType.Set,
+                value = 0f
             });
         }
 

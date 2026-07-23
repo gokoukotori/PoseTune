@@ -75,6 +75,7 @@ namespace Gokoukotori.PoseTune.Editor
         public Motion Motion;
         public AnimationClip Clip;
         public BlendTree BlendTree;
+        public Texture2D PreviewImage;
         public AnimationClip AdjustmentClip;
         public string StateType = "";
     }

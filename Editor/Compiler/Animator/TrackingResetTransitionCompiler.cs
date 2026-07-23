@@ -10,23 +10,31 @@ namespace Gokoukotori.PoseTune.Editor
         private static AnimatorState CreateCleanupState(
             AnimatorBuildResult result,
             AnimatorControllerLayer layer,
+            PoseGraph graph,
             PoseGroupDefinition group,
+            PoseDefinition pose,
             string stateName,
             string clipName,
             Vector3 position,
-            bool addTrackingReset,
             bool controlsActionPlayable,
             string activeParameter,
             List<string> poseActiveParameters,
-            bool controlsTrackingContext)
+            TrackingPolicyData outgoingPolicy)
         {
             var state = layer.stateMachine.AddState(stateName, position);
             var hold = AnimatorLayerFactory.ResetHoldClip(clipName, CriticalStateHoldSeconds);
             state.motion = hold;
             result.GeneratedAssets.Add(hold);
-            if (addTrackingReset)
+            if (pose.EmitTrackingControl && ParameterAllocator.RequiresTrackingVote(graph, group))
             {
-                TrackingCompiler.AddTrackingBehavior(state, TrackingPolicyData.ResetToTracking());
+                ParameterDriverCompiler.SetTrackingVote(state, group, 0);
+            }
+
+            if (pose.GenerateResetOnExit)
+            {
+                ParameterDriverCompiler.RequestTrackingReset(
+                    state,
+                    TrackingArbiterCompiler.ControlledParts(outgoingPolicy));
             }
 
             PoseSpaceCompiler.AddExitPoseSpaceBehavior(state);
@@ -34,42 +42,19 @@ namespace Gokoukotori.PoseTune.Editor
             {
                 ParameterDriverCompiler.SetGroupActive(state, activeParameter, 0f);
             }
-            if (controlsTrackingContext)
-            {
-                ParameterDriverCompiler.SetTrackingContext(state, 0);
-            }
             ParameterDriverCompiler.ResetPoseActiveParameters(state, poseActiveParameters);
 
             return state;
         }
 
-        private static AnimatorState CleanupStateForPose(
-            PoseDefinition pose,
-            AnimatorState reset,
-            AnimatorState noResetCleanup)
-        {
-            return pose.GenerateResetOnExit || noResetCleanup == null ? reset : noResetCleanup;
-        }
-
-        private static void AddCleanupReturnTransitions(
+        private static void AddCleanupReturnTransition(
             AnimatorState idle,
-            AnimatorState reset,
-            AnimatorState noResetCleanup)
+            AnimatorState cleanup)
         {
-            var resetToIdle = reset.AddTransition(idle);
-            resetToIdle.hasExitTime = true;
-            resetToIdle.exitTime = 1f;
-            resetToIdle.duration = 0f;
-
-            if (noResetCleanup == null)
-            {
-                return;
-            }
-
-            var noResetToIdle = noResetCleanup.AddTransition(idle);
-            noResetToIdle.hasExitTime = true;
-            noResetToIdle.exitTime = 1f;
-            noResetToIdle.duration = 0f;
+            var toIdle = cleanup.AddTransition(idle);
+            toIdle.hasExitTime = true;
+            toIdle.exitTime = 1f;
+            toIdle.duration = 0f;
         }
     }
 }

@@ -32,16 +32,38 @@ namespace Gokoukotori.PoseTune.Editor
             var texture = RenderPose(pose, root, size) ?? CreateFallbackTexture(size, root);
             var path = ThumbnailAssetPath(pose, folder);
 
-            File.WriteAllBytes(path, texture.EncodeToPNG());
-            AssetDatabase.ImportAsset(path);
-            var imported = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
-            if (imported != null)
-            {
-                pose.customIcon = imported;
-                EditorUtility.SetDirty(pose);
-            }
+            return PersistThumbnail(pose, path, texture);
+        }
 
-            return imported != null ? imported : texture;
+        internal static Texture2D PersistThumbnail(PoseClip pose, string path, Texture2D texture)
+        {
+            var transferTemporaryToCaller = false;
+            try
+            {
+                File.WriteAllBytes(path, texture.EncodeToPNG());
+                AssetDatabase.ImportAsset(path);
+                var imported = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+                if (imported != null)
+                {
+                    if (pose != null)
+                    {
+                        pose.customIcon = imported;
+                        EditorUtility.SetDirty(pose);
+                    }
+
+                    return imported;
+                }
+
+                transferTemporaryToCaller = true;
+                return texture;
+            }
+            finally
+            {
+                if (!transferTemporaryToCaller && texture != null && !EditorUtility.IsPersistent(texture))
+                {
+                    Object.DestroyImmediate(texture);
+                }
+            }
         }
 
         public static string ThumbnailAssetPath(PoseClip pose, string folder)
@@ -66,6 +88,7 @@ namespace Gokoukotori.PoseTune.Editor
             Camera camera = null;
             Light light = null;
             RenderTexture renderTexture = null;
+            var ownsAnimationMode = false;
             try
             {
                 clone = Object.Instantiate(avatar.gameObject);
@@ -82,7 +105,12 @@ namespace Gokoukotori.PoseTune.Editor
                 var samplingStarted = false;
                 try
                 {
-                    AnimationMode.StartAnimationMode();
+                    if (!AnimationMode.InAnimationMode())
+                    {
+                        AnimationMode.StartAnimationMode();
+                        ownsAnimationMode = true;
+                    }
+
                     AnimationMode.BeginSampling();
                     samplingStarted = true;
                     AnimationMode.SampleAnimationClip(clone, sampleClip, 0f);
@@ -140,13 +168,18 @@ namespace Gokoukotori.PoseTune.Editor
             }
             finally
             {
-                if (AnimationMode.InAnimationMode())
+                if (ownsAnimationMode && AnimationMode.InAnimationMode())
                 {
                     AnimationMode.StopAnimationMode();
                 }
 
                 if (renderTexture != null)
                 {
+                    if (camera != null && camera.targetTexture == renderTexture)
+                    {
+                        camera.targetTexture = null;
+                    }
+
                     renderTexture.Release();
                     Object.DestroyImmediate(renderTexture);
                 }

@@ -1,3 +1,4 @@
+using System;
 using Gokoukotori.PoseTune;
 using Gokoukotori.PoseTune.Editor;
 using UnityEditor.Animations;
@@ -102,9 +103,11 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Conditions
 
         public static bool Matches(ParameterConditionData condition, PoseTuneParameterSnapshot snapshot)
         {
-            if (condition == null || string.IsNullOrWhiteSpace(condition.parameter))
+            if (condition == null ||
+                string.IsNullOrWhiteSpace(condition.parameter) ||
+                !PoseTuneConditionRule.IsValid(condition))
             {
-                return true;
+                return false;
             }
 
             snapshot ??= new PoseTuneParameterSnapshot();
@@ -124,17 +127,21 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Conditions
                     return snapshot.Bool(condition.parameter);
                 case ConditionOperator.IfNot:
                     return !snapshot.Bool(condition.parameter);
-                default:
+                case ConditionOperator.Equals:
                     return Approximately(Value(condition, snapshot), Threshold(condition));
+                default:
+                    return false;
             }
         }
 
         public static void AddAnimatorCondition(AnimatorStateTransition transition, ParameterConditionData condition)
         {
-            if (transition == null || condition == null || string.IsNullOrWhiteSpace(condition.parameter))
+            if (transition == null)
             {
-                return;
+                throw new ArgumentNullException(nameof(transition));
             }
+
+            PoseTuneConditionRule.EnsureCompilable(condition);
 
             switch (condition.op)
             {

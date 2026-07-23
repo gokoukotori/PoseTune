@@ -1,6 +1,7 @@
 using System.Linq;
 using Gokoukotori.PoseTune;
 using Gokoukotori.PoseTune.Editor;
+using UnityEngine;
 
 namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
 {
@@ -10,16 +11,45 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
         {
             if (graph.RootTrackingPolicyCount > 1)
             {
-                report.Warning(PoseTuneDiagnostics.DuplicateRootTrackingPolicies.Code, "root 直下に PoseTrackingPolicy が複数あります。最初の policy だけを fallback として使用します。", graph.RootComponent);
+                report.Error(PoseTuneDiagnostics.DuplicateRootTrackingPolicies.Code,
+                    "root 直下に PoseTrackingPolicy が複数あります。所有者ごとに1つだけ残してください。",
+                    graph.RootComponent);
+            }
+
+            foreach (var group in graph.Groups.Where(group => group.Source != null))
+            {
+                ValidateDuplicateOwner(group.Source, report, "PoseGroup");
+            }
+
+            foreach (var pose in graph.Poses.Where(pose => pose.Source != null))
+            {
+                ValidateDuplicateOwner(pose.Source, report, "PoseClip");
+                if (pose.Source.GetComponent<PoseTrackingPolicy>() == null &&
+                    TrackingPolicyUtility.WasCustomizedFromPoseDefault(pose.Source.tracking))
+                {
+                    report.Warning(PoseTuneDiagnostics.LegacyInlineTrackingPolicy.Code,
+                        "旧形式の PoseClip.tracking を読み取り互換で使用しています。PoseTrackingPolicy component へ変換してください。",
+                        pose.Source);
+                }
             }
         }
 
         public static void ValidatePose(PoseGraph graph, PoseDefinition pose, ValidationReport report)
         {
-            if (!pose.GenerateResetOnExit && graph.RootComponent.disableWhenFullBodyTracking)
+            // generateResetOnExit=false is a supported sticky-policy contract. It must not
+            // be reported as an FBT warning merely because no reset request is generated.
+        }
+
+        private static void ValidateDuplicateOwner(Component owner, ValidationReport report, string ownerName)
+        {
+            if (owner.GetComponents<PoseTrackingPolicy>().Length <= 1)
             {
-                report.Warning(PoseTuneDiagnostics.TrackingResetDisabledForFbt.Code, "tracking reset が無効なため FBT 復帰挙動を確認してください。", pose.Source);
+                return;
             }
+
+            report.Error(PoseTuneDiagnostics.DuplicateRootTrackingPolicies.Code,
+                $"{ownerName} に PoseTrackingPolicy が複数あります。所有者ごとに1つだけ残してください。",
+                owner);
         }
 
         public static void ValidateFbtCompatibility(PoseGraph graph, ValidationReport report)

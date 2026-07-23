@@ -33,6 +33,8 @@ namespace Gokoukotori.PoseTune
         public AutoContextProfile autoContextProfile = AutoContextProfile.Standard;
         [InspectorName("トラッキング制御を生成")]
         public bool emitTrackingControl = true;
+        [InspectorName("トラッキングポリシー")]
+        public PoseTrackingPolicyPresetData trackingPolicy = new();
         [InspectorName("アイコン生成を抑止")]
         public bool suppressIconGeneration;
         [InspectorName("グループ条件")]

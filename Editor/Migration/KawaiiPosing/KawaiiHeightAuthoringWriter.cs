@@ -1,3 +1,4 @@
+using System.Linq;
 using Gokoukotori.PoseTune;
 using nadena.dev.modular_avatar.core;
 using UnityEditor;
@@ -18,18 +19,22 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
-            var height = root.GetComponentInChildren<PoseHeightAdjust>(true);
+            var height = root.GetComponentsInChildren<PoseHeightAdjust>(true)
+                .FirstOrDefault(candidate => candidate.GetComponentInParent<PoseTuneRoot>(true) == root);
             if (height == null)
             {
-                height = KawaiiAuthoringObjectUtility.EnsureChild(
+                var heightObject = KawaiiAuthoringObjectUtility.EnsureChild(
                     root.transform,
                     "高さ調整",
                     report,
                     "Height",
-                    undoName).AddComponent<PoseHeightAdjust>();
+                    undoName);
+                height = Undo.AddComponent<PoseHeightAdjust>(heightObject);
             }
 
             Undo.RecordObject(height, undoName);
+            ((Behaviour)height).enabled = true;
+            height.includeInBuild = true;
             height.parameterName = "FootHeight";
             height.saved = true;
             height.synced = false;
@@ -60,6 +65,7 @@ namespace Gokoukotori.PoseTune.Editor
 
             report.FootHeightEnabledPoseCount = report.CreatedPoseCount;
             EditorUtility.SetDirty(height);
+            KawaiiAuthoringObjectUtility.RecordPrefabModifications(height);
         }
 
         private static bool TryResolveSourceParameterMetadata(

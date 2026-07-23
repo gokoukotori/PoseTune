@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Gokoukotori.PoseTune;
@@ -13,64 +14,443 @@ namespace Gokoukotori.PoseTune.Editor
         Replace
     }
 
+    internal sealed class PoseTunePresetApplyPlan
+    {
+        internal readonly PoseTuneRoot Root;
+        internal readonly PoseTunePreset Preset;
+        internal readonly PoseTunePresetApplyMode Mode;
+        internal readonly List<PoseTunePresetGroupOperation> GroupOperations = new();
+        internal readonly List<PoseClip> PosesToRemove = new();
+        internal readonly List<PoseGroup> GroupsToRemove = new();
+        internal readonly List<Component> DependentComponentsToRemove = new();
+        internal readonly List<string> Errors = new();
+
+        internal PoseTunePresetApplyPlan(
+            PoseTuneRoot root,
+            PoseTunePreset preset,
+            PoseTunePresetApplyMode mode)
+        {
+            Root = root;
+            Preset = preset;
+            Mode = mode;
+        }
+
+        internal bool IsValid => Errors.Count == 0;
+        internal int AddedGroupCount => GroupOperations.Count(operation => operation.Existing == null);
+        internal int UpdatedGroupCount => GroupOperations.Count(operation => operation.Existing != null);
+        internal int RemovedGroupCount => GroupsToRemove.Count;
+        internal int AddedPoseCount => GroupOperations.Sum(operation => operation.Poses.Count(pose => pose.Existing == null));
+        internal int UpdatedPoseCount => GroupOperations.Sum(operation => operation.Poses.Count(pose => pose.Existing != null));
+        internal int RemovedPoseCount => PosesToRemove.Count;
+        internal int RemovedDependentComponentCount => DependentComponentsToRemove.Count;
+    }
+
+    internal sealed class PoseTunePresetGroupOperation
+    {
+        internal readonly PoseGroupPresetData Data;
+        internal readonly PoseGroup Existing;
+        internal readonly List<PoseTunePresetPoseOperation> Poses = new();
+
+        internal PoseTunePresetGroupOperation(PoseGroupPresetData data, PoseGroup existing)
+        {
+            Data = data;
+            Existing = existing;
+        }
+    }
+
+    internal sealed class PoseTunePresetPoseOperation
+    {
+        internal readonly PoseClipPresetData Data;
+        internal readonly PoseClip Existing;
+
+        internal PoseTunePresetPoseOperation(PoseClipPresetData data, PoseClip existing)
+        {
+            Data = data;
+            Existing = existing;
+        }
+    }
+
     public sealed class PoseTunePresetApplier
     {
+        private const string UndoName = "PoseTune プリセットを適用";
+        private const string PoseGroupsRootName = "ポーズグループ";
+        private const string LegacyPoseGroupsRootName = "Pose Groups";
+
         public PoseTunePreset Capture(PoseTuneRoot root)
         {
             var preset = ScriptableObject.CreateInstance<PoseTunePreset>();
+            preset.schemaVersion = PoseTunePreset.CurrentSchemaVersion;
             if (root == null)
             {
                 return preset;
             }
 
             preset.presetName = root.displayName;
-            var menu = root.GetComponentInChildren<PoseMenu>(true);
+            preset.rootTrackingPolicy = PoseTunePresetMapper.CaptureTrackingPolicy(RootPolicies(root).FirstOrDefault());
+            var menu = OwnedComponents<PoseMenu>(root).FirstOrDefault();
             if (menu != null)
             {
                 PoseTunePresetSettingsMapper.CaptureMenu(preset.menu, menu);
             }
 
-            var height = root.GetComponentInChildren<PoseHeightAdjust>(true);
+            var height = OwnedComponents<PoseHeightAdjust>(root).FirstOrDefault();
             if (height != null)
             {
                 PoseTunePresetSettingsMapper.CaptureHeight(preset.height, height);
             }
 
-            preset.groups = root.GetComponentsInChildren<PoseGroup>(true)
+            preset.groups = OwnedComponents<PoseGroup>(root)
                 .Where(PoseTuneAuthoringInclusion.Includes)
                 .OrderBy(group => group.menuOrder)
-                .ThenBy(group => group.displayName)
-                .Select(PoseTunePresetMapper.CaptureGroup)
+                .ThenBy(group => group.displayName, StringComparer.Ordinal)
+                .Select(group => PoseTunePresetMapper.CaptureGroup(root, group))
                 .ToList();
             return preset;
         }
 
         public void Apply(PoseTuneRoot root, PoseTunePreset preset, PoseTunePresetApplyMode mode)
         {
-            if (root == null || preset == null)
+            var plan = CreatePlan(root, preset, mode);
+            if (!plan.IsValid)
+            {
+                foreach (var error in plan.Errors)
+                {
+                    Debug.LogError("PoseTune preset apply aborted: " + error, root);
+                }
+
+                return;
+            }
+
+            Commit(plan);
+        }
+
+        internal PoseTunePresetApplyPlan CreatePlan(
+            PoseTuneRoot root,
+            PoseTunePreset preset,
+            PoseTunePresetApplyMode mode)
+        {
+            var plan = new PoseTunePresetApplyPlan(root, preset, mode);
+            if (root == null)
+            {
+                plan.Errors.Add("PoseTuneRoot is null.");
+                return plan;
+            }
+
+            if (preset == null)
+            {
+                plan.Errors.Add("PoseTunePreset is null.");
+                return plan;
+            }
+
+            if (EditorUtility.IsPersistent(root) || PrefabUtility.IsPartOfImmutablePrefab(root))
+            {
+                plan.Errors.Add("The target root is not editable in the current Scene or Prefab Stage.");
+                return plan;
+            }
+
+            if (preset.groups == null)
+            {
+                plan.Errors.Add("Preset groups is null. A malformed preset is not interpreted as an empty replacement.");
+                return plan;
+            }
+
+            var currentGroups = OwnedComponents<PoseGroup>(root).ToList();
+            var currentPoses = OwnedComponents<PoseClip>(root).ToList();
+            ValidateStableGuidUniqueness(currentGroups.Cast<Object>(), "current group", plan.Errors);
+            ValidateStableGuidUniqueness(currentPoses.Cast<Object>(), "current pose", plan.Errors);
+            ValidatePresetData(preset, plan.Errors);
+            if (!plan.IsValid)
+            {
+                return plan;
+            }
+
+            var usedGroups = new HashSet<PoseGroup>();
+            var usedPoses = new HashSet<PoseClip>();
+            var reservedGroupGuids = preset.groups
+                .Where(group => group != null)
+                .Select(group => NormalizeGuid(group.groupStableGuid))
+                .Where(guid => !string.IsNullOrEmpty(guid))
+                .ToHashSet(StringComparer.Ordinal);
+            var reservedPoseGuids = preset.groups
+                .Where(group => group?.poses != null)
+                .SelectMany(group => group.poses)
+                .Where(pose => pose != null)
+                .Select(pose => NormalizeGuid(pose.poseStableGuid))
+                .Where(guid => !string.IsNullOrEmpty(guid))
+                .ToHashSet(StringComparer.Ordinal);
+            for (var groupIndex = 0; groupIndex < preset.groups.Count; groupIndex++)
+            {
+                var groupData = preset.groups[groupIndex];
+                if (groupData == null)
+                {
+                    continue;
+                }
+
+                var group = MatchGroup(
+                    currentGroups,
+                    usedGroups,
+                    reservedGroupGuids,
+                    groupData,
+                    groupIndex,
+                    plan.Errors);
+                if (plan.Errors.Count > 0)
+                {
+                    continue;
+                }
+
+                if (group != null)
+                {
+                    usedGroups.Add(group);
+                }
+
+                var groupOperation = new PoseTunePresetGroupOperation(groupData, group);
+                plan.GroupOperations.Add(groupOperation);
+                var groupPoses = group != null
+                    ? PoseGroupOwnership.OwnedClips(group)
+                        .Where(pose => NearestRoot(pose) == root)
+                        .ToList()
+                    : new List<PoseClip>();
+                var usedGroupPoses = new HashSet<PoseClip>();
+                for (var poseIndex = 0; poseIndex < groupData.poses.Count; poseIndex++)
+                {
+                    var poseData = groupData.poses[poseIndex];
+                    if (poseData == null)
+                    {
+                        continue;
+                    }
+
+                    var poseStableGuid = NormalizeGuid(poseData.poseStableGuid);
+                    if (!string.IsNullOrEmpty(poseStableGuid))
+                    {
+                        var crossGroupMatch = currentPoses.FirstOrDefault(pose =>
+                            ReadStableGuid(pose) == poseStableGuid &&
+                            (group == null || !PoseGroupOwnership.IsOwnedBy(group, pose)));
+                        if (crossGroupMatch != null)
+                        {
+                            plan.Errors.Add(
+                                $"Pose stable GUID '{poseStableGuid}' belongs to another group. " +
+                                "Cross-group preset moves must be resolved explicitly before apply.");
+                            continue;
+                        }
+                    }
+
+                    var pose = MatchPose(
+                        groupPoses,
+                        usedGroupPoses,
+                        reservedPoseGuids,
+                        poseData,
+                        groupIndex,
+                        poseIndex,
+                        plan.Errors);
+                    if (plan.Errors.Count > 0)
+                    {
+                        continue;
+                    }
+
+                    if (pose != null)
+                    {
+                        usedGroupPoses.Add(pose);
+                        usedPoses.Add(pose);
+                    }
+
+                    groupOperation.Poses.Add(new PoseTunePresetPoseOperation(poseData, pose));
+                }
+            }
+
+            if (!plan.IsValid)
+            {
+                plan.GroupOperations.Clear();
+                return plan;
+            }
+
+            if (mode == PoseTunePresetApplyMode.Replace)
+            {
+                plan.PosesToRemove.AddRange(currentPoses.Where(pose => !usedPoses.Contains(pose)));
+                plan.GroupsToRemove.AddRange(currentGroups.Where(group => !usedGroups.Contains(group)));
+                CollectOrphanedDependentComponents(plan);
+            }
+
+            return plan;
+        }
+
+        internal bool Commit(PoseTunePresetApplyPlan plan)
+        {
+            if (plan == null || !plan.IsValid || plan.Root == null || plan.Preset == null)
+            {
+                return false;
+            }
+
+            Undo.IncrementCurrentGroup();
+            var undoGroup = Undo.GetCurrentGroup();
+            Undo.SetCurrentGroupName(UndoName);
+            try
+            {
+                ApplyMenu(plan.Root, plan.Preset.menu);
+                ApplyHeight(plan.Root, plan.Preset.height);
+                ApplyRootTrackingPolicy(plan);
+
+                foreach (var groupOperation in plan.GroupOperations)
+                {
+                    var group = groupOperation.Existing ?? CreatePoseGroup(plan.Root, groupOperation.Data);
+                    Undo.RecordObject(group, UndoName);
+                    PoseTunePresetMapper.ApplyGroupData(plan.Root, group, groupOperation.Data);
+                    ApplyGroupTrackingPolicy(plan, group, groupOperation.Data);
+                    AssertStableGuidApplied(group, groupOperation.Data.groupStableGuid, "group");
+                    RecordPrefabModifications(group);
+
+                    foreach (var poseOperation in groupOperation.Poses)
+                    {
+                        var pose = poseOperation.Existing ?? CreatePoseClip(group, poseOperation.Data);
+                        Undo.RecordObject(pose, UndoName);
+                        PoseTunePresetMapper.ApplyPoseData(plan.Root, pose, poseOperation.Data);
+                        ApplyPoseTrackingPolicy(plan, pose, poseOperation.Data);
+                        AssertStableGuidApplied(pose, poseOperation.Data.poseStableGuid, "pose");
+                        RecordPrefabModifications(pose);
+                    }
+                }
+
+                foreach (var dependent in plan.DependentComponentsToRemove.Where(component => component != null))
+                {
+                    Undo.DestroyObjectImmediate(dependent);
+                }
+
+                foreach (var pose in plan.PosesToRemove.Where(pose => pose != null))
+                {
+                    Undo.DestroyObjectImmediate(pose);
+                }
+
+                foreach (var group in plan.GroupsToRemove.Where(group => group != null))
+                {
+                    Undo.DestroyObjectImmediate(group);
+                }
+
+                Undo.CollapseUndoOperations(undoGroup);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Undo.RevertAllDownToGroup(undoGroup);
+                Debug.LogException(exception, plan.Root);
+                return false;
+            }
+        }
+
+        private static void ApplyRootTrackingPolicy(PoseTunePresetApplyPlan plan)
+        {
+            var data = plan.Preset.schemaVersion >= PoseTunePreset.CurrentSchemaVersion
+                ? plan.Preset.rootTrackingPolicy
+                : null;
+            ApplyTrackingPolicyComponents(
+                plan.Root.gameObject,
+                RootPolicies(plan.Root),
+                data,
+                plan.Mode);
+        }
+
+        private static void ApplyGroupTrackingPolicy(
+            PoseTunePresetApplyPlan plan,
+            PoseGroup group,
+            PoseGroupPresetData data)
+        {
+            var policyData = plan.Preset.schemaVersion >= PoseTunePreset.CurrentSchemaVersion
+                ? data.trackingPolicy
+                : null;
+            ApplyTrackingPolicyComponents(
+                group.gameObject,
+                group.GetComponents<PoseTrackingPolicy>(),
+                policyData,
+                plan.Mode);
+        }
+
+        private static void ApplyPoseTrackingPolicy(
+            PoseTunePresetApplyPlan plan,
+            PoseClip pose,
+            PoseClipPresetData data)
+        {
+            if (plan.Preset.schemaVersion >= PoseTunePreset.CurrentSchemaVersion)
+            {
+                ApplyTrackingPolicyComponents(
+                    pose.gameObject,
+                    pose.GetComponents<PoseTrackingPolicy>(),
+                    data.trackingPolicy,
+                    plan.Mode);
+                if ((data.trackingPolicy != null && data.trackingPolicy.present) ||
+                    plan.Mode == PoseTunePresetApplyMode.Replace)
+                {
+                    pose.tracking = TrackingPolicyData.DefaultForPose();
+                }
+                return;
+            }
+
+            if (plan.Mode != PoseTunePresetApplyMode.Replace)
+            {
+                pose.tracking = TrackingPolicyUtility.Copy(data.tracking);
+                return;
+            }
+
+            var hasCustomInlineTracking = TrackingPolicyUtility.WasCustomizedFromPoseDefault(data.tracking);
+            var legacyPolicy = hasCustomInlineTracking
+                ? new PoseTrackingPolicyPresetData
+                {
+                    present = true,
+                    tracking = TrackingPolicyUtility.Copy(data.tracking),
+                    useFullBodyTrackingOverride = false,
+                    fullBodyTracking = TrackingPolicyData.DefaultForPose(),
+                    generateResetOnExit = true
+                }
+                : null;
+            ApplyTrackingPolicyComponents(
+                pose.gameObject,
+                pose.GetComponents<PoseTrackingPolicy>(),
+                legacyPolicy,
+                PoseTunePresetApplyMode.Replace);
+            pose.tracking = TrackingPolicyData.DefaultForPose();
+        }
+
+        private static void ApplyTrackingPolicyComponents(
+            GameObject addTarget,
+            IEnumerable<PoseTrackingPolicy> existingPolicies,
+            PoseTrackingPolicyPresetData data,
+            PoseTunePresetApplyMode mode)
+        {
+            var policies = (existingPolicies ?? Enumerable.Empty<PoseTrackingPolicy>())
+                .Where(policy => policy != null)
+                .ToList();
+            var shouldApply = data != null && data.present;
+            if (!shouldApply)
+            {
+                if (mode == PoseTunePresetApplyMode.Replace)
+                {
+                    foreach (var policy in policies)
+                    {
+                        Undo.DestroyObjectImmediate(policy);
+                    }
+                }
+
+                return;
+            }
+
+            var primary = policies.FirstOrDefault();
+            if (primary == null)
+            {
+                primary = Undo.AddComponent<PoseTrackingPolicy>(addTarget);
+            }
+
+            if (!PoseTunePresetMapper.TrackingPolicyMatches(primary, data))
+            {
+                Undo.RecordObject(primary, UndoName);
+                PoseTunePresetMapper.ApplyTrackingPolicyData(primary, data);
+                RecordPrefabModifications(primary);
+            }
+
+            if (mode != PoseTunePresetApplyMode.Replace)
             {
                 return;
             }
 
-            ApplyMenu(root, preset.menu);
-            ApplyHeight(root, preset.height);
-
-            var usedGroups = new HashSet<PoseGroup>();
-            foreach (var groupData in preset.groups ?? Enumerable.Empty<PoseGroupPresetData>())
+            foreach (var duplicate in policies.Skip(1))
             {
-                var group = FindMatchingGroup(root, groupData, usedGroups) ?? PoseTuneAuthoringFactory.AddPoseGroup(root, groupData.kind);
-                usedGroups.Add(group);
-                PoseTunePresetMapper.ApplyGroupData(root, group, groupData);
-                if (mode == PoseTunePresetApplyMode.Replace)
-                {
-                    foreach (var pose in group.GetComponentsInChildren<PoseClip>(true).ToArray())
-                    {
-                        Object.DestroyImmediate(pose.gameObject);
-                    }
-                }
-
-                ApplyPoses(root, group, groupData, mode);
-                EditorUtility.SetDirty(group);
+                Undo.DestroyObjectImmediate(duplicate);
             }
         }
 
@@ -91,17 +471,20 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
-            var menu = root.GetComponentInChildren<PoseMenu>(true);
+            var menu = OwnedComponents<PoseMenu>(root).FirstOrDefault();
             if (menu == null)
             {
-                var go = new GameObject("メニュー");
-                Undo.RegisterCreatedObjectUndo(go, "PoseTune メニューを追加");
-                go.transform.SetParent(root.transform, false);
-                menu = go.AddComponent<PoseMenu>();
+                var go = CreateChild(root.transform, "メニュー");
+                menu = Undo.AddComponent<PoseMenu>(go);
+            }
+            else
+            {
+                Undo.RecordObject(menu, UndoName);
             }
 
             PoseTunePresetSettingsMapper.ApplyMenu(menu, data);
-            EditorUtility.SetDirty(menu);
+            ((Behaviour)menu).enabled = true;
+            RecordPrefabModifications(menu);
         }
 
         private static void ApplyHeight(PoseTuneRoot root, PoseHeightPresetData data)
@@ -111,60 +494,376 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
-            var height = root.GetComponentInChildren<PoseHeightAdjust>(true);
+            var height = OwnedComponents<PoseHeightAdjust>(root).FirstOrDefault();
             if (height == null)
             {
-                var go = new GameObject("高さ調整");
-                Undo.RegisterCreatedObjectUndo(go, "PoseTune 高さ調整を追加");
-                go.transform.SetParent(root.transform, false);
-                height = go.AddComponent<PoseHeightAdjust>();
+                var go = CreateChild(root.transform, "高さ調整");
+                height = Undo.AddComponent<PoseHeightAdjust>(go);
+            }
+            else
+            {
+                Undo.RecordObject(height, UndoName);
             }
 
             PoseTunePresetSettingsMapper.ApplyHeight(height, data);
-            EditorUtility.SetDirty(height);
+            ((Behaviour)height).enabled = true;
+            RecordPrefabModifications(height);
         }
 
-        private static PoseGroup FindMatchingGroup(
-            PoseTuneRoot root,
+        private static PoseGroup CreatePoseGroup(PoseTuneRoot root, PoseGroupPresetData data)
+        {
+            var displayName = string.IsNullOrWhiteSpace(data.displayName)
+                ? PoseTuneTemplateFactory.DefaultDisplayName(data.kind)
+                : data.displayName.Trim();
+            var go = CreateChild(FindPoseGroupsRoot(root), displayName);
+            return Undo.AddComponent<PoseGroup>(go);
+        }
+
+        private static PoseClip CreatePoseClip(PoseGroup group, PoseClipPresetData data)
+        {
+            var name = !string.IsNullOrWhiteSpace(data.displayName)
+                ? data.displayName.Trim()
+                : data.clip != null
+                    ? data.clip.name
+                    : "新規ポーズ";
+            var go = CreateChild(group.transform, name);
+            return Undo.AddComponent<PoseClip>(go);
+        }
+
+        private static GameObject CreateChild(Transform parent, string name)
+        {
+            var go = new GameObject(name);
+            Undo.RegisterCreatedObjectUndo(go, UndoName);
+            Undo.SetTransformParent(go.transform, parent, UndoName);
+            return go;
+        }
+
+        private static Transform FindPoseGroupsRoot(PoseTuneRoot root)
+        {
+            return root.GetComponentsInChildren<Transform>(true)
+                       .FirstOrDefault(transform =>
+                           NearestRoot(transform) == root &&
+                           (transform.name == PoseGroupsRootName || transform.name == LegacyPoseGroupsRootName))
+                   ?? root.transform;
+        }
+
+        private static PoseGroup MatchGroup(
+            IReadOnlyList<PoseGroup> groups,
+            ISet<PoseGroup> used,
+            ISet<string> reservedStableGuids,
             PoseGroupPresetData data,
-            HashSet<PoseGroup> usedGroups)
+            int groupIndex,
+            ICollection<string> errors)
         {
-            var groups = root.GetComponentsInChildren<PoseGroup>(true)
-                .Where(group => !usedGroups.Contains(group))
+            var available = groups.Where(group => !used.Contains(group)).ToList();
+            var stableGuid = NormalizeGuid(data.groupStableGuid);
+            if (!string.IsNullOrEmpty(stableGuid))
+            {
+                return UniqueOrError(
+                    available.Where(group => ReadStableGuid(group) == stableGuid).ToList(),
+                    $"group[{groupIndex}] stable GUID '{stableGuid}'",
+                    errors);
+            }
+
+            available = available
+                .Where(group => !reservedStableGuids.Contains(ReadStableGuid(group)))
                 .ToList();
-            return groups.FirstOrDefault(group => !string.IsNullOrWhiteSpace(data.groupStableGuid) &&
-                                                  group.StableGuid == data.groupStableGuid)
-                   ?? groups.FirstOrDefault(group => group.kind == data.kind &&
-                                                  !string.IsNullOrWhiteSpace(group.parameterName) &&
-                                                  group.parameterName == data.parameterName)
-                   ?? groups.FirstOrDefault(group => group.kind == data.kind && group.displayName == data.displayName)
-                   ?? groups.FirstOrDefault(group => group.kind == data.kind);
+
+            if (!string.IsNullOrWhiteSpace(data.parameterName))
+            {
+                var parameterMatches = available.Where(group =>
+                        group.kind == data.kind &&
+                        string.Equals(group.parameterName, data.parameterName, StringComparison.Ordinal))
+                    .ToList();
+                if (parameterMatches.Count > 0)
+                {
+                    return UniqueOrError(parameterMatches, $"group[{groupIndex}] kind/parameter fallback", errors);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(data.displayName))
+            {
+                var displayMatches = available.Where(group =>
+                        group.kind == data.kind &&
+                        string.Equals(group.displayName, data.displayName, StringComparison.Ordinal))
+                    .ToList();
+                if (displayMatches.Count > 0)
+                {
+                    return UniqueOrError(displayMatches, $"group[{groupIndex}] kind/display-name fallback", errors);
+                }
+            }
+
+            var kindMatches = available.Where(group => group.kind == data.kind).ToList();
+            return kindMatches.Count > 0
+                ? UniqueOrError(kindMatches, $"group[{groupIndex}] kind fallback", errors)
+                : null;
         }
 
-        private static void ApplyPoses(PoseTuneRoot root, PoseGroup group, PoseGroupPresetData groupData, PoseTunePresetApplyMode mode)
+        private static PoseClip MatchPose(
+            IReadOnlyList<PoseClip> poses,
+            ISet<PoseClip> used,
+            ISet<string> reservedStableGuids,
+            PoseClipPresetData data,
+            int groupIndex,
+            int poseIndex,
+            ICollection<string> errors)
         {
-            var usedPoses = new HashSet<PoseClip>();
-            foreach (var poseData in groupData.poses ?? Enumerable.Empty<PoseClipPresetData>())
+            var available = poses.Where(pose => !used.Contains(pose)).ToList();
+            var stableGuid = NormalizeGuid(data.poseStableGuid);
+            if (!string.IsNullOrEmpty(stableGuid))
             {
-                var pose = mode == PoseTunePresetApplyMode.Merge
-                    ? FindMatchingPose(group, poseData, usedPoses)
-                    : null;
-                pose ??= PoseTuneAuthoringFactory.AddPoseClip(group, poseData.clip);
-                usedPoses.Add(pose);
-                PoseTunePresetMapper.ApplyPoseData(root, pose, poseData);
-                EditorUtility.SetDirty(pose);
+                return UniqueOrError(
+                    available.Where(pose => ReadStableGuid(pose) == stableGuid).ToList(),
+                    $"group[{groupIndex}].pose[{poseIndex}] stable GUID '{stableGuid}'",
+                    errors);
+            }
+
+            available = available
+                .Where(pose => !reservedStableGuids.Contains(ReadStableGuid(pose)))
+                .ToList();
+
+            if (data.clip != null)
+            {
+                var clipMatches = available.Where(pose => ClipMatches(pose.clip, data.clip)).ToList();
+                if (clipMatches.Count > 0)
+                {
+                    return UniqueOrError(clipMatches, $"group[{groupIndex}].pose[{poseIndex}] clip fallback", errors);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(data.displayName))
+            {
+                var displayMatches = available.Where(pose =>
+                        string.Equals(pose.displayName, data.displayName, StringComparison.Ordinal))
+                    .ToList();
+                if (displayMatches.Count > 0)
+                {
+                    return UniqueOrError(displayMatches, $"group[{groupIndex}].pose[{poseIndex}] display-name fallback", errors);
+                }
+            }
+
+            return null;
+        }
+
+        private static T UniqueOrError<T>(
+            IReadOnlyList<T> matches,
+            string description,
+            ICollection<string> errors)
+            where T : Object
+        {
+            if (matches.Count <= 1)
+            {
+                return matches.Count == 1 ? matches[0] : null;
+            }
+
+            errors.Add($"Ambiguous preset match for {description}: {matches.Count} candidates.");
+            return null;
+        }
+
+        private static void ValidatePresetData(PoseTunePreset preset, ICollection<string> errors)
+        {
+            var groupGuids = new Dictionary<string, int>(StringComparer.Ordinal);
+            var poseGuids = new Dictionary<string, string>(StringComparer.Ordinal);
+            for (var groupIndex = 0; groupIndex < preset.groups.Count; groupIndex++)
+            {
+                var group = preset.groups[groupIndex];
+                if (group == null)
+                {
+                    errors.Add($"Preset group[{groupIndex}] is null.");
+                    continue;
+                }
+
+                ValidateGuid(group.groupStableGuid, $"Preset group[{groupIndex}]", errors);
+                AddUniquePresetGuid(groupGuids, NormalizeGuid(group.groupStableGuid), groupIndex, "group", errors);
+                if (group.poses == null)
+                {
+                    errors.Add($"Preset group[{groupIndex}].poses is null.");
+                    continue;
+                }
+
+                for (var poseIndex = 0; poseIndex < group.poses.Count; poseIndex++)
+                {
+                    var pose = group.poses[poseIndex];
+                    if (pose == null)
+                    {
+                        errors.Add($"Preset group[{groupIndex}].pose[{poseIndex}] is null.");
+                        continue;
+                    }
+
+                    var guid = NormalizeGuid(pose.poseStableGuid);
+                    ValidateGuid(
+                        pose.poseStableGuid,
+                        $"Preset group[{groupIndex}].pose[{poseIndex}]",
+                        errors);
+                    if (string.IsNullOrEmpty(guid))
+                    {
+                        continue;
+                    }
+
+                    var location = $"group[{groupIndex}].pose[{poseIndex}]";
+                    if (poseGuids.TryGetValue(guid, out var previous))
+                    {
+                        errors.Add($"Duplicate preset pose stable GUID '{guid}' at {previous} and {location}.");
+                    }
+                    else
+                    {
+                        poseGuids.Add(guid, location);
+                    }
+                }
             }
         }
 
-        private static PoseClip FindMatchingPose(PoseGroup group, PoseClipPresetData data, HashSet<PoseClip> usedPoses)
+        private static void CollectOrphanedDependentComponents(PoseTunePresetApplyPlan plan)
         {
-            var poses = group.GetComponentsInChildren<PoseClip>(true)
-                .Where(pose => !usedPoses.Contains(pose))
-                .ToList();
-            return poses.FirstOrDefault(pose => ClipMatches(pose.clip, data.clip))
-                   ?? poses.FirstOrDefault(pose => pose.displayName == data.displayName)
-                   ?? poses.FirstOrDefault(pose => !string.IsNullOrWhiteSpace(data.poseStableGuid) &&
-                                                   pose.StableGuid == data.poseStableGuid);
+            var removedPoses = new HashSet<PoseClip>(plan.PosesToRemove);
+            var removedGroups = new HashSet<PoseGroup>(plan.GroupsToRemove);
+            var candidateObjects = plan.PosesToRemove.Cast<Component>()
+                .Concat(plan.GroupsToRemove)
+                .Where(component => component != null)
+                .Select(component => component.gameObject)
+                .Distinct();
+            foreach (var gameObject in candidateObjects)
+            {
+                var hasRemainingOwner = gameObject.GetComponents<PoseClip>()
+                                            .Any(pose => !removedPoses.Contains(pose)) ||
+                                        gameObject.GetComponents<PoseGroup>()
+                                            .Any(group => !removedGroups.Contains(group));
+                if (hasRemainingOwner)
+                {
+                    continue;
+                }
+
+                plan.DependentComponentsToRemove.AddRange(gameObject.GetComponents<PoseCondition>());
+                plan.DependentComponentsToRemove.AddRange(gameObject.GetComponents<PoseTrackingPolicy>());
+            }
+        }
+
+        private static void AddUniquePresetGuid(
+            IDictionary<string, int> seen,
+            string guid,
+            int index,
+            string kind,
+            ICollection<string> errors)
+        {
+            if (string.IsNullOrEmpty(guid))
+            {
+                return;
+            }
+
+            if (seen.TryGetValue(guid, out var previous))
+            {
+                errors.Add($"Duplicate preset {kind} stable GUID '{guid}' at [{previous}] and [{index}].");
+            }
+            else
+            {
+                seen.Add(guid, index);
+            }
+        }
+
+        private static void ValidateStableGuidUniqueness(
+            IEnumerable<Object> components,
+            string kind,
+            ICollection<string> errors)
+        {
+            foreach (var component in components)
+            {
+                var raw = ReadRawStableGuid(component);
+                if (!string.IsNullOrWhiteSpace(raw) && !Guid.TryParse(raw.Trim(), out _))
+                {
+                    errors.Add($"Invalid {kind} stable GUID '{raw.Trim()}'.");
+                }
+            }
+
+            foreach (var duplicate in components
+                         .Select(component => new { Component = component, Guid = ReadStableGuid(component) })
+                         .Where(item => !string.IsNullOrEmpty(item.Guid))
+                         .GroupBy(item => item.Guid, StringComparer.Ordinal)
+                         .Where(group => group.Count() > 1))
+            {
+                errors.Add($"Duplicate {kind} stable GUID '{duplicate.Key}' has {duplicate.Count()} candidates.");
+            }
+        }
+
+        private static string ReadStableGuid(Object component)
+        {
+            if (component == null)
+            {
+                return "";
+            }
+
+            return NormalizeGuid(ReadRawStableGuid(component));
+        }
+
+        private static string ReadRawStableGuid(Object component)
+        {
+            if (component == null)
+            {
+                return "";
+            }
+
+            using var serialized = new SerializedObject(component);
+            return serialized.FindProperty("stableGuid.value")?.stringValue ?? "";
+        }
+
+        private static string NormalizeGuid(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return "";
+            }
+
+            return Guid.TryParse(value.Trim(), out var guid)
+                ? guid.ToString("N")
+                : value.Trim();
+        }
+
+        private static void ValidateGuid(string value, string location, ICollection<string> errors)
+        {
+            if (!string.IsNullOrWhiteSpace(value) && !Guid.TryParse(value.Trim(), out _))
+            {
+                errors.Add($"{location} has an invalid stable GUID '{value.Trim()}'.");
+            }
+        }
+
+        private static IEnumerable<T> OwnedComponents<T>(PoseTuneRoot root) where T : Component
+        {
+            return root != null
+                ? root.GetComponentsInChildren<T>(true).Where(component => NearestRoot(component) == root)
+                : Enumerable.Empty<T>();
+        }
+
+        private static IEnumerable<PoseTrackingPolicy> RootPolicies(PoseTuneRoot root)
+        {
+            return OwnedComponents<PoseTrackingPolicy>(root)
+                .Where(policy => policy.transform == root.transform ||
+                                 policy.transform.parent == root.transform &&
+                                 policy.GetComponent<PoseGroup>() == null &&
+                                 policy.GetComponent<PoseClip>() == null)
+                .OrderBy(policy => policy.transform == root.transform ? 0 : 1)
+                .ThenBy(policy => policy.transform.GetSiblingIndex());
+        }
+
+        private static PoseTuneRoot NearestRoot(Component component)
+        {
+            return component != null ? component.GetComponentInParent<PoseTuneRoot>(true) : null;
+        }
+
+        private static void RecordPrefabModifications(Object target)
+        {
+            if (target != null && PrefabUtility.IsPartOfPrefabInstance(target))
+            {
+                PrefabUtility.RecordPrefabInstancePropertyModifications(target);
+            }
+        }
+
+        private static void AssertStableGuidApplied(Object component, string requestedGuid, string kind)
+        {
+            var normalized = NormalizeGuid(requestedGuid);
+            if (!string.IsNullOrEmpty(normalized) && ReadStableGuid(component) != normalized)
+            {
+                throw new InvalidOperationException(
+                    $"Preset {kind} stable GUID '{normalized}' could not be applied without a collision.");
+            }
         }
 
         private static bool ClipMatches(AnimationClip left, AnimationClip right)
@@ -183,6 +882,5 @@ namespace Gokoukotori.PoseTune.Editor
             var rightPath = AssetDatabase.GetAssetPath(right);
             return !string.IsNullOrWhiteSpace(leftPath) && leftPath == rightPath;
         }
-
     }
 }

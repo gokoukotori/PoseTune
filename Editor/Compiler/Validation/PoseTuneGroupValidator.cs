@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Linq;
 using Gokoukotori.PoseTune;
 using Gokoukotori.PoseTune.Editor;
@@ -16,7 +15,7 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
                 if (group.Poses.Count == 0)
                 {
                     var sourcePoseCount = group.Source != null
-                        ? group.Source.GetComponentsInChildren<PoseClip>(true).Length
+                        ? PoseGroupOwnership.OwnedClips(group.Source).Count()
                         : 0;
                     if (sourcePoseCount == 0)
                     {
@@ -30,14 +29,13 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
 
                 ValidateInitialPoseCount(group, report);
                 ValidateExclusiveGroup(group, report);
-                ValidateAutoPriorityAmbiguity(graph, group, report);
             }
         }
 
         public static void ValidateParameterConflicts(PoseGraph graph, ValidationReport report)
         {
             var originalNames = PoseGraphBuildFilter.BuildableGroups(graph)
-                .Where(group => PoseTuneCompilerRules.AllowsManualControl(graph.RootComponent, group))
+                .Where(group => PoseTuneCompilerRules.RequiresPoseSelectionParameter(graph.RootComponent, group))
                 .Where(group => group.Source != null && !string.IsNullOrWhiteSpace(group.Source.parameterName))
                 .Select(group => new
                 {
@@ -65,7 +63,7 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
         public static void ValidateSyncedGroupIntCount(PoseGraph graph, ValidationReport report)
         {
             var syncedGroupInts = PoseGraphBuildFilter.BuildableGroups(graph).Count(group =>
-                PoseTuneCompilerRules.AllowsManualControl(graph.RootComponent, group) && group.Synced);
+                PoseTuneCompilerRules.RequiresPoseSelectionParameter(graph.RootComponent, group) && group.Synced);
             if (syncedGroupInts > MaxSyncedGroupIntCount)
             {
                 report.Warning(PoseTuneDiagnostics.GroupSyncedParameterBudgetExceeded.Code,
@@ -85,40 +83,6 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
             {
                 report.Warning(PoseTuneDiagnostics.GroupNonExclusiveOverridePose.Code, "非排他 group の override pose は他 group と curve 競合する可能性があります。", group.Source);
             }
-        }
-
-        private static void ValidateAutoPriorityAmbiguity(PoseGraph graph, PoseGroupDefinition group, ValidationReport report)
-        {
-            if (!graph.RootComponent.enableAutoContextSwitch ||
-                group.ActivationMode == PoseGroupActivationMode.Manual ||
-                group.AutoPoseSelectionMode == AutoPoseSelectionMode.SelectedPosePerGroup)
-            {
-                return;
-            }
-
-            foreach (var duplicate in group.Poses
-                         .Where(pose => pose.ConditionBranches.Count == 0 ||
-                                        pose.ConditionBranches.Any(branch => branch.Count > 0) ||
-                                        group.Kind != PoseGroupKind.Custom)
-                         .GroupBy(pose => pose.Priority + ":" + ConditionKey(pose))
-                         .Where(candidate => candidate.Count() > 1))
-            {
-                foreach (var pose in duplicate)
-                {
-                    report.Warning(PoseTuneDiagnostics.AutoPosePriorityAmbiguous.Code, "同条件・同 priority の auto pose が複数あります。auto pose の優先順位が曖昧です。", pose.Source);
-                }
-            }
-        }
-
-        private static string ConditionKey(PoseDefinition pose)
-        {
-            var branches = pose.ConditionBranches.Count > 0
-                ? pose.ConditionBranches
-                : new List<List<ParameterConditionData>> { pose.Conditions };
-            return string.Join("|", branches.Select(branch => string.Join("&", (branch ?? new List<ParameterConditionData>())
-                .OrderBy(condition => condition.parameter)
-                .ThenBy(condition => condition.op)
-                .Select(condition => $"{condition.parameter}:{condition.valueType}:{condition.op}:{condition.floatValue}:{condition.intValue}:{condition.boolValue}"))));
         }
 
         private static void ValidateInitialPoseCount(PoseGroupDefinition group, ValidationReport report)

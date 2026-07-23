@@ -9,18 +9,33 @@ namespace Gokoukotori.PoseTune.Editor
 {
     internal static class KawaiiPoseAuthoringWriter
     {
-        public static void CreatePose(
+        public static PoseClip CreatePose(
             PoseGroup group,
             KawaiiAnimationDto source,
             KawaiiMigrationOptions options,
             KawaiiMigrationReport report,
             bool iconsDisabled,
-            string undoName)
+            string undoName,
+            IKawaiiMigrationAssetStore assetStore = null)
         {
             var poseObject = new GameObject(SafeName(KawaiiPosingMapper.DisplayName(source), "Pose " + source.Index));
             Undo.RegisterCreatedObjectUndo(poseObject, undoName);
-            poseObject.transform.SetParent(group.transform, false);
-            var pose = poseObject.AddComponent<PoseClip>();
+            Undo.SetTransformParent(poseObject.transform, group.transform, undoName);
+            var pose = Undo.AddComponent<PoseClip>(poseObject);
+            ConfigurePose(pose, group, source, options, report, iconsDisabled, assetStore);
+            report.Created(poseObject, "Pose");
+            return pose;
+        }
+
+        internal static void ConfigurePose(
+            PoseClip pose,
+            PoseGroup group,
+            KawaiiAnimationDto source,
+            KawaiiMigrationOptions options,
+            KawaiiMigrationReport report,
+            bool iconsDisabled,
+            IKawaiiMigrationAssetStore assetStore = null)
+        {
             var sourceMotion = ResolveSourceMotion(source.Motion, source.Clip, options, report);
             var skippedBlendTree = IsSkippedBlendTreeWithoutFallback(source, options, sourceMotion);
             pose.displayName = KawaiiPosingMapper.DisplayName(source);
@@ -46,12 +61,9 @@ namespace Gokoukotori.PoseTune.Editor
             pose.recenterRootXZToHead = options.rootRecenterMode == KawaiiRootRecenterMode.FirstRootKeyApproximation;
             pose.emitTrackingControl = group.emitTrackingControl;
             pose.suppressIconGeneration = iconsDisabled;
-            pose.tracking = pose.emitTrackingControl
-                ? KawaiiPosingMapper.DefaultTracking(group.kind)
-                : TrackingPolicyData.DefaultForPose();
             ApplyMotionTime(pose, source, options, report);
             ApplyPoseSpace(pose, options);
-            BakeCompatibilityAtMigration(pose, source, options, report);
+            BakeCompatibilityAtMigration(pose, source, options, report, assetStore);
 
             if (pose.sourceMotion == null)
             {
@@ -64,8 +76,6 @@ namespace Gokoukotori.PoseTune.Editor
                     report.Warning(PoseTuneDiagnostics.KawaiiPoseSourceMotionMissing.Code, "animation clip が見つかりません: " + pose.displayName, pose);
                 }
             }
-
-            report.Created(poseObject, "Pose");
         }
 
         private static Texture2D ResolvePoseIcon(
@@ -86,7 +96,7 @@ namespace Gokoukotori.PoseTune.Editor
             return source.PreviewImage;
         }
 
-        private static Motion ResolveSourceMotion(
+        internal static Motion ResolveSourceMotion(
             Motion motion,
             AnimationClip clip,
             KawaiiMigrationOptions options,
@@ -110,7 +120,7 @@ namespace Gokoukotori.PoseTune.Editor
             return motion != null ? motion : clip;
         }
 
-        private static bool IsSkippedBlendTreeWithoutFallback(
+        internal static bool IsSkippedBlendTreeWithoutFallback(
             KawaiiAnimationDto source,
             KawaiiMigrationOptions options,
             Motion resolvedMotion)
@@ -176,7 +186,8 @@ namespace Gokoukotori.PoseTune.Editor
             PoseClip pose,
             KawaiiAnimationDto source,
             KawaiiMigrationOptions options,
-            KawaiiMigrationReport report)
+            KawaiiMigrationReport report,
+            IKawaiiMigrationAssetStore assetStore)
         {
             var bakeRootRecenter = options.rootRecenterMode == KawaiiRootRecenterMode.BakeAtMigration;
             var bakeRotation = options.rotationMode == KawaiiRotationMode.BakeAtMigration && source.IsRotate;
@@ -207,19 +218,33 @@ namespace Gokoukotori.PoseTune.Editor
                 PoseMotionPreparationContext.Empty());
             if (prepared.Motion == null)
             {
-                return;
+                throw new System.InvalidOperationException("BakeAtMigration did not produce a Motion: " + pose.displayName);
             }
 
-            pose.sourceMotion = prepared.Motion;
-            pose.clip = prepared.Motion as AnimationClip ?? pose.clip;
-            pose.adjustmentClip = null;
-            pose.rootOffset = Vector3.zero;
-            pose.rootYawOffsetDegrees = 0f;
-            pose.humanoidOrientationOffsetYDegrees = 0f;
-            pose.recenterRootXZToHead = false;
-            foreach (var asset in prepared.GeneratedAssets)
+            if (assetStore == null)
             {
-                report.Created(asset, asset is BlendTree ? "BlendTree" : "Clip");
+                throw new System.InvalidOperationException("BakeAtMigration requires a persistent migration asset store.");
+            }
+
+            var persistedMotion = assetStore.PersistPreparedMotion(pose, prepared);
+            if (persistedMotion == null || !EditorUtility.IsPersistent(persistedMotion))
+            {
+                throw new System.InvalidOperationException("BakeAtMigration Motion was not persisted: " + pose.displayName);
+            }
+
+            pose.sourceMotion = persistedMotion;
+            pose.clip = persistedMotion as AnimationClip ?? pose.clip;
+            pose.adjustmentClip = null;
+            if (bakeRootRecenter)
+            {
+                pose.rootOffset = Vector3.zero;
+                pose.rootYawOffsetDegrees = 0f;
+                pose.recenterRootXZToHead = false;
+            }
+
+            if (bakeRotation)
+            {
+                pose.humanoidOrientationOffsetYDegrees = 0f;
             }
         }
 

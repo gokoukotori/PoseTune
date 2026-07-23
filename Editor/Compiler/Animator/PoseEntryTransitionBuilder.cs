@@ -12,7 +12,6 @@ namespace Gokoukotori.PoseTune.Editor
             PoseGraph graph,
             PoseGroupDefinition group,
             PoseDefinition pose,
-            PoseDefinition autoPose,
             PoseStateVariants variants,
             HashSet<string> duplicateStateBaseNames,
             List<PoseGroupDefinition> exclusiveResetTargets,
@@ -34,7 +33,7 @@ namespace Gokoukotori.PoseTune.Editor
                 ? pose.ConditionBranches
                 : new List<List<ParameterConditionData>> { pose.Conditions };
             var hasAutoEntry = conditionBranches.Any(branch =>
-                AllowsAutoEntry(graph.RootComponent, group, pose, autoPose, branch));
+                AllowsAutoEntry(graph.RootComponent, group, pose, branch));
             AnimatorState commit = null;
             AnimatorState desktopCommit = null;
             AnimatorState vrCommit = null;
@@ -50,7 +49,7 @@ namespace Gokoukotori.PoseTune.Editor
                             duplicateStateBaseNames,
                             exclusiveResetTargets, poseActiveParameters, controlsActionPlayable,
                             activeParameter, true, x + 280, y,
-                            trackingContextId: variants.BaseTrackingContextId);
+                            trackingVoteId: variants.BaseTrackingVoteId);
                         manualTarget = commit;
                     }
 
@@ -59,6 +58,7 @@ namespace Gokoukotori.PoseTune.Editor
                     enter.duration = 0f;
                     enter.canTransitionToSelf = false;
                     AddManualModeEntryCondition(enter, graph.RootComponent);
+                    AddTrackingVoteClearedCondition(enter, graph, group);
                     enter.AddCondition(AnimatorConditionMode.Equals, pose.SelectionValue(graph.RootComponent), group.ParameterName);
                     AddManualCommitReentryGuard(enter, manualTarget, state, poseActiveParameter);
                     AddFbtEntryCondition(enter, graph.RootComponent, pose, false);
@@ -82,7 +82,7 @@ namespace Gokoukotori.PoseTune.Editor
                             exclusiveResetTargets, poseActiveParameters, controlsActionPlayable,
                             activeParameter, true, x + 420, y,
                             "_Desktop",
-                            variants.DesktopLowerBodyTrackingContextId);
+                            variants.DesktopLowerBodyTrackingVoteId);
                             desktopTarget = desktopCommit;
                         }
 
@@ -91,6 +91,7 @@ namespace Gokoukotori.PoseTune.Editor
                         desktopEnter.duration = 0f;
                         desktopEnter.canTransitionToSelf = false;
                         AddManualModeEntryCondition(desktopEnter, graph.RootComponent);
+                        AddTrackingVoteClearedCondition(desktopEnter, graph, group);
                         desktopEnter.AddCondition(AnimatorConditionMode.Equals, pose.SelectionValue(graph.RootComponent), group.ParameterName);
                         AddManualCommitReentryGuard(desktopEnter, desktopTarget, desktopLowerBodyState, poseActiveParameter);
                         AddFbtEntryCondition(desktopEnter, graph.RootComponent, pose, false);
@@ -107,7 +108,8 @@ namespace Gokoukotori.PoseTune.Editor
                                 duplicateStateBaseNames,
                                 exclusiveResetTargets, poseActiveParameters, controlsActionPlayable,
                                 activeParameter, false, x + 420, y,
-                                trackingContextId: variants.VrTrackingContextId);
+                                "_VR",
+                                variants.VrTrackingVoteId);
                             vrTarget = vrCommit;
                         }
 
@@ -116,6 +118,7 @@ namespace Gokoukotori.PoseTune.Editor
                         vrEnter.duration = 0f;
                         vrEnter.canTransitionToSelf = false;
                         AddManualModeEntryCondition(vrEnter, graph.RootComponent);
+                        AddTrackingVoteClearedCondition(vrEnter, graph, group);
                         vrEnter.AddCondition(AnimatorConditionMode.Equals, pose.SelectionValue(graph.RootComponent), group.ParameterName);
                         AddManualCommitReentryGuard(vrEnter, vrTarget, vrState, poseActiveParameter);
                         AddFbtEntryCondition(vrEnter, graph.RootComponent, pose, false);
@@ -133,7 +136,7 @@ namespace Gokoukotori.PoseTune.Editor
                             exclusiveResetTargets, poseActiveParameters, controlsActionPlayable,
                             activeParameter, !needsPoseSpaceVrVariant, x + 560, y,
                             "_FBT",
-                            variants.FullBodyTrackingContextId);
+                            variants.FullBodyTrackingVoteId);
                             fbtTarget = fbtCommit;
                         }
 
@@ -142,6 +145,7 @@ namespace Gokoukotori.PoseTune.Editor
                         fbtEnter.duration = 0f;
                         fbtEnter.canTransitionToSelf = false;
                         AddManualModeEntryCondition(fbtEnter, graph.RootComponent);
+                        AddTrackingVoteClearedCondition(fbtEnter, graph, group);
                         fbtEnter.AddCondition(AnimatorConditionMode.Equals, pose.SelectionValue(graph.RootComponent), group.ParameterName);
                         AddManualCommitReentryGuard(fbtEnter, fbtTarget, fbtState, poseActiveParameter);
                         AddFbtEntryCondition(fbtEnter, graph.RootComponent, pose, true);
@@ -150,13 +154,14 @@ namespace Gokoukotori.PoseTune.Editor
                     }
                 }
 
-                if (AllowsAutoEntry(graph.RootComponent, group, pose, autoPose, branch))
+                if (AllowsAutoEntry(graph.RootComponent, group, pose, branch))
                 {
                     var enter = layer.stateMachine.AddAnyStateTransition(state);
                     enter.hasExitTime = false;
                     enter.duration = 0f;
                     enter.canTransitionToSelf = false;
                     enter.AddCondition(AnimatorConditionMode.Equals, 1, graph.RootComponent.Parameter(PoseTuneNames.Mode));
+                    AddTrackingVoteClearedCondition(enter, graph, group);
                     AddSelectedPoseAutoEntryCondition(enter, graph.RootComponent, group, pose);
                     AddFbtEntryCondition(enter, graph.RootComponent, pose, false);
                     if (needsDesktopLowerBodyLockVariant)
@@ -178,6 +183,7 @@ namespace Gokoukotori.PoseTune.Editor
                         desktopEnter.canTransitionToSelf = false;
                         desktopEnter.AddCondition(AnimatorConditionMode.Equals, 1,
                             graph.RootComponent.Parameter(PoseTuneNames.Mode));
+                        AddTrackingVoteClearedCondition(desktopEnter, graph, group);
                         AddSelectedPoseAutoEntryCondition(desktopEnter, graph.RootComponent, group, pose);
                         AddFbtEntryCondition(desktopEnter, graph.RootComponent, pose, false);
                         AddDesktopModeCondition(desktopEnter);
@@ -193,6 +199,7 @@ namespace Gokoukotori.PoseTune.Editor
                         vrEnter.canTransitionToSelf = false;
                         vrEnter.AddCondition(AnimatorConditionMode.Equals, 1,
                             graph.RootComponent.Parameter(PoseTuneNames.Mode));
+                        AddTrackingVoteClearedCondition(vrEnter, graph, group);
                         AddSelectedPoseAutoEntryCondition(vrEnter, graph.RootComponent, group, pose);
                         AddFbtEntryCondition(vrEnter, graph.RootComponent, pose, false);
                         AddPoseSpaceScopeCondition(vrEnter, pose, true);
@@ -208,6 +215,7 @@ namespace Gokoukotori.PoseTune.Editor
                         fbtEnter.canTransitionToSelf = false;
                         fbtEnter.AddCondition(AnimatorConditionMode.Equals, 1,
                             graph.RootComponent.Parameter(PoseTuneNames.Mode));
+                        AddTrackingVoteClearedCondition(fbtEnter, graph, group);
                         AddSelectedPoseAutoEntryCondition(fbtEnter, graph.RootComponent, group, pose);
                         AddFbtEntryCondition(fbtEnter, graph.RootComponent, pose, true);
                         AddPoseSpaceScopeCondition(fbtEnter, pose, needsPoseSpaceVrVariant);

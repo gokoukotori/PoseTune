@@ -30,7 +30,7 @@ namespace Gokoukotori.PoseTune
 
     public enum AutoPoseSelectionMode
     {
-        [InspectorName("初期ポーズのみ")]
+        [InspectorName("条件に一致する最優先ポーズ")]
         InitialPoseOnly,
         [InspectorName("グループで選択中のポーズ")]
         SelectedPosePerGroup

@@ -40,6 +40,51 @@ namespace Gokoukotori.PoseTune.Editor
             return branches;
         }
 
+        public static List<List<ParameterConditionData>> ReadIncomingConditionBranches(
+            AnimatorStateMachine parentStateMachine,
+            AnimatorStateMachine childStateMachine)
+        {
+            var branches = new List<List<ParameterConditionData>>();
+            if (parentStateMachine == null || childStateMachine == null)
+            {
+                return branches;
+            }
+
+            foreach (var transition in parentStateMachine.anyStateTransitions
+                         .Where(transition => transition.destinationStateMachine == childStateMachine))
+            {
+                AddBranch(branches, transition.conditions);
+            }
+
+            foreach (var transition in parentStateMachine.entryTransitions
+                         .Where(transition => transition.destinationStateMachine == childStateMachine))
+            {
+                AddBranch(branches, transition.conditions);
+            }
+
+            foreach (var state in parentStateMachine.states.Select(child => child.state).Where(state => state != null))
+            {
+                foreach (var transition in state.transitions
+                             .Where(transition => transition.destinationStateMachine == childStateMachine))
+                {
+                    AddBranch(branches, transition.conditions);
+                }
+            }
+
+            foreach (var sourceStateMachine in parentStateMachine.stateMachines
+                         .Select(child => child.stateMachine)
+                         .Where(stateMachine => stateMachine != null))
+            {
+                foreach (var transition in parentStateMachine.GetStateMachineTransitions(sourceStateMachine)
+                             .Where(transition => transition.destinationStateMachine == childStateMachine))
+                {
+                    AddBranch(branches, transition.conditions);
+                }
+            }
+
+            return branches;
+        }
+
         public static List<ParameterConditionData> FlattenConditionBranches(
             List<List<ParameterConditionData>> branches)
         {

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using nadena.dev.ndmf;
+using nadena.dev.ndmf.animator;
 using nadena.dev.ndmf.builtin;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -30,7 +31,8 @@ namespace Gokoukotori.PoseTune.Editor
 
             InPhase(BuildPhase.Transforming)
                 .AfterPlugin("nadena.dev.modular-avatar")
-                .Run("PoseTune の生成 build output を検証", PoseTuneBuildRunner.PostValidate);
+                .WithRequiredExtension(typeof(AnimatorServicesContext), sequence =>
+                    sequence.Run("PoseTune の生成 build output を検証", PoseTuneBuildRunner.PostValidate));
 
             InPhase(BuildPhase.Optimizing)
                 .AfterPlugin("nadena.dev.modular-avatar")
@@ -78,6 +80,19 @@ namespace Gokoukotori.PoseTune.Editor
 
                 var parameterPlan = new ParameterAllocator().AllocateStrict(graph);
                 var animatorResult = new AnimatorCompiler().Compile(graph, parameterPlan);
+                var animatorValidation = new PoseTuneAnimatorValidator().Validate(graph, animatorResult.TargetController);
+                MergeReport(graph.Validation, animatorValidation);
+                if (animatorValidation.Issues.Any())
+                {
+                    LogReport(graph.RootComponent, animatorValidation);
+                }
+
+                if (animatorValidation.HasErrors)
+                {
+                    PoseTuneGeneratedAnimatorAssetCleanup.DestroyUnsaved(animatorResult);
+                    continue;
+                }
+
                 if (!PoseTuneNdmfAssetSaver.TrySaveGeneratedAnimatorAssets(context, animatorResult))
                 {
                     graph.Validation.Error(
@@ -85,6 +100,7 @@ namespace Gokoukotori.PoseTune.Editor
                         "NDMF AssetSaver が利用できないため、PoseTune が生成した animator assets を build 用に保存できません。",
                         graph.RootComponent);
                     LogReport(graph.RootComponent, graph.Validation);
+                    PoseTuneGeneratedAnimatorAssetCleanup.DestroyUnsaved(animatorResult);
                     continue;
                 }
 
@@ -97,9 +113,10 @@ namespace Gokoukotori.PoseTune.Editor
         {
             var state = context.GetState<PoseTuneBuildState>();
             var postBuildValidator = new PoseTunePostBuildValidator();
+            var virtualControllers = context.Extension<AnimatorServicesContext>().ControllerContext;
             foreach (var graph in state.Graphs.Where(g => g.Root != null && !g.HasErrors))
             {
-                var report = postBuildValidator.Validate(graph);
+                var report = postBuildValidator.Validate(graph, virtualControllers);
                 state.Reports.Add(report);
                 LogReport(graph.Root, report);
             }
@@ -158,6 +175,26 @@ namespace Gokoukotori.PoseTune.Editor
         private static string IssueKey(ValidationIssue issue)
         {
             return $"{issue.Severity}|{issue.Code}|{issue.Message}";
+        }
+
+        private static void MergeReport(ValidationReport destination, ValidationReport source)
+        {
+            if (destination == null || source == null)
+            {
+                return;
+            }
+
+            foreach (var issue in source.Issues)
+            {
+                if (issue.Severity == ValidationSeverity.Error)
+                {
+                    destination.Error(issue.Code, issue.Message, issue.Context);
+                }
+                else
+                {
+                    destination.Warning(issue.Code, issue.Message, issue.Context);
+                }
+            }
         }
 
         private static void LogReport(Object context, ValidationReport report)

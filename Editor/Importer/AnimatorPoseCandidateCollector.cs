@@ -38,7 +38,8 @@ namespace Gokoukotori.PoseTune.Editor
             string sourceLayerName,
             List<ImportCandidate> result,
             HashSet<string> seen,
-            ImportAnalysisOptions options)
+            ImportAnalysisOptions options,
+            List<List<ParameterConditionData>> inheritedConditionBranches)
         {
             if (stateMachine == null)
             {
@@ -49,13 +50,16 @@ namespace Gokoukotori.PoseTune.Editor
             {
                 var statePath = path + "/" + child.state.name;
                 CollectMotion(child.state.motion, child.state, stateMachine, statePath, sourceLayerIndex, sourceLayerName, result,
-                    seen, options, new List<BlendTreeChildInfo>());
+                    seen, options, new List<BlendTreeChildInfo>(), inheritedConditionBranches);
             }
 
             foreach (var child in stateMachine.stateMachines)
             {
+                var childConditionBranches = CombineConditionBranches(
+                    inheritedConditionBranches,
+                    AnimatorConditionBranchReader.ReadIncomingConditionBranches(stateMachine, child.stateMachine));
                 TraverseStateMachine(child.stateMachine, path + "/" + child.stateMachine.name, sourceLayerIndex, sourceLayerName,
-                    result, seen, options);
+                    result, seen, options, childConditionBranches);
             }
         }
 
@@ -89,7 +93,8 @@ namespace Gokoukotori.PoseTune.Editor
             List<ImportCandidate> result,
             HashSet<string> seen,
             ImportAnalysisOptions options,
-            List<BlendTreeChildInfo> blendTreePath)
+            List<BlendTreeChildInfo> blendTreePath,
+            List<List<ParameterConditionData>> inheritedConditionBranches)
         {
             switch (motion)
             {
@@ -97,7 +102,7 @@ namespace Gokoukotori.PoseTune.Editor
                     return;
                 case AnimationClip clip:
                     AddClip(clip, state, stateMachine, path, sourceLayerIndex, sourceLayerName, result, seen, options,
-                        blendTreePath);
+                        blendTreePath, inheritedConditionBranches);
                     return;
                 case BlendTree tree:
                     foreach (var child in tree.children)
@@ -115,7 +120,7 @@ namespace Gokoukotori.PoseTune.Editor
                             }
                         };
                         CollectMotion(child.motion, state, stateMachine, path + "/" + tree.name, sourceLayerIndex, sourceLayerName,
-                            result, seen, options, nextPath);
+                            result, seen, options, nextPath, inheritedConditionBranches);
                     }
 
                     break;
@@ -132,7 +137,8 @@ namespace Gokoukotori.PoseTune.Editor
             List<ImportCandidate> result,
             HashSet<string> seen,
             ImportAnalysisOptions options,
-            List<BlendTreeChildInfo> blendTreePath)
+            List<BlendTreeChildInfo> blendTreePath,
+            List<List<ParameterConditionData>> inheritedConditionBranches)
         {
             if (clip == null)
             {
@@ -152,7 +158,9 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
-            var conditionBranches = AnimatorConditionBranchReader.ReadIncomingConditionBranches(stateMachine, state);
+            var conditionBranches = CombineConditionBranches(
+                inheritedConditionBranches,
+                AnimatorConditionBranchReader.ReadIncomingConditionBranches(stateMachine, state));
             var groupKind = AnimatorPoseCandidateHeuristics.GuessGroupKind(name + " " + path);
             var enabled = AnimatorPoseCandidateHeuristics.IsGroupKindEnabledByOptions(groupKind, options);
             if (!enabled && !options.createDisabledCandidates)
@@ -160,13 +168,14 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
+            var hasTrackingBehavior = AnimatorTrackingPolicyReader.HasTrackingBehavior(state);
             var confidence = new ImportConfidenceScorer().Score(new ImportCandidateScoringContext
             {
                 Clip = clip,
                 StatePath = path,
                 SourceLayerName = sourceLayerName ?? "",
                 HasHumanoidCurves = AnimatorPoseCandidateHeuristics.HasHumanoidCurves(clip),
-                HasTrackingBehavior = AnimatorTrackingPolicyReader.HasTrackingBehavior(state),
+                HasTrackingBehavior = hasTrackingBehavior,
                 ConditionBranches = conditionBranches,
                 FromBlendTree = blendTreePath != null && blendTreePath.Count > 0
             });
@@ -189,6 +198,7 @@ namespace Gokoukotori.PoseTune.Editor
                 DisabledReason = enabled ? "" : AnimatorPoseCandidateHeuristics.DisabledReasonFor(groupKind),
                 FromBlendTree = blendTreePath != null && blendTreePath.Count > 0,
                 BlendTreePath = CopyBlendTreePath(blendTreePath),
+                HasTrackingBehavior = hasTrackingBehavior,
                 TrackingPolicy = AnimatorTrackingPolicyReader.ReadTrackingPolicy(state),
                 Conditions = AnimatorConditionBranchReader.FlattenConditionBranches(conditionBranches),
                 ConditionBranches = conditionBranches,
@@ -198,6 +208,25 @@ namespace Gokoukotori.PoseTune.Editor
                     Conditions = branch.Select(PoseTuneConditionUtility.Copy).ToList()
                 }).ToList()
             });
+        }
+
+        private static List<List<ParameterConditionData>> CombineConditionBranches(
+            List<List<ParameterConditionData>> inherited,
+            List<List<ParameterConditionData>> local)
+        {
+            if (inherited == null || inherited.Count == 0)
+            {
+                return local == null || local.Count == 0
+                    ? new List<List<ParameterConditionData>>()
+                    : PoseTuneConditionBranchUtility.Clone(local);
+            }
+
+            if (local == null || local.Count == 0)
+            {
+                return PoseTuneConditionBranchUtility.Clone(inherited);
+            }
+
+            return PoseTuneConditionBranchUtility.AndBranches(inherited, local);
         }
 
         private static List<BlendTreeChildInfo> CopyBlendTreePath(IEnumerable<BlendTreeChildInfo> path)

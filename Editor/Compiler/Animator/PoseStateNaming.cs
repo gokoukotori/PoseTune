@@ -32,6 +32,14 @@ namespace Gokoukotori.PoseTune.Editor
                 .ToHashSet();
         }
 
+        public static string CleanupName(
+            PoseDefinition pose,
+            HashSet<string> duplicateBaseNames,
+            string suffix = "")
+        {
+            return "Handoff_" + Name(pose, duplicateBaseNames, suffix);
+        }
+
         private static string BaseName(PoseDefinition pose)
         {
             var baseName = pose?.SourceMotion is BlendTree && !string.IsNullOrWhiteSpace(pose.DisplayName)

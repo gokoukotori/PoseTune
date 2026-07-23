@@ -62,6 +62,12 @@ namespace Gokoukotori.PoseTune.Editor
                     {
                         if (GUILayout.Button("移行を実行"))
                         {
+                            options.confirmSharedSourceObjectMutation = false;
+                            if (!ConfirmSharedSourceMutation(systems.Select(system => system.Component).ToArray()))
+                            {
+                                return;
+                            }
+
                             options.dryRunOnly = false;
                             lastReport = new KawaiiPosingMigrationExecutor().Execute(
                                 avatarRoot,
@@ -105,8 +111,91 @@ namespace Gokoukotori.PoseTune.Editor
             }
             options.addTrackingPolicy = EditorGUILayout.Toggle("TrackingPolicy を追加", options.addTrackingPolicy);
             options.disableWhenFullBodyTracking = EditorGUILayout.Toggle("FBT 時に無効化", options.disableWhenFullBodyTracking);
-            options.disableSourceKawaiiObjectAfterMigration = EditorGUILayout.Toggle("元 object を無効化", options.disableSourceKawaiiObjectAfterMigration);
-            options.tagSourceAsEditorOnly = EditorGUILayout.Toggle("元 object を EditorOnly (原則必須)", options.tagSourceAsEditorOnly);
+            options.sourceDisposition = SelectableEnumPopup("移行元の扱い", options.sourceDisposition);
+        }
+
+        private bool ConfirmSharedSourceMutation(MonoBehaviour[] sources)
+        {
+            if (options.sourceDisposition == KawaiiSourceDisposition.KeepUnchanged)
+            {
+                return EditorUtility.DisplayDialog(
+                    "PoseTune Kawaii Migration",
+                    "移行元を変更せずに保持します。KawaiiPosing と PoseTune の両方が build に作用し得ます。\n" +
+                    "build 前に構成を確認してください。移行を続行しますか？",
+                    "続行",
+                    "キャンセル");
+            }
+
+            var sourceSet = sources.Where(source => source != null).ToHashSet();
+            var sharedObjects = sourceSet
+                .Select(source => source.gameObject)
+                .Distinct()
+                .Where(gameObject => IsSharedSourceObject(gameObject, sourceSet))
+                .ToArray();
+            if (sharedObjects.Length == 0)
+            {
+                return true;
+            }
+
+            var details = string.Join("\n\n", sharedObjects.Select(gameObject =>
+                DescribeSharedSourceObject(gameObject, sourceSet)));
+            options.confirmSharedSourceObjectMutation = EditorUtility.DisplayDialog(
+                "PoseTune Kawaii Migration",
+                "移行元 GameObject には他の Component または子階層があります。選択した処理は GameObject 全体へ作用します。\n\n" +
+                details + "\n\n続行しますか？",
+                "続行",
+                "キャンセル");
+            return options.confirmSharedSourceObjectMutation;
+        }
+
+        private static bool IsSharedSourceObject(GameObject gameObject, System.Collections.Generic.ISet<MonoBehaviour> sources)
+        {
+            if (gameObject == null || gameObject.transform.childCount > 0)
+            {
+                return true;
+            }
+
+            return gameObject.GetComponents<Component>().Any(component =>
+                component is not Transform &&
+                (component is not MonoBehaviour behaviour || !sources.Contains(behaviour)));
+        }
+
+        private static string DescribeSharedSourceObject(
+            GameObject gameObject,
+            System.Collections.Generic.ISet<MonoBehaviour> sources)
+        {
+            var unrelatedComponents = gameObject.GetComponents<Component>()
+                .Where(component => component is not Transform &&
+                                    (component is not MonoBehaviour behaviour || !sources.Contains(behaviour)))
+                .Select(component => component.GetType().FullName)
+                .ToArray();
+            var childPaths = gameObject.GetComponentsInChildren<Transform>(true)
+                .Where(transform => transform != gameObject.transform)
+                .Select(transform => HierarchyPath(transform))
+                .ToArray();
+            var lines = new System.Collections.Generic.List<string> { "- " + HierarchyPath(gameObject.transform) };
+            if (unrelatedComponents.Length > 0)
+            {
+                lines.Add("  Components: " + string.Join(", ", unrelatedComponents));
+            }
+
+            if (childPaths.Length > 0)
+            {
+                lines.Add("  Children: " + string.Join(", ", childPaths));
+            }
+
+            return string.Join("\n", lines);
+        }
+
+        private static string HierarchyPath(Transform transform)
+        {
+            var names = new System.Collections.Generic.Stack<string>();
+            for (var current = transform; current != null; current = current.parent)
+            {
+                names.Push(current.name);
+            }
+
+            return string.Join("/", names);
         }
 
         private static T SelectableEnumPopup<T>(string label, T value) where T : struct, Enum

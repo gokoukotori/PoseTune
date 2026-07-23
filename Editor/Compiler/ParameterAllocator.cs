@@ -9,6 +9,7 @@ namespace Gokoukotori.PoseTune.Editor
         public ParameterPlan Allocate(PoseGraph graph)
         {
             var builder = new ParameterPlanBuilder();
+            var buildableGroups = PoseGraphBuildFilter.BuildableGroups(graph).ToList();
             builder.AddInt(graph.RootComponent.Parameter(PoseTuneNames.Mode))
                 .Saved()
                 .DefaultValue((float)graph.RootComponent.defaultMode);
@@ -32,11 +33,21 @@ namespace Gokoukotori.PoseTune.Editor
                     .DefaultValue(graph.Options != null && graph.Options.locomotionLock ? 1f : 0f);
             }
 
-            if (NeedsTrackingContext(graph))
+            if (NeedsTrackingArbiter(graph))
             {
-                builder.AddNotSyncedInt(PoseTuneNames.TrackingContext)
-                    .LocalOnly()
-                    .AnimatorOnly();
+                foreach (var group in buildableGroups.Where(group => RequiresTrackingVote(graph, group)))
+                {
+                    builder.AddNotSyncedInt(PoseTuneNames.TrackingVoteParameter(group))
+                        .LocalOnly()
+                        .AnimatorOnly();
+                }
+
+                foreach (var part in TrackingArbiterCompiler.RequiredParts(graph))
+                {
+                    builder.AddNotSyncedBool(PoseTuneNames.TrackingResetParameter(part))
+                        .LocalOnly()
+                        .AnimatorOnly();
+                }
             }
 
             if (NeedsSupineFlag(graph))
@@ -51,10 +62,9 @@ namespace Gokoukotori.PoseTune.Editor
                     .LocalOnly();
             }
 
-            var buildableGroups = PoseGraphBuildFilter.BuildableGroups(graph).ToList();
             foreach (var group in buildableGroups)
             {
-                if (PoseTuneCompilerRules.AllowsManualControl(graph.RootComponent, group))
+                if (PoseTuneCompilerRules.RequiresPoseSelectionParameter(graph.RootComponent, group))
                 {
                     builder.AddInt(group.ParameterName)
                         .Saved(group.Saved)
@@ -62,7 +72,7 @@ namespace Gokoukotori.PoseTune.Editor
                         .DefaultValue(group.Poses.FirstOrDefault(p => p.Initial)?.SelectionValue(graph.RootComponent) ?? 0);
                 }
 
-                if (PoseTuneCompilerRules.ControlsActionPlayable(graph.RootComponent) || graph.HasPoseOptions)
+                if (group.Poses.Count > 0)
                 {
                     foreach (var parameterName in PoseTuneLayerNaming.GroupActiveParameters(group))
                     {
@@ -189,11 +199,18 @@ namespace Gokoukotori.PoseTune.Editor
                                             pose.MotionTime.mode == MotionTimeMode.UseGeneratedHeightParameter));
         }
 
-        internal static bool NeedsTrackingContext(PoseGraph graph)
+        internal static bool NeedsTrackingArbiter(PoseGraph graph)
         {
             return graph != null &&
-                   (graph.HasPoseOptions ||
-                    graph.Poses.Any(pose => pose.EmitTrackingControl));
+                   (graph.HasPoseOptions || TrackingArbiterCompiler.RequiredParts(graph).Count > 0);
+        }
+
+        internal static bool RequiresTrackingVote(PoseGraph graph, PoseGroupDefinition group)
+        {
+            return graph != null &&
+                   group != null &&
+                   NeedsTrackingArbiter(graph) &&
+                   group.Poses.Any(pose => pose.EmitTrackingControl);
         }
 
     }

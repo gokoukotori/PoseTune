@@ -24,7 +24,7 @@ namespace Gokoukotori.PoseTune.Editor
         public bool RootGenerateResetOnExit = true;
         public bool HasCustomRootGenerateResetOnExit;
         public int RootTrackingPolicyCount;
-        internal TrackingContextRegistry TrackingContexts = new();
+        internal TrackingVoteRegistry TrackingVotes = new();
         public ValidationReport Validation = new();
 
         public PoseTuneRoot Root => RootComponent;

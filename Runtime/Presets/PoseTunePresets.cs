@@ -6,8 +6,16 @@ namespace Gokoukotori.PoseTune
     [CreateAssetMenu(menuName = "PoseTune/PoseTune プリセット")]
     public sealed class PoseTunePreset : ScriptableObject
     {
+        public const int CurrentSchemaVersion = 2;
+
+        [HideInInspector]
+        // Assets created before schema v2 have no serialized version field and must remain legacy-safe.
+        // Capture writes CurrentSchemaVersion explicitly for every newly authored preset.
+        public int schemaVersion = 1;
         [InspectorName("プリセット名")]
         public string presetName = "";
+        [InspectorName("Root トラッキングポリシー")]
+        public PoseTrackingPolicyPresetData rootTrackingPolicy = new();
         [InspectorName("グループ")]
         public List<PoseGroupPresetData> groups = new();
         [InspectorName("メニュー")]

@@ -11,27 +11,27 @@ namespace Gokoukotori.PoseTune.Editor
         public static PoseGroupKind MapGroupKind(KawaiiLayerDto layer)
         {
             var key = ((layer.StateMachineName ?? "") + " " + (layer.MenuName ?? "")).ToLowerInvariant();
-            if (key.Contains("sitstand") || key.Contains("立ち"))
+            if (key.Contains("sitstand") || key.Contains("standing") || key.Contains("立ち"))
             {
                 return PoseGroupKind.Standing;
             }
 
-            if (key.Contains("sitshallow") || key.Contains("中腰"))
+            if (key.Contains("sitshallow") || key.Contains("chair") || key.Contains("中腰"))
             {
                 return PoseGroupKind.Chair;
             }
 
-            if (key.Contains("sitdeep") || key.Contains("座り"))
+            if (key.Contains("sitdeep") || key.Contains("floor") || key.Contains("座り"))
             {
                 return PoseGroupKind.Floor;
             }
 
-            if (key.Contains("sitsleepup") || key.Contains("仰向け"))
+            if (key.Contains("sitsleepup") || key.Contains("supine") || key.Contains("仰向け"))
             {
                 return PoseGroupKind.Supine;
             }
 
-            if (key.Contains("sitsleepdown") || key.Contains("うつ伏せ"))
+            if (key.Contains("sitsleepdown") || key.Contains("prone") || key.Contains("うつ伏せ"))
             {
                 return PoseGroupKind.Prone;
             }

@@ -127,38 +127,36 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
         {
             var graph = context.Graph;
             var plan = context.Parameters;
-            var existingCost = ExistingExpressionParameterCost(graph);
-            var totalCost = existingCost + plan.SyncedCost;
-            if (totalCost > MaxExpressionParameterCost)
+            var budget = ExpressionParameterBudgetCalculator.Calculate(
+                ExistingExpressionParameters(graph),
+                plan.Parameters);
+            if (budget.TotalSyncedCost > MaxExpressionParameterCost)
             {
                 report.Error(PoseTuneDiagnostics.ParameterSyncedBudgetExceeded.Code,
-                    $"PoseTune の同期パラメータコストは {plan.SyncedCost}、既存 Expression Parameter のコストは {existingCost} で、合計 {totalCost}/{MaxExpressionParameterCost} です。",
+                    $"PoseTune が追加する同期パラメータコストは {budget.AdditionalSyncedCost}、既存 Expression Parameter のコストは {budget.ExistingSyncedCost} で、マージ後の合計は {budget.TotalSyncedCost}/{MaxExpressionParameterCost} です。",
                     graph.RootComponent);
             }
 
-            var generatedCount = plan.Parameters.Count(PoseTuneValidationContext.CountsAsExpressionParameter);
-            var existingCount = ExistingExpressionParameterCount(graph);
-            var totalCount = existingCount + generatedCount;
-            if (totalCount > MaxExpressionParameterCount)
+            if (budget.TotalCount > MaxExpressionParameterCount)
             {
                 report.Error(PoseTuneDiagnostics.ExpressionParameterCountExceeded.Code,
-                    $"PoseTune の Expression Parameter 数は {generatedCount}、既存 Expression Parameter 数は {existingCount} で、合計 {totalCount}/{MaxExpressionParameterCount} です。",
+                    $"PoseTune が追加する Expression Parameter 数は {budget.AdditionalCount}、既存 Expression Parameter 数は {budget.ExistingCount} で、マージ後の合計は {budget.TotalCount}/{MaxExpressionParameterCount} です。",
                     graph.RootComponent);
             }
-            else if (totalCount > ExpressionParameterCountWarningThreshold)
+            else if (budget.TotalCount > ExpressionParameterCountWarningThreshold)
             {
                 report.Warning(PoseTuneDiagnostics.ExpressionParameterCountNearLimit.Code,
-                    $"Expression Parameter 数が {totalCount}/{MaxExpressionParameterCount} です。VRChat の上限に近づいています。",
+                    $"Expression Parameter 数が {budget.TotalCount}/{MaxExpressionParameterCount} です。VRChat の上限に近づいています。",
                     graph.RootComponent);
             }
         }
 
-        private static int ExistingExpressionParameterCost(PoseGraph graph)
+        private static IEnumerable<ExistingExpressionParameterSnapshot> ExistingExpressionParameters(PoseGraph graph)
         {
             var descriptor = graph.AvatarDescriptor;
             if (descriptor == null)
             {
-                return 0;
+                yield break;
             }
 
             var expressionParameters = descriptor.GetType().GetField("expressionParameters")?.GetValue(descriptor);
@@ -166,55 +164,38 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
                 as System.Collections.IEnumerable;
             if (parameters == null)
             {
-                return 0;
+                yield break;
             }
 
-            var cost = 0;
             foreach (var parameter in parameters)
             {
-                if (parameter == null || !ReadBoolField(parameter, "networkSynced", true))
+                if (parameter == null)
                 {
                     continue;
                 }
 
-                cost += CostForExpressionParameter(parameter);
+                var parameterType = parameter.GetType();
+                var name = parameterType.GetField("name")?.GetValue(parameter)?.ToString() ?? "";
+                var valueType = ToPoseTuneValueType(
+                    parameterType.GetField("valueType")?.GetValue(parameter)?.ToString());
+                yield return new ExistingExpressionParameterSnapshot(
+                    name,
+                    valueType,
+                    ReadBoolField(parameter, "networkSynced", true));
             }
-
-            return cost;
         }
 
-        private static int ExistingExpressionParameterCount(PoseGraph graph)
+        private static PoseTuneParameterValueType ToPoseTuneValueType(string valueType)
         {
-            var descriptor = graph.AvatarDescriptor;
-            if (descriptor == null)
+            switch (valueType)
             {
-                return 0;
+                case "Bool":
+                    return PoseTuneParameterValueType.Bool;
+                case "Int":
+                    return PoseTuneParameterValueType.Int;
+                default:
+                    return PoseTuneParameterValueType.Float;
             }
-
-            var expressionParameters = descriptor.GetType().GetField("expressionParameters")?.GetValue(descriptor);
-            var parameters = expressionParameters?.GetType().GetField("parameters")?.GetValue(expressionParameters)
-                as System.Collections.IEnumerable;
-            if (parameters == null)
-            {
-                return 0;
-            }
-
-            var count = 0;
-            foreach (var parameter in parameters)
-            {
-                if (parameter != null)
-                {
-                    count++;
-                }
-            }
-
-            return count;
-        }
-
-        private static int CostForExpressionParameter(object parameter)
-        {
-            var valueType = parameter.GetType().GetField("valueType")?.GetValue(parameter)?.ToString();
-            return valueType == "Bool" ? 1 : 8;
         }
 
         private static bool ReadBoolField(object target, string fieldName, bool fallback)

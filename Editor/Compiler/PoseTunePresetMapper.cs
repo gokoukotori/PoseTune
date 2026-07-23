@@ -1,14 +1,16 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Gokoukotori.PoseTune;
 using Gokoukotori.PoseTune.Editor.Compiler.Conditions;
+using UnityEditor;
 using UnityEngine;
 
 namespace Gokoukotori.PoseTune.Editor
 {
     internal static class PoseTunePresetMapper
     {
-        public static PoseGroupPresetData CaptureGroup(PoseGroup group)
+        public static PoseGroupPresetData CaptureGroup(PoseTuneRoot root, PoseGroup group)
         {
             return new PoseGroupPresetData
             {
@@ -25,10 +27,12 @@ namespace Gokoukotori.PoseTune.Editor
                 autoPoseSelectionMode = group.autoPoseSelectionMode,
                 autoContextProfile = group.autoContextProfile,
                 emitTrackingControl = group.emitTrackingControl,
+                trackingPolicy = CaptureTrackingPolicy(group.GetComponents<PoseTrackingPolicy>().FirstOrDefault()),
                 suppressIconGeneration = group.suppressIconGeneration,
                 groupConditions = group.groupConditions.Select(PoseTuneConditionUtility.Copy).ToList(),
                 poseSpace = CopyPoseSpace(group.poseSpace),
-                poses = group.GetComponentsInChildren<PoseClip>(true)
+                poses = PoseGroupOwnership.OwnedClips(group)
+                    .Where(pose => pose.GetComponentInParent<PoseTuneRoot>(true) == root)
                     .Where(PoseTuneAuthoringInclusion.Includes)
                     .OrderBy(pose => pose.menuOrder)
                     .ThenBy(pose => pose.displayName)
@@ -39,9 +43,16 @@ namespace Gokoukotori.PoseTune.Editor
 
         public static void ApplyGroupData(PoseTuneRoot root, PoseGroup group, PoseGroupPresetData data)
         {
-            if (!StableGuidExistsOnOtherGroup(root, group, data.groupStableGuid))
+            var requestedStableGuid = NormalizeGuid(data.groupStableGuid);
+            if (!string.IsNullOrEmpty(requestedStableGuid) &&
+                !StableGuidExistsOnOtherGroup(root, group, requestedStableGuid))
             {
-                group.SetStableGuid(data.groupStableGuid);
+                group.SetStableGuid(requestedStableGuid);
+            }
+            else if (string.IsNullOrEmpty(requestedStableGuid) &&
+                     string.IsNullOrEmpty(ReadStableGuid(group)))
+            {
+                group.RegenerateStableGuid();
             }
 
             group.includeInBuild = true;
@@ -69,9 +80,16 @@ namespace Gokoukotori.PoseTune.Editor
 
         public static void ApplyPoseData(PoseTuneRoot root, PoseClip pose, PoseClipPresetData data)
         {
-            if (!StableGuidExistsOnOtherPose(root, pose, data.poseStableGuid))
+            var requestedStableGuid = NormalizeGuid(data.poseStableGuid);
+            if (!string.IsNullOrEmpty(requestedStableGuid) &&
+                !StableGuidExistsOnOtherPose(root, pose, requestedStableGuid))
             {
-                pose.SetStableGuid(data.poseStableGuid);
+                pose.SetStableGuid(requestedStableGuid);
+            }
+            else if (string.IsNullOrEmpty(requestedStableGuid) &&
+                     string.IsNullOrEmpty(ReadStableGuid(pose)))
+            {
+                pose.RegenerateStableGuid();
             }
 
             pose.includeInBuild = true;
@@ -95,7 +113,6 @@ namespace Gokoukotori.PoseTune.Editor
             pose.cameraOffset = data.cameraOffset;
             pose.priority = data.priority;
             pose.blendMode = data.blendMode;
-            pose.tracking = TrackingPolicyUtility.Copy(data.tracking);
             pose.emitTrackingControl = data.emitTrackingControl;
             pose.suppressIconGeneration = data.suppressIconGeneration;
             pose.motionTime = CopyMotionTime(data.motionTime);
@@ -107,6 +124,19 @@ namespace Gokoukotori.PoseTune.Editor
 
         private static PoseClipPresetData CapturePose(PoseClip pose)
         {
+            var policy = pose.GetComponents<PoseTrackingPolicy>().FirstOrDefault();
+            var policyData = policy != null
+                ? CaptureTrackingPolicy(policy)
+                : TrackingPolicyUtility.WasCustomizedFromPoseDefault(pose.tracking)
+                    ? new PoseTrackingPolicyPresetData
+                    {
+                        present = true,
+                        tracking = TrackingPolicyUtility.Copy(pose.tracking),
+                        useFullBodyTrackingOverride = false,
+                        fullBodyTracking = TrackingPolicyData.DefaultForPose(),
+                        generateResetOnExit = true
+                    }
+                    : new PoseTrackingPolicyPresetData { present = false };
             return new PoseClipPresetData
             {
                 poseStableGuid = pose.StableGuid,
@@ -129,8 +159,9 @@ namespace Gokoukotori.PoseTune.Editor
                 cameraOffset = pose.cameraOffset,
                 priority = pose.priority,
                 blendMode = pose.blendMode,
-                tracking = TrackingPolicyUtility.Copy(pose.tracking),
+                tracking = TrackingPolicyData.DefaultForPose(),
                 emitTrackingControl = pose.emitTrackingControl,
+                trackingPolicy = policyData,
                 suppressIconGeneration = pose.suppressIconGeneration,
                 motionTime = CopyMotionTime(pose.motionTime),
                 poseSpace = CopyPoseSpace(pose.poseSpace),
@@ -138,18 +169,93 @@ namespace Gokoukotori.PoseTune.Editor
             };
         }
 
+        public static PoseTrackingPolicyPresetData CaptureTrackingPolicy(PoseTrackingPolicy policy)
+        {
+            if (policy == null)
+            {
+                return new PoseTrackingPolicyPresetData { present = false };
+            }
+
+            return new PoseTrackingPolicyPresetData
+            {
+                present = true,
+                tracking = TrackingPolicyUtility.Copy(policy.tracking),
+                useFullBodyTrackingOverride = policy.useFullBodyTrackingOverride,
+                fullBodyTracking = TrackingPolicyUtility.Copy(policy.fullBodyTracking),
+                generateResetOnExit = policy.generateResetOnExit
+            };
+        }
+
+        public static bool TrackingPolicyMatches(
+            PoseTrackingPolicy policy,
+            PoseTrackingPolicyPresetData data)
+        {
+            if (policy == null || data == null || !data.present || !policy.enabled)
+            {
+                return false;
+            }
+
+            return TrackingPolicyUtility.AreEqual(policy.tracking, data.tracking) &&
+                   policy.useFullBodyTrackingOverride == data.useFullBodyTrackingOverride &&
+                   TrackingPolicyUtility.AreEqual(policy.fullBodyTracking, data.fullBodyTracking) &&
+                   policy.generateResetOnExit == data.generateResetOnExit;
+        }
+
+        public static void ApplyTrackingPolicyData(
+            PoseTrackingPolicy policy,
+            PoseTrackingPolicyPresetData data)
+        {
+            if (policy == null || data == null || !data.present)
+            {
+                return;
+            }
+
+            policy.tracking = TrackingPolicyUtility.Copy(data.tracking);
+            policy.useFullBodyTrackingOverride = data.useFullBodyTrackingOverride;
+            policy.fullBodyTracking = TrackingPolicyUtility.Copy(data.fullBodyTracking);
+            policy.generateResetOnExit = data.generateResetOnExit;
+            policy.enabled = true;
+        }
+
         private static bool StableGuidExistsOnOtherGroup(PoseTuneRoot root, PoseGroup current, string stableGuid)
         {
-            return !string.IsNullOrWhiteSpace(stableGuid) &&
+            var normalized = NormalizeGuid(stableGuid);
+            return !string.IsNullOrEmpty(normalized) &&
                    root.GetComponentsInChildren<PoseGroup>(true)
-                       .Any(group => group != current && group.StableGuid == stableGuid);
+                       .Where(group => group.GetComponentInParent<PoseTuneRoot>(true) == root)
+                       .Any(group => group != current && ReadStableGuid(group) == normalized);
         }
 
         private static bool StableGuidExistsOnOtherPose(PoseTuneRoot root, PoseClip current, string stableGuid)
         {
-            return !string.IsNullOrWhiteSpace(stableGuid) &&
+            var normalized = NormalizeGuid(stableGuid);
+            return !string.IsNullOrEmpty(normalized) &&
                    root.GetComponentsInChildren<PoseClip>(true)
-                       .Any(pose => pose != current && pose.StableGuid == stableGuid);
+                       .Where(pose => pose.GetComponentInParent<PoseTuneRoot>(true) == root)
+                       .Any(pose => pose != current && ReadStableGuid(pose) == normalized);
+        }
+
+        private static string ReadStableGuid(UnityEngine.Object component)
+        {
+            if (component == null)
+            {
+                return "";
+            }
+
+            using var serialized = new SerializedObject(component);
+            return NormalizeGuid(serialized.FindProperty("stableGuid.value")?.stringValue);
+        }
+
+        private static string NormalizeGuid(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return "";
+            }
+
+            return Guid.TryParse(value.Trim(), out var guid)
+                ? guid.ToString("N")
+                : value.Trim();
         }
 
         private static MotionTimeSettings CopyMotionTime(MotionTimeSettings source)

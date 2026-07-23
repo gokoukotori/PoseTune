@@ -89,10 +89,7 @@ namespace Gokoukotori.PoseTune.Editor
                     Object.DestroyImmediate(clone);
                 }
 
-                if (sampleClip != null && sampleClip != pose.clip)
-                {
-                    Object.DestroyImmediate(sampleClip);
-                }
+                PoseClipPreparationService.ReleasePreparedClipForSampling(sampleClip);
             }
         }
 

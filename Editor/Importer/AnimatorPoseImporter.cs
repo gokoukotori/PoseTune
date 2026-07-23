@@ -56,7 +56,8 @@ namespace Gokoukotori.PoseTune.Editor
                     layer.name,
                     result,
                     seen,
-                    options);
+                    options,
+                    new List<List<ParameterConditionData>>());
             }
 
             return result

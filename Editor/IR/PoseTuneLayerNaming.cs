@@ -12,7 +12,6 @@ namespace Gokoukotori.PoseTune.Editor
         public const string LockFeet = "LockFeet";
         public const string LocomotionLock = "LocomotionLock";
         public const string SupineFlag = "SupineFlag";
-        public const string TrackingContext = "PTI/TrackingContext";
         public const string GeneratedRootName = "PoseTune Generated";
 
         public static string ShortGuid(string guid)
@@ -48,6 +47,33 @@ namespace Gokoukotori.PoseTune.Editor
         public static string PoseActiveParameter(PoseDefinition pose)
         {
             return "PTI/PoseActive/" + ShortGuid(pose != null ? pose.Id : "");
+        }
+
+        public static string TrackingVoteParameter(PoseGroupDefinition group)
+        {
+            return "PTI/TrackingVote/" + Sanitize(group != null ? group.Id : "");
+        }
+
+        public static string TrackingResetParameter(TrackingPart part)
+        {
+            return "PTI/TrackingReset/" + part;
+        }
+
+        public static string TrackingArbiterLayerName(TrackingPart part)
+        {
+            return "PT_TrackingArbiter_" + part;
+        }
+
+        private static string Sanitize(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return "unknown";
+            }
+
+            var characters = value.Select(character =>
+                char.IsLetterOrDigit(character) || character == '_' ? character : '_').ToArray();
+            return new string(characters);
         }
 
     }

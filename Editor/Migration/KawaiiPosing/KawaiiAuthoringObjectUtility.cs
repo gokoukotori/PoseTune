@@ -22,9 +22,17 @@ namespace Gokoukotori.PoseTune.Editor
 
             var go = new GameObject(name);
             Undo.RegisterCreatedObjectUndo(go, undoName);
-            go.transform.SetParent(parent, false);
+            Undo.SetTransformParent(go.transform, parent, undoName);
             report.Created(go, kind);
             return go;
+        }
+
+        public static void RecordPrefabModifications(Object target)
+        {
+            if (target != null && PrefabUtility.IsPartOfPrefabInstance(target))
+            {
+                PrefabUtility.RecordPrefabInstancePropertyModifications(target);
+            }
         }
 
         public static VRCAvatarDescriptor ResolveAvatar(GameObject selected)

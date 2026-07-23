@@ -34,7 +34,7 @@ namespace Gokoukotori.PoseTune.Editor
             new ClearGroupParameterAutoFix(PoseTuneDiagnostics.GroupGeneratedParameterConflict.Code, "この group の明示 parameter 名をクリア"),
             new AlignLoopSettingAutoFix(),
             new GenerateThumbnailAutoFix(),
-            new DisableDuplicateRootPoliciesAutoFix(),
+            new ConvertLegacyTrackingPolicyAutoFix(),
             new DisableFbtGuardAutoFix(),
             new AllowFbtAutoFix(),
             new FillKawaiiSourceMotionAutoFix()
@@ -45,6 +45,42 @@ namespace Gokoukotori.PoseTune.Editor
         public IEnumerable<IPoseTuneAutoFix> FindFixes(ValidationIssue issue, PoseGraph graph)
         {
             return fixes.Where(fix => fix.Code == issue.Code && fix.CanFix(issue, graph));
+        }
+    }
+
+    internal sealed class ConvertLegacyTrackingPolicyAutoFix : PoseTuneAutoFixBase
+    {
+        public ConvertLegacyTrackingPolicyAutoFix() : base(
+            PoseTuneDiagnostics.LegacyInlineTrackingPolicy.Code,
+            "旧 tracking 値を PoseTrackingPolicy へ変換",
+            AutoFixSafety.Reversible)
+        {
+        }
+
+        public override bool CanFix(ValidationIssue issue, PoseGraph graph)
+        {
+            return issue.Context is PoseClip pose &&
+                   pose.GetComponent<PoseTrackingPolicy>() == null &&
+                   TrackingPolicyUtility.WasCustomizedFromPoseDefault(pose.tracking);
+        }
+
+        public override void Apply(ValidationIssue issue, PoseGraph graph)
+        {
+            if (issue.Context is not PoseClip pose || pose.GetComponent<PoseTrackingPolicy>() != null)
+            {
+                return;
+            }
+
+            var legacyTracking = TrackingPolicyUtility.Copy(pose.tracking);
+            Undo.RecordObject(pose, Label);
+            var policy = Undo.AddComponent<PoseTrackingPolicy>(pose.gameObject);
+            Undo.RecordObject(policy, Label);
+            policy.tracking = legacyTracking;
+            policy.useFullBodyTrackingOverride = false;
+            policy.generateResetOnExit = true;
+            pose.tracking = TrackingPolicyData.DefaultForPose();
+            EditorUtility.SetDirty(pose);
+            EditorUtility.SetDirty(policy);
         }
     }
 

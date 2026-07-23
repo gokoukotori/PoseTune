@@ -47,10 +47,13 @@ namespace Gokoukotori.PoseTune
         public PoseClipPriority priority = PoseClipPriority.Normal;
         [InspectorName("ブレンドモード")]
         public PoseClipBlendMode blendMode = PoseClipBlendMode.Override;
-        [InspectorName("トラッキング")]
+        [HideInInspector]
+        [InspectorName("トラッキング (legacy)")]
         public TrackingPolicyData tracking = TrackingPolicyData.DefaultForPose();
         [InspectorName("トラッキング制御を生成")]
         public bool emitTrackingControl = true;
+        [InspectorName("トラッキングポリシー")]
+        public PoseTrackingPolicyPresetData trackingPolicy = new();
         [InspectorName("アイコン生成を抑止")]
         public bool suppressIconGeneration;
         [InspectorName("Motion Time")]

@@ -17,7 +17,7 @@ namespace Gokoukotori.PoseTune.Editor
             definition.LayerName = buildable
                 ? NormalizeLayerName(group, usedLayerNames)
                 : LayerBaseName(group);
-            definition.ParameterName = buildable && PoseTuneCompilerRules.AllowsManualControl(root, definition)
+            definition.ParameterName = buildable && PoseTuneCompilerRules.RequiresPoseSelectionParameter(root, definition)
                 ? NormalizeGroupParameter(root, group, usedParameters)
                 : GroupParameterName(root, group);
         }

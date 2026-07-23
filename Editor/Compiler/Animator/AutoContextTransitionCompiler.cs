@@ -18,17 +18,6 @@ namespace Gokoukotori.PoseTune.Editor
                    !hasAutoEntry;
         }
 
-        private static PoseDefinition SelectAutoPose(PoseGroupDefinition group)
-        {
-            return group.Poses
-                .OrderByDescending(pose => pose.Initial)
-                .ThenByDescending(pose => PriorityRank(pose.Priority))
-                .ThenBy(pose => pose.MenuOrder)
-                .ThenBy(pose => pose.DisplayName)
-                .ThenBy(pose => pose.Id)
-                .FirstOrDefault();
-        }
-
         private static bool AllowsManualEntry(PoseTuneRoot root, PoseGroupDefinition group)
         {
             return !root.enableAutoContextSwitch || group.ActivationMode != PoseGroupActivationMode.Auto;
@@ -38,17 +27,10 @@ namespace Gokoukotori.PoseTune.Editor
             PoseTuneRoot root,
             PoseGroupDefinition group,
             PoseDefinition pose,
-            PoseDefinition autoPose,
             List<ParameterConditionData> branch)
         {
             if (!root.enableAutoContextSwitch ||
                 group.ActivationMode == PoseGroupActivationMode.Manual)
-            {
-                return false;
-            }
-
-            if (group.AutoPoseSelectionMode != AutoPoseSelectionMode.SelectedPosePerGroup &&
-                pose != autoPose)
             {
                 return false;
             }

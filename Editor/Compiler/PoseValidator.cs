@@ -41,6 +41,7 @@ namespace Gokoukotori.PoseTune.Editor
             }
 
             PoseTuneParameterValidator.Validate(context, report);
+            PoseTuneConditionValidator.Validate(graph, report);
             PoseTuneHeightValidator.Validate(graph, report);
             PoseTuneKawaiiCompatibilityValidator.ValidateGraph(graph, report);
             PoseTuneGoroneSystemExValidator.Validate(graph, report);

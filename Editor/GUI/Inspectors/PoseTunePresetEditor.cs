@@ -11,6 +11,7 @@ namespace Gokoukotori.PoseTune.Editor
         {
             DrawFields(
                 new PoseTuneFieldLabel("presetName", "プリセット名"),
+                new PoseTuneFieldLabel("rootTrackingPolicy", "Root トラッキングポリシー"),
                 new PoseTuneFieldLabel("groups", "グループ"),
                 new PoseTuneFieldLabel("menu", "メニュー"),
                 new PoseTuneFieldLabel("height", "高さ"));

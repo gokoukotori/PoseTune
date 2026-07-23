@@ -21,6 +21,8 @@ namespace Gokoukotori.PoseTune.Editor
         public TrackingPolicyData Policy = TrackingPolicyData.DefaultForPose();
         public Object Context;
         public bool GenerateResetOnExit = true;
+        public bool HasFullBodyTrackingOverride;
+        public TrackingPolicyData FullBodyTrackingPolicy = TrackingPolicyData.DefaultForPose();
     }
 
     internal sealed class PoseTrackingPolicyResolution
@@ -35,13 +37,15 @@ namespace Gokoukotori.PoseTune.Editor
     {
         public static void CollectRootPolicy(PoseTuneRoot root, PoseGraph graph)
         {
-            var policies = root.GetComponentsInChildren<PoseTrackingPolicy>(true)
+            var allPolicies = root.GetComponentsInChildren<PoseTrackingPolicy>(true)
                 .Where(policy => policy != null && IsRootLevelPolicy(root, policy))
+                .ToList();
+            var policies = allPolicies
                 .Where(PoseTuneAuthoringInclusion.ComponentEnabled)
                 .OrderBy(policy => policy.transform == root.transform ? 0 : 1)
                 .ThenBy(policy => policy.transform.GetSiblingIndex())
                 .ToList();
-            graph.RootTrackingPolicyCount = policies.Count;
+            graph.RootTrackingPolicyCount = allPolicies.Count;
             var policy = policies.FirstOrDefault();
             if (policy == null)
             {
@@ -49,24 +53,34 @@ namespace Gokoukotori.PoseTune.Editor
             }
 
             graph.RootTrackingPolicy = TrackingPolicyUtility.Copy(policy.tracking);
-            graph.HasCustomRootTrackingPolicy =
-                !TrackingPolicyUtility.AreEqual(policy.tracking, TrackingPolicyData.DefaultForPose());
+            // Component presence is the override marker. A policy whose values happen to
+            // equal the defaults is still an explicit authoring decision.
+            graph.HasCustomRootTrackingPolicy = true;
             graph.RootGenerateResetOnExit = policy.generateResetOnExit;
-            graph.HasCustomRootGenerateResetOnExit = !policy.generateResetOnExit;
+            graph.HasCustomRootGenerateResetOnExit = true;
         }
 
         public static PoseTrackingPolicyResolution ResolvePosePolicy(PoseGraph graph, PoseGroup group, PoseClip clip)
         {
+            if (group == null || clip == null || !group.emitTrackingControl || !clip.emitTrackingControl)
+            {
+                return new PoseTrackingPolicyResolution
+                {
+                    Policy = TrackingPolicyUtility.NoChange(),
+                    GenerateResetOnExit = false,
+                    HasFullBodyTrackingOverride = false,
+                    FullBodyTrackingPolicy = TrackingPolicyUtility.NoChange()
+                };
+            }
+
+            var winner = ResolveWinner(graph != null ? graph.RootComponent : null, group, clip);
             var result = new PoseTrackingPolicyResolution
             {
-                Policy = MergeTrackingPolicy(graph, group, clip),
-                GenerateResetOnExit = ResolveGenerateResetOnExit(graph, group, clip)
+                Policy = TrackingPolicyUtility.Copy(winner.Policy),
+                GenerateResetOnExit = winner.GenerateResetOnExit,
+                HasFullBodyTrackingOverride = winner.HasFullBodyTrackingOverride,
+                FullBodyTrackingPolicy = TrackingPolicyUtility.Copy(winner.FullBodyTrackingPolicy)
             };
-            result.HasFullBodyTrackingOverride = TryResolveFullBodyTrackingOverride(
-                graph,
-                group,
-                clip,
-                out result.FullBodyTrackingPolicy);
             return result;
         }
 
@@ -85,38 +99,8 @@ namespace Gokoukotori.PoseTune.Editor
                     return Summary(TrackingPolicySource.None, TrackingPolicyUtility.NoChange(), pose, false);
                 }
 
-                var clipPolicy = pose.GetComponents<PoseTrackingPolicy>()
-                    .FirstOrDefault(PoseTuneAuthoringInclusion.ComponentEnabled);
-                if (clipPolicy != null)
-                {
-                    return Summary(TrackingPolicySource.ClipPolicy, clipPolicy.tracking, clipPolicy,
-                        clipPolicy.generateResetOnExit);
-                }
-
-                if (TrackingPolicyUtility.WasCustomizedFromPoseDefault(pose.tracking))
-                {
-                    return Summary(TrackingPolicySource.ClipField, pose.tracking, pose, true);
-                }
-
-                var groupPolicy = group != null
-                    ? group.GetComponents<PoseTrackingPolicy>().FirstOrDefault(PoseTuneAuthoringInclusion.ComponentEnabled)
-                    : null;
-                if (groupPolicy != null)
-                {
-                    return Summary(TrackingPolicySource.GroupPolicy, groupPolicy.tracking, groupPolicy,
-                        groupPolicy.generateResetOnExit);
-                }
-
-                var rootPolicy = RootPolicy(root);
-                if (rootPolicy != null)
-                {
-                    return Summary(TrackingPolicySource.RootPolicy, rootPolicy.tracking, rootPolicy,
-                        rootPolicy.generateResetOnExit);
-                }
-
-                return Summary(TrackingPolicySource.KindDefault,
-                    TrackingPolicyUtility.DefaultForGroup(group != null ? group.kind : PoseGroupKind.Custom),
-                    group != null ? group : root, true);
+                var winner = ResolveWinner(root, group, pose);
+                return Summary(winner);
             }
 
             if (selectedObject is PoseGroup selectedGroup)
@@ -130,24 +114,25 @@ namespace Gokoukotori.PoseTune.Editor
                     .FirstOrDefault(PoseTuneAuthoringInclusion.ComponentEnabled);
                 if (groupPolicy != null)
                 {
-                    return Summary(TrackingPolicySource.GroupPolicy, groupPolicy.tracking, groupPolicy,
-                        groupPolicy.generateResetOnExit);
+                    return Summary(ResolvedPolicy.FromComponent(
+                        TrackingPolicySource.GroupPolicy,
+                        groupPolicy));
                 }
 
                 var rootPolicy = RootPolicy(root);
                 if (rootPolicy != null)
                 {
-                    return Summary(TrackingPolicySource.RootPolicy, rootPolicy.tracking, rootPolicy,
-                        rootPolicy.generateResetOnExit);
+                    return Summary(ResolvedPolicy.FromComponent(
+                        TrackingPolicySource.RootPolicy,
+                        rootPolicy));
                 }
 
-                return Summary(TrackingPolicySource.KindDefault,
-                    TrackingPolicyUtility.DefaultForGroup(selectedGroup.kind), selectedGroup, true);
+                return Summary(ResolvedPolicy.FromDefault(selectedGroup.kind, selectedGroup));
             }
 
             var policy = RootPolicy(root);
             return policy != null
-                ? Summary(TrackingPolicySource.RootPolicy, policy.tracking, policy, policy.generateResetOnExit)
+                ? Summary(ResolvedPolicy.FromComponent(TrackingPolicySource.RootPolicy, policy))
                 : Summary(TrackingPolicySource.KindDefault, TrackingPolicyData.DefaultForPose(), root, true);
         }
 
@@ -163,120 +148,110 @@ namespace Gokoukotori.PoseTune.Editor
                 : null;
         }
 
+        private static TrackingPolicySummary Summary(ResolvedPolicy resolved)
+        {
+            return new TrackingPolicySummary
+            {
+                Source = resolved.Source,
+                Policy = TrackingPolicyUtility.Copy(resolved.Policy),
+                Context = resolved.Context,
+                GenerateResetOnExit = resolved.GenerateResetOnExit,
+                HasFullBodyTrackingOverride = resolved.HasFullBodyTrackingOverride,
+                FullBodyTrackingPolicy = TrackingPolicyUtility.Copy(resolved.FullBodyTrackingPolicy)
+            };
+        }
+
         private static TrackingPolicySummary Summary(
             TrackingPolicySource source,
             TrackingPolicyData policy,
             Object context,
             bool generateResetOnExit)
         {
-            return new TrackingPolicySummary
+            return Summary(new ResolvedPolicy
             {
                 Source = source,
                 Policy = TrackingPolicyUtility.Copy(policy),
                 Context = context,
-                GenerateResetOnExit = generateResetOnExit
-            };
+                GenerateResetOnExit = generateResetOnExit,
+                FullBodyTrackingPolicy = TrackingPolicyData.DefaultForPose()
+            });
         }
 
-        private static TrackingPolicyData MergeTrackingPolicy(PoseGraph graph, PoseGroup group, PoseClip clip)
+        private static ResolvedPolicy ResolveWinner(PoseTuneRoot root, PoseGroup group, PoseClip clip)
         {
-            if (!group.emitTrackingControl || !clip.emitTrackingControl)
-            {
-                return TrackingPolicyUtility.NoChange();
-            }
-
-            var groupPolicy = group.GetComponents<PoseTrackingPolicy>()
-                .FirstOrDefault(PoseTuneAuthoringInclusion.ComponentEnabled);
             var clipPolicy = clip.GetComponents<PoseTrackingPolicy>()
                 .FirstOrDefault(PoseTuneAuthoringInclusion.ComponentEnabled);
             if (clipPolicy != null)
             {
-                return TrackingPolicyUtility.Copy(clipPolicy.tracking);
+                return ResolvedPolicy.FromComponent(TrackingPolicySource.ClipPolicy, clipPolicy);
             }
 
             if (TrackingPolicyUtility.WasCustomizedFromPoseDefault(clip.tracking))
             {
-                return TrackingPolicyUtility.Copy(clip.tracking);
+                return new ResolvedPolicy
+                {
+                    Source = TrackingPolicySource.ClipField,
+                    Policy = TrackingPolicyUtility.Copy(clip.tracking),
+                    Context = clip,
+                    GenerateResetOnExit = true,
+                    HasFullBodyTrackingOverride = false,
+                    FullBodyTrackingPolicy = TrackingPolicyData.DefaultForPose()
+                };
             }
 
-            if (groupPolicy != null)
-            {
-                return TrackingPolicyUtility.Copy(groupPolicy.tracking);
-            }
-
-            return graph.HasCustomRootTrackingPolicy
-                ? TrackingPolicyUtility.Copy(graph.RootTrackingPolicy)
-                : TrackingPolicyUtility.DefaultForGroup(group.kind);
-        }
-
-        private static bool ResolveGenerateResetOnExit(PoseGraph graph, PoseGroup group, PoseClip clip)
-        {
-            if (!group.emitTrackingControl || !clip.emitTrackingControl)
-            {
-                return false;
-            }
-
-            var clipPolicy = clip.GetComponents<PoseTrackingPolicy>()
-                .FirstOrDefault(PoseTuneAuthoringInclusion.ComponentEnabled);
-            if (clipPolicy != null)
-            {
-                return clipPolicy.generateResetOnExit;
-            }
-
-            var groupPolicy = group.GetComponents<PoseTrackingPolicy>()
-                .FirstOrDefault(PoseTuneAuthoringInclusion.ComponentEnabled);
-            if (groupPolicy != null)
-            {
-                return groupPolicy.generateResetOnExit;
-            }
-
-            return graph.HasCustomRootGenerateResetOnExit ? graph.RootGenerateResetOnExit : true;
-        }
-
-        private static bool TryResolveFullBodyTrackingOverride(
-            PoseGraph graph,
-            PoseGroup group,
-            PoseClip clip,
-            out TrackingPolicyData tracking)
-        {
-            if (!group.emitTrackingControl || !clip.emitTrackingControl)
-            {
-                tracking = TrackingPolicyUtility.NoChange();
-                return false;
-            }
-
-            var clipPolicy = clip.GetComponents<PoseTrackingPolicy>()
-                .FirstOrDefault(PoseTuneAuthoringInclusion.ComponentEnabled);
-            if (clipPolicy != null && clipPolicy.useFullBodyTrackingOverride)
-            {
-                tracking = TrackingPolicyUtility.Copy(clipPolicy.fullBodyTracking);
-                return true;
-            }
-
-            var groupPolicy = group.GetComponents<PoseTrackingPolicy>()
-                .FirstOrDefault(PoseTuneAuthoringInclusion.ComponentEnabled);
-            if (groupPolicy != null && groupPolicy.useFullBodyTrackingOverride)
-            {
-                tracking = TrackingPolicyUtility.Copy(groupPolicy.fullBodyTracking);
-                return true;
-            }
-
-            var rootPolicy = graph.RootComponent != null
-                ? graph.RootComponent.GetComponentsInChildren<PoseTrackingPolicy>(true)
-                    .Where(policy => policy != null && IsRootLevelPolicy(graph.RootComponent, policy))
-                    .Where(PoseTuneAuthoringInclusion.ComponentEnabled)
-                    .OrderBy(policy => policy.transform == graph.RootComponent.transform ? 0 : 1)
-                    .ThenBy(policy => policy.transform.GetSiblingIndex())
-                    .FirstOrDefault(policy => policy.useFullBodyTrackingOverride)
+            var groupPolicy = group != null
+                ? group.GetComponents<PoseTrackingPolicy>()
+                    .FirstOrDefault(PoseTuneAuthoringInclusion.ComponentEnabled)
                 : null;
+            if (groupPolicy != null)
+            {
+                return ResolvedPolicy.FromComponent(TrackingPolicySource.GroupPolicy, groupPolicy);
+            }
+
+            var rootPolicy = RootPolicy(root);
             if (rootPolicy != null)
             {
-                tracking = TrackingPolicyUtility.Copy(rootPolicy.fullBodyTracking);
-                return true;
+                return ResolvedPolicy.FromComponent(TrackingPolicySource.RootPolicy, rootPolicy);
             }
 
-            tracking = TrackingPolicyData.DefaultForPose();
-            return false;
+            return ResolvedPolicy.FromDefault(group != null ? group.kind : PoseGroupKind.Custom,
+                group != null ? (Object)group : root);
+        }
+
+        private sealed class ResolvedPolicy
+        {
+            public TrackingPolicySource Source;
+            public TrackingPolicyData Policy;
+            public Object Context;
+            public bool GenerateResetOnExit;
+            public bool HasFullBodyTrackingOverride;
+            public TrackingPolicyData FullBodyTrackingPolicy;
+
+            public static ResolvedPolicy FromComponent(TrackingPolicySource source, PoseTrackingPolicy component)
+            {
+                return new ResolvedPolicy
+                {
+                    Source = source,
+                    Policy = TrackingPolicyUtility.Copy(component.tracking),
+                    Context = component,
+                    GenerateResetOnExit = component.generateResetOnExit,
+                    HasFullBodyTrackingOverride = component.useFullBodyTrackingOverride,
+                    FullBodyTrackingPolicy = TrackingPolicyUtility.Copy(component.fullBodyTracking)
+                };
+            }
+
+            public static ResolvedPolicy FromDefault(PoseGroupKind kind, Object context)
+            {
+                return new ResolvedPolicy
+                {
+                    Source = TrackingPolicySource.KindDefault,
+                    Policy = TrackingPolicyUtility.DefaultForGroup(kind),
+                    Context = context,
+                    GenerateResetOnExit = true,
+                    HasFullBodyTrackingOverride = false,
+                    FullBodyTrackingPolicy = TrackingPolicyData.DefaultForPose()
+                };
+            }
         }
 
         private static bool IsRootLevelPolicy(PoseTuneRoot root, PoseTrackingPolicy policy)

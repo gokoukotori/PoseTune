@@ -3,37 +3,66 @@ using System.Linq;
 
 namespace Gokoukotori.PoseTune.Editor
 {
-    internal sealed class TrackingContextRegistry
+    internal enum TrackingPart
     {
-        private readonly List<TrackingContextDefinition> contexts = new();
+        Head,
+        LeftHand,
+        RightHand,
+        Hip,
+        LeftFoot,
+        RightFoot,
+        LeftFingers,
+        RightFingers,
+        Eyes,
+        Mouth
+    }
 
-        public IReadOnlyList<TrackingContextDefinition> Contexts => contexts;
+    internal sealed class TrackingVoteRegistry
+    {
+        private readonly List<TrackingVoteDefinition> votes = new();
 
-        public int GetOrAdd(TrackingPolicyData policy)
+        public IReadOnlyList<TrackingVoteDefinition> Votes => votes;
+
+        public int GetOrAdd(
+            PoseGroupDefinition group,
+            PoseDefinition pose,
+            string variant,
+            TrackingPolicyData policy)
         {
             var copy = policy != null
                 ? TrackingPolicyUtility.Copy(policy)
                 : TrackingPolicyUtility.NoChange();
-            var existing = contexts.FirstOrDefault(context =>
-                TrackingPolicyUtility.AreEqual(context.Policy, copy));
+            var existing = votes.FirstOrDefault(vote =>
+                vote.GroupId == (group?.Id ?? "") &&
+                vote.PoseId == (pose?.Id ?? "") &&
+                vote.Variant == (variant ?? ""));
             if (existing != null)
             {
                 return existing.Id;
             }
 
-            var definition = new TrackingContextDefinition
+            var definition = new TrackingVoteDefinition
             {
-                Id = contexts.Count + 1,
+                Id = votes.Where(vote => vote.GroupId == (group?.Id ?? ""))
+                    .Select(vote => vote.Id)
+                    .DefaultIfEmpty(0)
+                    .Max() + 1,
+                GroupId = group?.Id ?? "",
+                PoseId = pose?.Id ?? "",
+                Variant = variant ?? "",
                 Policy = copy
             };
-            contexts.Add(definition);
+            votes.Add(definition);
             return definition.Id;
         }
     }
 
-    internal sealed class TrackingContextDefinition
+    internal sealed class TrackingVoteDefinition
     {
         public int Id { get; set; }
+        public string GroupId { get; set; }
+        public string PoseId { get; set; }
+        public string Variant { get; set; }
         public TrackingPolicyData Policy { get; set; }
     }
 }

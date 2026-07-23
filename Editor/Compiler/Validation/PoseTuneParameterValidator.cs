@@ -56,7 +56,7 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
             }
 
             foreach (var group in PoseGraphBuildFilter.BuildableGroups(graph)
-                         .Where(group => PoseTuneCompilerRules.AllowsManualControl(graph.RootComponent, group)))
+                         .Where(group => PoseTuneCompilerRules.RequiresPoseSelectionParameter(graph.RootComponent, group)))
             {
                 Check(group.ParameterName, PoseTuneParameterSyncType.Int, group.Source);
             }

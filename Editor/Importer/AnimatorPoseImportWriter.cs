@@ -38,7 +38,13 @@ namespace Gokoukotori.PoseTune.Editor
                 pose.displayName = string.IsNullOrWhiteSpace(candidate.DisplayName)
                     ? ObjectNames.NicifyVariableName(candidate.Clip.name)
                     : candidate.DisplayName;
-                pose.tracking = TrackingPolicyUtility.Copy(candidate.TrackingPolicy);
+                pose.emitTrackingControl = candidate.HasTrackingBehavior;
+                if (candidate.HasTrackingBehavior)
+                {
+                    var policy = Undo.AddComponent<PoseTrackingPolicy>(pose.gameObject);
+                    policy.tracking = TrackingPolicyUtility.Copy(candidate.TrackingPolicy);
+                    EditorUtility.SetDirty(policy);
+                }
                 var branches = candidate.ConditionBranches?
                     .Where(branch => branch != null)
                     .Select(branch => branch.Select(PoseTuneConditionUtility.Copy).ToList())

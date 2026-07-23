@@ -1,6 +1,7 @@
 using System.Linq;
 using Gokoukotori.PoseTune;
 using Gokoukotori.PoseTune.Editor.Compiler.Hashing;
+using nadena.dev.ndmf.animator;
 using UnityEditor.Animations;
 using UnityEngine;
 using VRC.SDK3.Avatars.Components;
@@ -10,7 +11,7 @@ namespace Gokoukotori.PoseTune.Editor
 {
     public sealed class PoseTunePostBuildValidator
     {
-        public ValidationReport Validate(PoseGraph graph)
+        public ValidationReport Validate(PoseGraph graph, VirtualControllerContext virtualControllers = null)
         {
             var report = new ValidationReport();
             if (graph?.RootComponent == null || graph.AvatarRoot == null)
@@ -35,7 +36,7 @@ namespace Gokoukotori.PoseTune.Editor
                 }
             }
 
-            ValidateMergedOutputs(graph, report);
+            ValidateMergedOutputs(graph, virtualControllers, report);
             return report;
         }
 
@@ -59,7 +60,10 @@ namespace Gokoukotori.PoseTune.Editor
             }
         }
 
-        private static void ValidateMergedOutputs(PoseGraph graph, ValidationReport report)
+        private static void ValidateMergedOutputs(
+            PoseGraph graph,
+            VirtualControllerContext virtualControllers,
+            ValidationReport report)
         {
             var descriptor = graph.AvatarDescriptor;
             var parameters = new ParameterAllocator().Allocate(graph);
@@ -75,7 +79,7 @@ namespace Gokoukotori.PoseTune.Editor
 
             var modeParameter = graph.RootComponent.Parameter(PoseTuneNames.Mode);
             if ((graph.Menu == null || graph.Menu.installMode != MenuInstallMode.None) &&
-                !MenuContainsParameter(descriptor.expressionsMenu, modeParameter))
+                !ExpressionMenuParameterSearch.Contains(descriptor.expressionsMenu, modeParameter))
             {
                 report.Error(PoseTuneDiagnostics.BuildMenuControlMissing.Code, "最終 Expressions Menu に PoseTune メニューコントロールがありません。", graph.RootComponent);
             }
@@ -83,14 +87,54 @@ namespace Gokoukotori.PoseTune.Editor
             var targetLayer = graph.RootComponent.targetLayer == PoseTuneTargetLayer.Base
                 ? VRCAvatarDescriptor.AnimLayerType.Base
                 : VRCAvatarDescriptor.AnimLayerType.Action;
-            var targetController = ControllerForLayer(descriptor, targetLayer);
-            if (targetController == null ||
-                PoseGraphBuildFilter.BuildableGroups(graph)
-                    .SelectMany(PoseTuneLayerNaming.ExpectedLayerNames)
-                    .Any(layerName => !targetController.layers.Any(layer => layer.name == layerName)))
+            VirtualAnimatorController virtualController = null;
+            if (virtualControllers != null)
+            {
+                if (!virtualControllers.Controllers.TryGetValue(targetLayer, out virtualController) ||
+                    virtualController == null)
+                {
+                    report.Error(
+                        PoseTuneDiagnostics.BuildPlayableLayerMissing.Code,
+                        "NDMF Animator Services の最終 playable layer に PoseTune の対象 controller がありません。",
+                        graph.RootComponent);
+                    return;
+                }
+
+            }
+
+            var targetController = virtualControllers == null
+                ? ControllerForLayer(descriptor, targetLayer)
+                : null;
+            if (virtualController == null && targetController == null)
             {
                 report.Error(PoseTuneDiagnostics.BuildPlayableLayerMissing.Code, "最終 Avatar playable layer に PoseTune のポーズレイヤーがありません。",
                     graph.RootComponent);
+                return;
+            }
+
+            var layerNames = virtualController != null
+                ? virtualController.Layers.Select(layer => layer.Name)
+                : targetController.layers.Select(layer => layer.name);
+            if (PoseGraphBuildFilter.BuildableGroups(graph)
+                .SelectMany(PoseTuneLayerNaming.ExpectedLayerNames)
+                .Any(layerName => !layerNames.Contains(layerName)))
+            {
+                report.Error(PoseTuneDiagnostics.BuildPlayableLayerMissing.Code, "最終 Avatar playable layer に PoseTune のポーズレイヤーがありません。",
+                    graph.RootComponent);
+            }
+
+            var animatorValidator = new PoseTuneAnimatorValidator();
+            var animatorReport = virtualController != null
+                ? animatorValidator.Validate(graph, virtualController)
+                : animatorValidator.Validate(graph, targetController);
+            foreach (var error in animatorReport.Errors)
+            {
+                report.Errors.Add(error);
+            }
+
+            foreach (var warning in animatorReport.Warnings)
+            {
+                report.Warnings.Add(warning);
             }
         }
 
@@ -99,35 +143,6 @@ namespace Gokoukotori.PoseTune.Editor
             return parameters != null &&
                    parameters.parameters != null &&
                    parameters.parameters.Any(parameter => parameter != null && parameter.name == name);
-        }
-
-        private static bool MenuContainsParameter(VRCExpressionsMenu menu, string parameterName)
-        {
-            if (menu == null || menu.controls == null)
-            {
-                return false;
-            }
-
-            foreach (var control in menu.controls)
-            {
-                if (control.parameter != null && control.parameter.name == parameterName)
-                {
-                    return true;
-                }
-
-                if (control.subParameters != null &&
-                    control.subParameters.Any(parameter => parameter != null && parameter.name == parameterName))
-                {
-                    return true;
-                }
-
-                if (MenuContainsParameter(control.subMenu, parameterName))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         private static AnimatorController ControllerForLayer(

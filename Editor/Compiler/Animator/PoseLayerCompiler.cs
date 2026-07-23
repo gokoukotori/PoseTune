@@ -28,22 +28,10 @@ namespace Gokoukotori.PoseTune.Editor
             result.GeneratedAssets.Add(empty);
             layer.stateMachine.defaultState = idle;
 
-            var emitTrackingControl = poses.Any(pose => pose.EmitTrackingControl);
-            var controlsTrackingContext = ParameterAllocator.NeedsTrackingContext(graph);
             var exclusiveResetTargets = ExclusiveResetTargets(graph, group);
             var poseActiveParameters = NeedsManualCommitGuard(graph.RootComponent, group, exclusiveResetTargets)
                 ? poses.Select(PoseTuneNames.PoseActiveParameter).Distinct().ToList()
                 : new List<string>();
-            var reset = CreateCleanupState(result, layer, group, "ResetTracking", layerName + "_ResetHold",
-                new Vector3(520, 80), emitTrackingControl, controlsActionPlayable, activeParameter,
-                poseActiveParameters, controlsTrackingContext);
-            var noResetCleanup = poses.Any(pose => !pose.GenerateResetOnExit)
-                ? CreateCleanupState(result, layer, group, "ExitCleanupNoReset", layerName + "_NoResetHold",
-                    new Vector3(760, 80), false, controlsActionPlayable, activeParameter,
-                    poseActiveParameters, controlsTrackingContext)
-                : null;
-
-            var autoPose = SelectAutoPose(group);
             var x = 240;
             var y = 180;
             var orderedPoses = PosesForTransitionGeneration(poses);
@@ -64,12 +52,53 @@ namespace Gokoukotori.PoseTune.Editor
                     controlsActionPlayable,
                     activeParameter,
                     poseActiveParameter);
+                variants.BaseHandoff = CreateCleanupState(
+                    result,
+                    layer,
+                    graph,
+                    group,
+                    pose,
+                    PoseStateNaming.CleanupName(pose, duplicateStateBaseNames),
+                    layerName + "_" + PoseTuneNames.ShortGuid(pose.Id) + "_HandoffHold",
+                    new Vector3(x + 1120, y),
+                    controlsActionPlayable,
+                    activeParameter,
+                    poseActiveParameters,
+                    variants.BaseTrackingPolicy);
+                if (variants.DesktopLowerBodyState != null)
+                {
+                    variants.DesktopLowerBodyHandoff = CreateCleanupState(
+                        result, layer, graph, group, pose,
+                        PoseStateNaming.CleanupName(pose, duplicateStateBaseNames, "_Desktop"),
+                        layerName + "_" + PoseTuneNames.ShortGuid(pose.Id) + "_Desktop_HandoffHold",
+                        new Vector3(x + 1260, y), controlsActionPlayable, activeParameter,
+                        poseActiveParameters, variants.DesktopLowerBodyTrackingPolicy);
+                }
+
+                if (variants.VrState != null)
+                {
+                    variants.VrHandoff = CreateCleanupState(
+                        result, layer, graph, group, pose,
+                        PoseStateNaming.CleanupName(pose, duplicateStateBaseNames, "_VR"),
+                        layerName + "_" + PoseTuneNames.ShortGuid(pose.Id) + "_VR_HandoffHold",
+                        new Vector3(x + 1400, y), controlsActionPlayable, activeParameter,
+                        poseActiveParameters, variants.VrTrackingPolicy);
+                }
+
+                if (variants.FullBodyState != null)
+                {
+                    variants.FullBodyHandoff = CreateCleanupState(
+                        result, layer, graph, group, pose,
+                        PoseStateNaming.CleanupName(pose, duplicateStateBaseNames, "_FBT"),
+                        layerName + "_" + PoseTuneNames.ShortGuid(pose.Id) + "_FBT_HandoffHold",
+                        new Vector3(x + 1540, y), controlsActionPlayable, activeParameter,
+                        poseActiveParameters, variants.FullBodyTrackingPolicy);
+                }
                 var hasAutoEntry = AddPoseEntryTransitions(
                     layer,
                     graph,
                     group,
                     pose,
-                    autoPose,
                     variants,
                     duplicateStateBaseNames,
                     exclusiveResetTargets,
@@ -79,15 +108,186 @@ namespace Gokoukotori.PoseTune.Editor
                     poseActiveParameter,
                     x,
                     y);
-                var cleanup = CleanupStateForPose(pose, reset, noResetCleanup);
-                AddPoseExitTransitions(variants, cleanup, graph, group, pose, hasAutoEntry);
+                AddPoseExitTransitions(variants, graph, group, pose, hasAutoEntry);
+                AddCleanupReturnTransition(idle, variants.BaseHandoff);
+                if (variants.DesktopLowerBodyHandoff != null)
+                {
+                    AddCleanupReturnTransition(idle, variants.DesktopLowerBodyHandoff);
+                }
+                if (variants.VrHandoff != null)
+                {
+                    AddCleanupReturnTransition(idle, variants.VrHandoff);
+                }
+                if (variants.FullBodyHandoff != null)
+                {
+                    AddCleanupReturnTransition(idle, variants.FullBodyHandoff);
+                }
 
                 y += 100;
             }
 
-            AddCleanupReturnTransitions(idle, reset, noResetCleanup);
-
             result.TargetController.AddLayer(layer);
+        }
+
+        private static void AddHigherPriorityAutoPreemptionTransitions(
+            AnimatorController controller,
+            PoseGraph graph,
+            PoseGroupDefinition group)
+        {
+            if (graph?.RootComponent == null ||
+                !graph.RootComponent.enableAutoContextSwitch ||
+                group == null ||
+                group.ActivationMode == PoseGroupActivationMode.Manual)
+            {
+                return;
+            }
+
+            var records = AutoPreemptionRecords(controller, graph, group);
+            var modeParameter = graph.RootComponent.Parameter(PoseTuneNames.Mode);
+            var voteParameter = PoseTuneNames.TrackingVoteParameter(group);
+            var activeParameters = new HashSet<string>(PoseTuneLayerNaming.GroupActiveParameters(group));
+            for (var lowerIndex = 1; lowerIndex < records.Count; lowerIndex++)
+            {
+                var higherRecords = records.Take(lowerIndex).ToList();
+                var higherStates = new HashSet<AnimatorState>(higherRecords
+                    .SelectMany(record => record.Variants)
+                    .Select(pair => pair.State));
+                var higherAutoEntries = records
+                    .Take(lowerIndex)
+                    .SelectMany(record => record.Layer.stateMachine.anyStateTransitions ??
+                        System.Array.Empty<AnimatorStateTransition>())
+                    .Distinct()
+                    .Where(transition =>
+                        transition != null &&
+                        transition.destinationState != null &&
+                        higherStates.Contains(transition.destinationState) &&
+                        (transition.conditions ?? System.Array.Empty<AnimatorCondition>()).Any(condition =>
+                            condition.parameter == modeParameter &&
+                            condition.mode == AnimatorConditionMode.Equals &&
+                            Mathf.Approximately(condition.threshold, 1f)))
+                    .ToList();
+
+                foreach (var pair in records[lowerIndex].Variants)
+                {
+                    foreach (var higherEntry in higherAutoEntries)
+                    {
+                        var preempt = pair.State.AddTransition(pair.Handoff);
+                        preempt.hasExitTime = false;
+                        preempt.duration = 0f;
+                        foreach (var condition in higherEntry.conditions ??
+                                 System.Array.Empty<AnimatorCondition>())
+                        {
+                            if (condition.parameter == voteParameter &&
+                                condition.mode == AnimatorConditionMode.Equals &&
+                                Mathf.Approximately(condition.threshold, 0f))
+                            {
+                                continue;
+                            }
+
+                            if (activeParameters.Contains(condition.parameter) &&
+                                condition.mode == AnimatorConditionMode.Less &&
+                                Mathf.Approximately(condition.threshold, 0.5f))
+                            {
+                                continue;
+                            }
+
+                            preempt.AddCondition(condition.mode, condition.threshold, condition.parameter);
+                        }
+                    }
+                }
+            }
+        }
+
+        private static List<PoseLayerRecord> AutoPreemptionRecords(
+            AnimatorController controller,
+            PoseGraph graph,
+            PoseGroupDefinition group)
+        {
+            var buckets = PoseTuneLayerNaming.LayerBuckets(group);
+            var result = new List<PoseLayerRecord>();
+            foreach (var pose in PosesForTransitionGeneration(group.Poses))
+            {
+                var bucket = buckets.First(candidate => candidate.Poses.Contains(pose));
+                var layer = controller.layers.Last(candidate => candidate.name == bucket.LayerName);
+                var duplicates = PoseStateNaming.DuplicateBaseNames(bucket.Poses);
+                var variants = new List<PoseVariantHandoff>();
+                AddVariantHandoff(
+                    layer,
+                    variants,
+                    PoseStateNaming.Name(pose, duplicates),
+                    PoseStateNaming.CleanupName(pose, duplicates));
+                if (PoseStateVariantRules.NeedsDesktopLowerBodyLockVariant(graph.RootComponent, group, pose))
+                {
+                    AddVariantHandoff(
+                        layer,
+                        variants,
+                        PoseStateNaming.Name(pose, duplicates, "_Desktop"),
+                        PoseStateNaming.CleanupName(pose, duplicates, "_Desktop"));
+                }
+
+                if (PoseStateVariantRules.NeedsPoseSpaceVrVariant(pose))
+                {
+                    AddVariantHandoff(
+                        layer,
+                        variants,
+                        PoseStateNaming.Name(pose, duplicates, "_VR"),
+                        PoseStateNaming.CleanupName(pose, duplicates, "_VR"));
+                }
+
+                if (pose.HasFullBodyTrackingOverride &&
+                    graph.RootComponent.advancedSettings?.allowFullBodyTracking == true)
+                {
+                    AddVariantHandoff(
+                        layer,
+                        variants,
+                        PoseStateNaming.Name(pose, duplicates, "_FBT"),
+                        PoseStateNaming.CleanupName(pose, duplicates, "_FBT"));
+                }
+
+                result.Add(new PoseLayerRecord
+                {
+                    Layer = layer,
+                    Variants = variants
+                });
+            }
+
+            return result;
+        }
+
+        private static void AddVariantHandoff(
+            AnimatorControllerLayer layer,
+            ICollection<PoseVariantHandoff> variants,
+            string stateName,
+            string handoffName)
+        {
+            var state = layer.stateMachine.states
+                .Select(child => child.state)
+                .FirstOrDefault(candidate => candidate != null && candidate.name == stateName);
+            var handoff = layer.stateMachine.states
+                .Select(child => child.state)
+                .FirstOrDefault(candidate => candidate != null && candidate.name == handoffName);
+            if (state != null && handoff != null)
+            {
+                variants.Add(new PoseVariantHandoff(state, handoff));
+            }
+        }
+
+        private sealed class PoseLayerRecord
+        {
+            public AnimatorControllerLayer Layer;
+            public List<PoseVariantHandoff> Variants;
+        }
+
+        private readonly struct PoseVariantHandoff
+        {
+            public PoseVariantHandoff(AnimatorState state, AnimatorState handoff)
+            {
+                State = state;
+                Handoff = handoff;
+            }
+
+            public AnimatorState State { get; }
+            public AnimatorState Handoff { get; }
         }
 
         private static List<PoseGroupDefinition> ExclusiveResetTargets(PoseGraph graph, PoseGroupDefinition group)
@@ -128,9 +328,33 @@ namespace Gokoukotori.PoseTune.Editor
 
         private static void AddManualGroupDeselectedCondition(
             AnimatorStateTransition transition,
+            PoseTuneRoot root,
+            PoseGroupDefinition group,
+            PoseDefinition pose)
+        {
+            transition.AddCondition(
+                AnimatorConditionMode.NotEqual,
+                pose.SelectionValue(root),
+                group.ParameterName);
+        }
+
+        private static void AddTrackingVoteClearedCondition(
+            AnimatorStateTransition transition,
+            PoseGraph graph,
             PoseGroupDefinition group)
         {
-            transition.AddCondition(AnimatorConditionMode.Less, 0.5f, group.ParameterName);
+            if (ParameterAllocator.RequiresTrackingVote(graph, group))
+            {
+                transition.AddCondition(
+                    AnimatorConditionMode.Equals,
+                    0f,
+                    PoseTuneNames.TrackingVoteParameter(group));
+            }
+
+            foreach (var activeParameter in PoseTuneLayerNaming.GroupActiveParameters(group))
+            {
+                transition.AddCondition(AnimatorConditionMode.Less, 0.5f, activeParameter);
+            }
         }
 
         private static AnimatorState CreateExclusiveCommitState(
@@ -147,7 +371,7 @@ namespace Gokoukotori.PoseTune.Editor
             int x,
             int y,
             string stateNameSuffix = "",
-            int trackingContextId = 0)
+            int trackingVoteId = 0)
         {
             var commit = layer.stateMachine.AddState(
                 "CommitExclusive_" + PoseStateNaming.Name(pose, duplicateStateBaseNames) + stateNameSuffix,
@@ -163,9 +387,9 @@ namespace Gokoukotori.PoseTune.Editor
             {
                 ParameterDriverCompiler.SetGroupActive(commit, activeParameter, 1f);
             }
-            if (trackingContextId > 0)
+            if (trackingVoteId > 0)
             {
-                ParameterDriverCompiler.SetTrackingContext(commit, trackingContextId);
+                ParameterDriverCompiler.SetTrackingVote(commit, group, trackingVoteId);
             }
             var toPose = commit.AddTransition(destination);
             toPose.hasExitTime = true;

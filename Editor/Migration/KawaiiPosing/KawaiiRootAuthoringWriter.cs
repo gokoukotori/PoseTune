@@ -20,7 +20,7 @@ namespace Gokoukotori.PoseTune.Editor
             EnsureGroupsRoot(root, report, undoName);
             EnsureMenu(root, report, undoName);
             KawaiiHeightAuthoringWriter.EnsureHeight(root, options, report, undoName);
-            EnsureTrackingPolicy(root, options, dtos, report);
+            EnsureTrackingPolicy(root, options, report);
             EnsurePoseOptions(root, report, undoName);
             return root;
         }
@@ -46,9 +46,9 @@ namespace Gokoukotori.PoseTune.Editor
 
             var rootObject = new GameObject("PoseTune Kawaii Migration");
             Undo.RegisterCreatedObjectUndo(rootObject, undoName);
-            rootObject.transform.SetParent(KawaiiAuthoringObjectUtility.ResolveAvatar(avatarRoot).transform, false);
-            var root = rootObject.AddComponent<PoseTuneRoot>();
-            rootObject.AddComponent<PoseTuneAssistant>();
+            Undo.SetTransformParent(rootObject.transform, KawaiiAuthoringObjectUtility.ResolveAvatar(avatarRoot).transform, undoName);
+            var root = Undo.AddComponent<PoseTuneRoot>(rootObject);
+            Undo.AddComponent<PoseTuneAssistant>(rootObject);
             report.Created(rootObject, "Root");
             return root;
         }
@@ -96,62 +96,68 @@ namespace Gokoukotori.PoseTune.Editor
             }
 
             EditorUtility.SetDirty(root);
+            KawaiiAuthoringObjectUtility.RecordPrefabModifications(root);
         }
 
         private static void EnsureMenu(PoseTuneRoot root, KawaiiMigrationReport report, string undoName)
         {
-            var existing = root.GetComponentInChildren<PoseMenu>(true);
+            var existing = root.GetComponentsInChildren<PoseMenu>(true)
+                .FirstOrDefault(menu => menu.GetComponentInParent<PoseTuneRoot>(true) == root);
             if (existing != null)
             {
                 Undo.RecordObject(existing, undoName);
+                ((Behaviour)existing).enabled = true;
                 existing.lyingMenuLayout = LyingMenuLayout.SeparateGroups;
                 existing.generateIcons = root.enableIconGeneration;
                 EditorUtility.SetDirty(existing);
+                KawaiiAuthoringObjectUtility.RecordPrefabModifications(existing);
                 return;
             }
 
             var menu = KawaiiAuthoringObjectUtility.EnsureChild(root.transform, "メニュー", report, "Menu", undoName);
-            var poseMenu = menu.GetComponent<PoseMenu>() ?? menu.AddComponent<PoseMenu>();
+            var poseMenu = menu.GetComponent<PoseMenu>() ?? Undo.AddComponent<PoseMenu>(menu);
+            Undo.RecordObject(poseMenu, undoName);
             poseMenu.lyingMenuLayout = LyingMenuLayout.SeparateGroups;
             poseMenu.generateIcons = root.enableIconGeneration;
             EditorUtility.SetDirty(poseMenu);
+            KawaiiAuthoringObjectUtility.RecordPrefabModifications(poseMenu);
         }
 
         private static void EnsureTrackingPolicy(
             PoseTuneRoot root,
             KawaiiMigrationOptions options,
-            IReadOnlyList<KawaiiPosingSystemDto> dtos,
             KawaiiMigrationReport report)
         {
-            if (!ShouldAddRootTrackingPolicy(options, dtos) || root.GetComponent<PoseTrackingPolicy>() != null)
+            if (!options.addTrackingPolicy || root.GetComponent<PoseTrackingPolicy>() != null)
             {
                 return;
             }
 
-            var policy = root.gameObject.AddComponent<PoseTrackingPolicy>();
+            var policy = Undo.AddComponent<PoseTrackingPolicy>(root.gameObject);
             policy.tracking = TrackingPolicyData.DefaultForPose();
             report.Created(policy, "TrackingPolicy");
         }
 
-        private static bool ShouldAddRootTrackingPolicy(
-            KawaiiMigrationOptions options,
-            IReadOnlyList<KawaiiPosingSystemDto> dtos)
-        {
-            return options.addTrackingPolicy &&
-                   (dtos == null || dtos.Count == 0 || dtos.All(dto => dto.MergeTrackingControl));
-        }
-
         private static void EnsurePoseOptions(PoseTuneRoot root, KawaiiMigrationReport report, string undoName)
         {
-            if (root.GetComponentInChildren<PoseOption>(true) != null)
+            var existing = root.GetComponentsInChildren<PoseOption>(true)
+                .FirstOrDefault(options => options.GetComponentInParent<PoseTuneRoot>(true) == root);
+            if (existing != null)
             {
+                Undo.RecordObject(existing, undoName);
+                ((Behaviour)existing).enabled = true;
+                existing.options.locomotionLock = false;
+                EditorUtility.SetDirty(existing);
+                KawaiiAuthoringObjectUtility.RecordPrefabModifications(existing);
                 return;
             }
 
             var optionsObject = KawaiiAuthoringObjectUtility.EnsureChild(root.transform, "オプション", report, "Options", undoName);
-            var options = optionsObject.GetComponent<PoseOption>() ?? optionsObject.AddComponent<PoseOption>();
+            var options = optionsObject.GetComponent<PoseOption>() ?? Undo.AddComponent<PoseOption>(optionsObject);
+            Undo.RecordObject(options, undoName);
             options.options.locomotionLock = false;
             EditorUtility.SetDirty(options);
+            KawaiiAuthoringObjectUtility.RecordPrefabModifications(options);
         }
     }
 }

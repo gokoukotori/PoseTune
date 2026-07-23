@@ -7,32 +7,39 @@ namespace Gokoukotori.PoseTune.Editor
     {
         private static void AddPoseExitTransitions(
             PoseStateVariants variants,
-            AnimatorState cleanup,
             PoseGraph graph,
             PoseGroupDefinition group,
             PoseDefinition pose,
             bool hasAutoEntry)
         {
-            AddPoseExitTransitions(variants.BaseState, cleanup, graph, group, pose, hasAutoEntry, false);
+            AddPoseExitTransitions(variants.BaseState, variants.BaseHandoff, graph, group, pose, hasAutoEntry, false);
             if (variants.NeedsDesktopLowerBodyLockVariant)
             {
-                AddVrModeInvalidExitTransition(variants.BaseState, cleanup);
+                AddVrModeInvalidExitTransition(variants.BaseState, variants.BaseHandoff);
+            }
+            else if (variants.NeedsPoseSpaceVrVariant)
+            {
+                AddDesktopModeInvalidExitTransition(variants.BaseState, variants.BaseHandoff);
             }
 
             if (variants.FullBodyState != null)
             {
-                AddPoseExitTransitions(variants.FullBodyState, cleanup, graph, group, pose, hasAutoEntry, true);
+                AddPoseExitTransitions(variants.FullBodyState, variants.FullBodyHandoff, graph, group, pose, hasAutoEntry, true);
             }
 
             if (variants.DesktopLowerBodyState != null)
             {
-                AddPoseExitTransitions(variants.DesktopLowerBodyState, cleanup, graph, group, pose, hasAutoEntry, false);
-                AddDesktopModeInvalidExitTransition(variants.DesktopLowerBodyState, cleanup);
+                AddPoseExitTransitions(variants.DesktopLowerBodyState, variants.DesktopLowerBodyHandoff, graph, group, pose, hasAutoEntry, false);
+                AddDesktopModeInvalidExitTransition(variants.DesktopLowerBodyState, variants.DesktopLowerBodyHandoff);
             }
 
             if (variants.VrState != null)
             {
-                AddPoseExitTransitions(variants.VrState, cleanup, graph, group, pose, hasAutoEntry, false);
+                AddPoseExitTransitions(variants.VrState, variants.VrHandoff, graph, group, pose, hasAutoEntry, false);
+                if (variants.NeedsPoseSpaceVrVariant)
+                {
+                    AddVrModeInvalidExitTransition(variants.VrState, variants.VrHandoff);
+                }
             }
         }
 
@@ -51,7 +58,7 @@ namespace Gokoukotori.PoseTune.Editor
                 toResetByGroup.hasExitTime = false;
                 toResetByGroup.duration = 0f;
                 AddManualModeEntryCondition(toResetByGroup, graph.RootComponent);
-                AddManualGroupDeselectedCondition(toResetByGroup, group);
+                AddManualGroupDeselectedCondition(toResetByGroup, graph.RootComponent, group, pose);
             }
 
             var toResetByMode = state.AddTransition(cleanup);

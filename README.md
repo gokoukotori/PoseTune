@@ -53,7 +53,7 @@ Unity Package Manager から導入する場合は、`Package Manager > + > Add p
 3. アバター配下に `PoseTune テンプレート` が作成されます。中には `PoseTuneRoot`、`PoseTuneAssistant`、`PoseMenu`、既定の PoseGroup、`PoseTrackingPolicy`、`PoseHeightAdjust` が入ります。
 4. `PoseTuneRoot` の Inspector で **アシスタントを開く** を押します。
 5. **ポーズ** タブで group を確認し、各 group の **ポーズ追加** から `PoseClip` を作成します。
-6. 作成した `PoseClip` に `AnimationClip` または `sourceMotion` を設定し、表示名、初期ポーズ、loop、menu order、tracking、conditions などを調整します。
+6. 作成した `PoseClip` に `AnimationClip` または `sourceMotion` を設定し、表示名、初期ポーズ、loop、menu order、conditions などを調整します。Pose 固有の tracking は同じ GameObject の `PoseTrackingPolicy` で編集します。
 7. **メニュー**、**トラッキング**、**高さ**、**プレビュー** タブで生成内容を確認します。
 8. **検証** タブで error / warning を確認し、必要に応じて safe fix を適用します。
 9. 通常どおり VRChat SDK / NDMF の build / upload を実行します。PoseTune は build 時に必要な Modular Avatar component と Animator asset を生成します。
@@ -95,6 +95,12 @@ PoseTune 全体のルート component です。原則として 1 avatar につ�
 - `groupConditions`: group 全体に追加する条件
 - `poseSpace`: Temporary Pose Space の制御
 
+`PoseGroup` を入れ子にした場合、各 `PoseClip` は最も近い親 `PoseGroup` だけに所属します。子 group を無効化または `includeInBuild=false` にしても、その pose が親 group へ取り込まれることはありません。親 group に所属させたい pose は、子 group の外へ移動してください。
+
+`activationMode=Auto` と `autoPoseSelectionMode=SelectedPosePerGroup` の組み合わせでは、menu を生成せずに pose 選択用 Int parameter だけを生成します。
+
+`InitialPoseOnly` は serialized enum 名として互換のため残していますが、実行時は条件に一致する pose を `priority → isInitial → menuOrder → displayName → Stable GUID` の順で比較し、最初の pose を勝者にします。上位 pose が有効になった場合も、現在 pose の cleanup/handoff を通ってから切り替えます。
+
 ### PoseClip
 
 実際のポーズを表す component です。`PoseGroup` の子に置きます。
@@ -115,7 +121,7 @@ PoseTune 全体のルート component です。原則として 1 avatar につ�
 - `priority`: 自動選択と Animator transition 生成順
 - `blendMode`: `Override` / `Additive`
 - `motionTime`: state time / custom float / height parameter との連動
-- `tracking`: pose 中の tracking override
+- `tracking`: 旧 asset の読み取り互換用 inline tracking。新規 authoring では表示されず、`PoseTrackingPolicy` へ変換して編集します
 - `emitTrackingControl`: tracking control を生成
 - `clipConditions`: pose 個別条件
 
@@ -132,11 +138,17 @@ Expression Menu 生成の設定です。
 
 ### PoseTrackingPolicy
 
-root / group / pose の effective tracking policy を補助する component です。
+root / group / pose の effective tracking policy を定義する component です。優先順位は **Pose component → 旧 `PoseClip.tracking` のカスタム値 → Group component → Root component → group kind 既定値** です。component が存在すれば、値が既定値と同じでも明示 override として扱います。Base、FBT override、`generateResetOnExit` は必ず同じ勝者 component から取得されます。
 
 - 頭、手、腰、足、指、目、口を `NoChange` / `Tracking` / `Animation` で指定
 - FBT 用 override を別途指定可能
-- `generateResetOnExit` により pose 終了時に tracking reset state を生成
+- `generateResetOnExit` により、PoseTune がその pose で明示変更した部位だけに終了時 reset request を生成
+
+複数 group が同時に有効な場合、各部位を `Animation > Tracking > NoChange` の順で合成します。`NoChange` は現在値を維持する単位元であり、他 pose の明示 vote を消しません。頭・手・足の Lock は対象部位に対する最優先の `Animation` vote です。Lock を OFF にすると残っている pose vote を再適用し、残存 vote がなければその対象部位だけを `Tracking` へ戻します。
+
+`generateResetOnExit=true` でも他の active pose が同じ部位を所有していれば、その勝者を再適用します。最後の owner が消えた部位だけが `Tracking` へ戻ります。`false` は sticky な値を維持する明示契約です。VRChat Tracking Control API は外部 Animator が以前保持していた値を取得できないため、PoseTune 外部の過去値を完全復元するものではありません。
+
+`PoseGroup.emitTrackingControl=false` または `PoseClip.emitTrackingControl=false` の pose は tracking vote を一切出しません。Pose Options の Lock は独立したユーザー操作なので引き続き機能します。`PoseTrackingPolicy` は所有者ごとに1つだけ追加でき、旧 asset に重複があれば validation error になります。
 
 ### PoseHeightAdjust
 
@@ -153,6 +165,16 @@ root / group / pose の effective tracking policy を補助する component で�
 
 GameObject 単位で条件をまとめる component です。条件は `And` / `Or` で合成できます。group conditions と pose conditions は Animator transition 条件に反映されます。
 同じ GameObject に複数の `PoseCondition` component がある場合、それぞれは OR branch として扱われます。
+
+使用できる比較は値型ごとに異なります。
+
+| 値型 | 使用できる比較 |
+| --- | --- |
+| Bool | `If`, `IfNot`, `Equals`, `NotEquals` |
+| Int | `Equals`, `NotEquals`, `Greater`, `Less`, `GreaterOrEqual`, `LessOrEqual` |
+| Float | `Greater`, `Less`, `GreaterOrEqual`, `LessOrEqual` |
+
+型に対応しない比較は build validation Error になります。既存の不正なserialized値は自動変換されないため、Inspectorで明示的に修正してください。
 
 ### PoseOption
 
@@ -220,6 +242,8 @@ group の manual control parameter は、`PoseGroup.parameterName` が空の場�
 
 Expression Parameters の同期 budget、parameter count、parameter type は VRChat の制限を受けます。PoseTune の validation は衝突や budget 超過を検出しますが、既存アバター側の controller や menu との相互作用は必ず実機で確認してください。
 
+Tracking arbiter が使用する `PTI/TrackingVote/<groupGuid>` と部位別 reset request は Animator-only の内部 parameter です。Expression Parameters budget や公開 menu parameter には追加されません。tracking と Pose Options のどちらも使わない構成では、これらの parameter、arbiter layer、Tracking Control Behaviour は生成しません。
+
 Expression Menu は VRChat の 1 menu あたり 8 controls 制限を前提にしています。`autoSplitMenu` が有効な場合、PoseTune は page submenu を自動生成します。
 
 ## Runtime / VRChat 制約
@@ -250,11 +274,21 @@ Assistant の **プレビュー** タブから pose preview と icon 生成を�
 
 `PoseOverrideImport` を追加し、`sourceController` に既存 Animator Controller を指定します。Assistant の **インポート** タブで candidate を解析し、必要な候補だけを選択して `PoseClip` として取り込みます。
 
-解析では transition condition、tracking policy、layer 名、pose 種別推定、confidence score が使われます。import 結果は必ず確認してください。
+解析では transition condition、tracking policy、layer 名、pose 種別推定、confidence score が使われます。Tracking Control Behaviour がない state は `emitTrackingControl=false` として取り込みます。複数 Behaviour がある場合は `NoChange` を単位元に順番に合成するため、後続の `NoChange` が先行する明示値を消すことはありません。入れ子の StateMachine では、親から子へ入る条件と子stateの条件を組み合わせて取り込みます。修正前のPoseTuneで既にimportしたposeへ失われた親条件は自動復元されないため、該当controllerを再解析・再importしてください。import結果は必ず確認してください。
 
 ### KawaiiPosing からの移行
 
 KawaiiPosing / PosingSystem が入った avatar を選択し、`GameObject > PoseTune > KawaiiPosing から移行` を実行します。移行 window では dry-run、既存 root への merge、新規 PoseTuneRoot 作成、custom icon 保持、FootHeight / BlendTree / MotionTime / PoseSpace 互換などを選択できます。
+
+`OverrideDefines`を取り込む場合も同じBlendTree／回転／Root再中心化／adjustment／MotionTime／PoseSpace設定を適用します。`ImportAllAsCustomDisabled`はCustom groupとposeの両方をbuild対象外で作成します。
+
+移行元の `mergeTrackingControl` は「全 controller の Tracking Control を統合する」設定であり、PoseTune の `emitTrackingControl` とは同じ意味ではありません。そのため、この値を `emitTrackingControl` へ直結しません。`addTrackingPolicy` を選択した場合だけ group kind に基づく近似 policy を追加します。元 controller 全体の統合結果や Override policy は厳密には復元できないため、専用 diagnostic を確認して部位別設定を調整してください。
+
+移行元は既定では変更しません。移行元GameObjectを`EditorOnly`または非アクティブにする場合、Avatar Root全体には適用できません。共有GameObjectへ適用する場合は、影響するcomponentと子階層を確認してから明示的に許可してください。移行元を保持すると旧・新両方のauthoring systemがbuildへ作用し得ます。
+
+`BakeAtMigration`で生成したClip／BlendTreeは `Assets/PoseTuneGenerated/KawaiiMigration/<Avatar>/<RootGuid>/Motions` 配下へ永続化されます。既存assetは上書きせず、移行失敗時はその実行で新規作成したassetだけをrollbackします。
+
+成功した移行は同じRoot配下の`Reports`にmanifestを保存します。manifestには作成asset path、移行option、移行元GameObjectの変更前tag／active状態が記録されます。SceneをUndoしても生成assetとmanifestは残るため、Redo後のMotion参照を維持できます。
 
 移行後は validation を実行し、生成された group、pose、height、tracking、menu を確認してください。
 
@@ -262,7 +296,9 @@ KawaiiPosing / PosingSystem が入った avatar を選択し、`GameObject > Pos
 
 ### PoseTunePreset
 
-`PoseTunePreset` は group、pose、menu、height の authoring 設定を保存します。Assistant の **プリセット** タブから現在の構成を保存し、別 avatar に `Merge` または `Replace` で適用できます。
+`PoseTunePreset` schema v2 は group、pose、menu、height に加えて、Root／Group／Pose の policy component の有無、全10部位、FBT override、`generateResetOnExit` を保存します。Assistant の **プリセット** タブから現在の構成を保存し、別 avatar に `Merge` または `Replace` で適用できます。
+
+`Merge`は preset に policy データがある owner だけを追加・更新し、policy が未指定なら適用先の既存 policy を保持します。`Replace`は policy component の有無まで preset と完全一致させます。旧 schema の `Replace` では、カスタムな legacy inline tracking を Pose policy component へ変換し、それ以外の既存 policy は削除します。プリセット外の`PoseGroup`／`PoseClip` componentを削除した後、同じGameObject上のownerがなくなる`PoseCondition`／`PoseTrackingPolicy`も除去しますが、それ以外の兄弟component、GameObject、子階層は保持します。適用全体は1回のUndo/Redoで扱います。
 
 ### AvatarAdjustmentPreset
 
@@ -281,6 +317,7 @@ Assistant の **検証** タブ、または build 時の NDMF validation で、�
 - parameter 名の空欄、予約名、型衝突、Expression Parameters budget 超過
 - menu control overflow
 - FBT、Gorone System EX、Kawaii 互換に関する警告
+- 重複した `PoseTrackingPolicy` と、旧 `PoseClip.tracking` の component 変換候補
 - generated output の欠落や古い graph hash
 
 一部の issue には auto-fix が用意されています。`安全な修正を一括適用` は safe / reversible な修正だけを適用します。Asset 書き込みを伴う fix は明示表示を ON にしてから個別に適用してください。
@@ -301,6 +338,7 @@ Editor/
   Importer/        Animator Controller import
   Migration/       KawaiiPosing migration
   Preview/         Pose preview、thumbnail generation
+Tests/Editor/      EditMode regression tests
 ```
 
 ## よくあるトラブル
