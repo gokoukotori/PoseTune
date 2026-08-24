@@ -8,8 +8,6 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Conditions
     {
         private static readonly ConditionOperator[] BoolOperators =
         {
-            ConditionOperator.Equals,
-            ConditionOperator.NotEquals,
             ConditionOperator.If,
             ConditionOperator.IfNot
         };

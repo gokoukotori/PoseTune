@@ -16,7 +16,5 @@ namespace Gokoukotori.PoseTune
         public float floatValue;
         [InspectorName("Int 値")]
         public int intValue;
-        [InspectorName("Bool 値")]
-        public bool boolValue;
     }
 }

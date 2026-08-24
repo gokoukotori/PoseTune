@@ -15,6 +15,7 @@ namespace Gokoukotori.PoseTune.Editor
             HashSet<string> usedParameters,
             HashSet<string> usedLayerNames)
         {
+            var tracking = PoseTuneTrackingPolicyResolver.ResolveGroupPolicy(root, group);
             var definition = new PoseGroupDefinition
             {
                 Id = group.StableGuid,
@@ -28,6 +29,10 @@ namespace Gokoukotori.PoseTune.Editor
                 AutoPoseSelectionMode = group.autoPoseSelectionMode,
                 AutoContextProfile = group.autoContextProfile,
                 EmitTrackingControl = group.emitTrackingControl,
+                GenerateResetOnExit = tracking.GenerateResetOnExit,
+                TrackingPolicy = tracking.Policy,
+                HasFullBodyTrackingOverride = tracking.HasFullBodyTrackingOverride,
+                FullBodyTrackingPolicy = tracking.FullBodyTrackingPolicy,
                 SuppressIconGeneration = group.suppressIconGeneration,
                 Icon = group.suppressIconGeneration ? null : group.icon,
                 Source = group,
@@ -47,7 +52,6 @@ namespace Gokoukotori.PoseTune.Editor
                 var value = clip.explicitMenuValue > 0 ? clip.explicitMenuValue : NextValue(explicitValues, ref nextValue);
                 explicitValues.Add(value);
                 var conditionBranches = PoseTuneConditionBranchCollector.Collect(graph, group, clip);
-                var tracking = PoseTuneTrackingPolicyResolver.ResolvePosePolicy(graph, group, clip);
                 var pose = new PoseDefinition
                 {
                     Id = clip.StableGuid,
@@ -73,12 +77,7 @@ namespace Gokoukotori.PoseTune.Editor
                     Group = definition,
                     Priority = clip.priority,
                     BlendMode = clip.blendMode,
-                    GenerateResetOnExit = tracking.GenerateResetOnExit,
-                    TrackingPolicy = tracking.Policy,
-                    EmitTrackingControl = group.emitTrackingControl && clip.emitTrackingControl,
                     SuppressIconGeneration = group.suppressIconGeneration || clip.suppressIconGeneration,
-                    HasFullBodyTrackingOverride = tracking.HasFullBodyTrackingOverride,
-                    FullBodyTrackingPolicy = tracking.FullBodyTrackingPolicy,
                     PoseSpace = ResolvePoseSpace(group, clip),
                     MotionTime = CopyMotionTime(clip.motionTime),
                     Conditions = conditionBranches.SelectMany(branch => branch).ToList(),

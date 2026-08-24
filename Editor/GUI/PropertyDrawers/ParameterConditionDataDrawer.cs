@@ -14,7 +14,6 @@ namespace Gokoukotori.PoseTune.Editor
         private static readonly GUIContent OperatorLabel = new("比較");
         private static readonly GUIContent FloatValueLabel = new("Float 値");
         private static readonly GUIContent IntValueLabel = new("Int 値");
-        private static readonly GUIContent BoolValueLabel = new("Bool 値");
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
@@ -141,9 +140,6 @@ namespace Gokoukotori.PoseTune.Editor
             var op = (ConditionOperator)operatorProperty.intValue;
             switch (valueType)
             {
-                case ParameterValueType.Bool when op is ConditionOperator.Equals or ConditionOperator.NotEquals:
-                    label = BoolValueLabel;
-                    return property.FindPropertyRelative("boolValue");
                 case ParameterValueType.Int:
                     label = IntValueLabel;
                     return property.FindPropertyRelative("intValue");

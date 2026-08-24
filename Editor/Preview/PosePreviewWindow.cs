@@ -40,7 +40,7 @@ namespace Gokoukotori.PoseTune.Editor
                     GroupKind = pose.Group.Kind,
                     GroupName = pose.Group.DisplayName,
                     Pose = pose.Source,
-                    TrackingSummary = TrackingSummary(pose.TrackingPolicy)
+                    TrackingSummary = TrackingSummary(pose.Group.TrackingPolicy)
                 })
                 .ToList();
         }

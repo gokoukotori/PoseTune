@@ -27,7 +27,7 @@ namespace Gokoukotori.PoseTune.Editor
                 autoPoseSelectionMode = group.autoPoseSelectionMode,
                 autoContextProfile = group.autoContextProfile,
                 emitTrackingControl = group.emitTrackingControl,
-                trackingPolicy = CaptureTrackingPolicy(group.GetComponents<PoseTrackingPolicy>().FirstOrDefault()),
+                trackingPolicy = CaptureTrackingPolicy(PoseTuneTrackingPolicyResolver.GroupPolicy(group)),
                 suppressIconGeneration = group.suppressIconGeneration,
                 groupConditions = group.groupConditions.Select(PoseTuneConditionUtility.Copy).ToList(),
                 poseSpace = CopyPoseSpace(group.poseSpace),
@@ -113,7 +113,6 @@ namespace Gokoukotori.PoseTune.Editor
             pose.cameraOffset = data.cameraOffset;
             pose.priority = data.priority;
             pose.blendMode = data.blendMode;
-            pose.emitTrackingControl = data.emitTrackingControl;
             pose.suppressIconGeneration = data.suppressIconGeneration;
             pose.motionTime = CopyMotionTime(data.motionTime);
             pose.poseSpace = CopyPoseSpace(data.poseSpace);
@@ -124,19 +123,6 @@ namespace Gokoukotori.PoseTune.Editor
 
         private static PoseClipPresetData CapturePose(PoseClip pose)
         {
-            var policy = pose.GetComponents<PoseTrackingPolicy>().FirstOrDefault();
-            var policyData = policy != null
-                ? CaptureTrackingPolicy(policy)
-                : TrackingPolicyUtility.WasCustomizedFromPoseDefault(pose.tracking)
-                    ? new PoseTrackingPolicyPresetData
-                    {
-                        present = true,
-                        tracking = TrackingPolicyUtility.Copy(pose.tracking),
-                        useFullBodyTrackingOverride = false,
-                        fullBodyTracking = TrackingPolicyData.DefaultForPose(),
-                        generateResetOnExit = true
-                    }
-                    : new PoseTrackingPolicyPresetData { present = false };
             return new PoseClipPresetData
             {
                 poseStableGuid = pose.StableGuid,
@@ -159,9 +145,6 @@ namespace Gokoukotori.PoseTune.Editor
                 cameraOffset = pose.cameraOffset,
                 priority = pose.priority,
                 blendMode = pose.blendMode,
-                tracking = TrackingPolicyData.DefaultForPose(),
-                emitTrackingControl = pose.emitTrackingControl,
-                trackingPolicy = policyData,
                 suppressIconGeneration = pose.suppressIconGeneration,
                 motionTime = CopyMotionTime(pose.motionTime),
                 poseSpace = CopyPoseSpace(pose.poseSpace),
@@ -171,7 +154,7 @@ namespace Gokoukotori.PoseTune.Editor
 
         public static PoseTrackingPolicyPresetData CaptureTrackingPolicy(PoseTrackingPolicy policy)
         {
-            if (policy == null)
+            if (policy == null || !PoseTuneAuthoringInclusion.ComponentEnabled(policy))
             {
                 return new PoseTrackingPolicyPresetData { present = false };
             }

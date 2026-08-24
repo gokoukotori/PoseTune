@@ -1,14 +1,12 @@
 using System.Collections.Generic;
 using nadena.dev.ndmf;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 namespace Gokoukotori.PoseTune
 {
     [AddComponentMenu("PoseTune/Pose Clip")]
     public sealed class PoseClip : MonoBehaviour, INDMFEditorOnly
     {
-        [FormerlySerializedAs("enabled")]
         [InspectorName("ビルドに含める")]
         public bool includeInBuild = true;
         [InspectorName("表示名")]
@@ -59,12 +57,6 @@ namespace Gokoukotori.PoseTune
         public MotionTimeSettings motionTime = new();
         [InspectorName("ポーズ空間")]
         public PoseSpacePolicy poseSpace = new();
-        [HideInInspector]
-        [InspectorName("トラッキング (legacy)")]
-        [Tooltip("旧バージョンとの読み取り互換用です。新規編集には PoseTrackingPolicy component を使用してください。")]
-        public TrackingPolicyData tracking = TrackingPolicyData.DefaultForPose();
-        [InspectorName("トラッキング制御を生成")]
-        public bool emitTrackingControl = true;
         [InspectorName("アイコン生成を抑止")]
         public bool suppressIconGeneration;
         [InspectorName("クリップ条件")]

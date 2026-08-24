@@ -74,7 +74,6 @@ namespace Gokoukotori.PoseTune.Editor
     {
         private const string UndoName = "PoseTune プリセットを適用";
         private const string PoseGroupsRootName = "ポーズグループ";
-        private const string LegacyPoseGroupsRootName = "Pose Groups";
 
         public PoseTunePreset Capture(PoseTuneRoot root)
         {
@@ -86,7 +85,8 @@ namespace Gokoukotori.PoseTune.Editor
             }
 
             preset.presetName = root.displayName;
-            preset.rootTrackingPolicy = PoseTunePresetMapper.CaptureTrackingPolicy(RootPolicies(root).FirstOrDefault());
+            preset.rootTrackingPolicy = PoseTunePresetMapper.CaptureTrackingPolicy(
+                PoseTuneTrackingPolicyResolver.RootPolicy(root));
             var menu = OwnedComponents<PoseMenu>(root).FirstOrDefault();
             if (menu != null)
             {
@@ -142,6 +142,14 @@ namespace Gokoukotori.PoseTune.Editor
                 return plan;
             }
 
+            if (preset.schemaVersion != PoseTunePreset.CurrentSchemaVersion)
+            {
+                plan.Errors.Add(
+                    $"Unsupported preset schema version {preset.schemaVersion}. " +
+                    $"Only schema v{PoseTunePreset.CurrentSchemaVersion} is supported; automatic migration is not available.");
+                return plan;
+            }
+
             if (EditorUtility.IsPersistent(root) || PrefabUtility.IsPartOfImmutablePrefab(root))
             {
                 plan.Errors.Add("The target root is not editable in the current Scene or Prefab Stage.");
@@ -166,18 +174,6 @@ namespace Gokoukotori.PoseTune.Editor
 
             var usedGroups = new HashSet<PoseGroup>();
             var usedPoses = new HashSet<PoseClip>();
-            var reservedGroupGuids = preset.groups
-                .Where(group => group != null)
-                .Select(group => NormalizeGuid(group.groupStableGuid))
-                .Where(guid => !string.IsNullOrEmpty(guid))
-                .ToHashSet(StringComparer.Ordinal);
-            var reservedPoseGuids = preset.groups
-                .Where(group => group?.poses != null)
-                .SelectMany(group => group.poses)
-                .Where(pose => pose != null)
-                .Select(pose => NormalizeGuid(pose.poseStableGuid))
-                .Where(guid => !string.IsNullOrEmpty(guid))
-                .ToHashSet(StringComparer.Ordinal);
             for (var groupIndex = 0; groupIndex < preset.groups.Count; groupIndex++)
             {
                 var groupData = preset.groups[groupIndex];
@@ -189,10 +185,7 @@ namespace Gokoukotori.PoseTune.Editor
                 var group = MatchGroup(
                     currentGroups,
                     usedGroups,
-                    reservedGroupGuids,
-                    groupData,
-                    groupIndex,
-                    plan.Errors);
+                    groupData);
                 if (plan.Errors.Count > 0)
                 {
                     continue;
@@ -237,11 +230,7 @@ namespace Gokoukotori.PoseTune.Editor
                     var pose = MatchPose(
                         groupPoses,
                         usedGroupPoses,
-                        reservedPoseGuids,
-                        poseData,
-                        groupIndex,
-                        poseIndex,
-                        plan.Errors);
+                        poseData);
                     if (plan.Errors.Count > 0)
                     {
                         continue;
@@ -303,7 +292,6 @@ namespace Gokoukotori.PoseTune.Editor
                         var pose = poseOperation.Existing ?? CreatePoseClip(group, poseOperation.Data);
                         Undo.RecordObject(pose, UndoName);
                         PoseTunePresetMapper.ApplyPoseData(plan.Root, pose, poseOperation.Data);
-                        ApplyPoseTrackingPolicy(plan, pose, poseOperation.Data);
                         AssertStableGuidApplied(pose, poseOperation.Data.poseStableGuid, "pose");
                         RecordPrefabModifications(pose);
                     }
@@ -337,13 +325,10 @@ namespace Gokoukotori.PoseTune.Editor
 
         private static void ApplyRootTrackingPolicy(PoseTunePresetApplyPlan plan)
         {
-            var data = plan.Preset.schemaVersion >= PoseTunePreset.CurrentSchemaVersion
-                ? plan.Preset.rootTrackingPolicy
-                : null;
             ApplyTrackingPolicyComponents(
                 plan.Root.gameObject,
-                RootPolicies(plan.Root),
-                data,
+                PoseTuneTrackingPolicyResolver.RootPolicies(plan.Root, true),
+                plan.Preset.rootTrackingPolicy,
                 plan.Mode);
         }
 
@@ -352,59 +337,11 @@ namespace Gokoukotori.PoseTune.Editor
             PoseGroup group,
             PoseGroupPresetData data)
         {
-            var policyData = plan.Preset.schemaVersion >= PoseTunePreset.CurrentSchemaVersion
-                ? data.trackingPolicy
-                : null;
             ApplyTrackingPolicyComponents(
                 group.gameObject,
                 group.GetComponents<PoseTrackingPolicy>(),
-                policyData,
+                data.trackingPolicy,
                 plan.Mode);
-        }
-
-        private static void ApplyPoseTrackingPolicy(
-            PoseTunePresetApplyPlan plan,
-            PoseClip pose,
-            PoseClipPresetData data)
-        {
-            if (plan.Preset.schemaVersion >= PoseTunePreset.CurrentSchemaVersion)
-            {
-                ApplyTrackingPolicyComponents(
-                    pose.gameObject,
-                    pose.GetComponents<PoseTrackingPolicy>(),
-                    data.trackingPolicy,
-                    plan.Mode);
-                if ((data.trackingPolicy != null && data.trackingPolicy.present) ||
-                    plan.Mode == PoseTunePresetApplyMode.Replace)
-                {
-                    pose.tracking = TrackingPolicyData.DefaultForPose();
-                }
-                return;
-            }
-
-            if (plan.Mode != PoseTunePresetApplyMode.Replace)
-            {
-                pose.tracking = TrackingPolicyUtility.Copy(data.tracking);
-                return;
-            }
-
-            var hasCustomInlineTracking = TrackingPolicyUtility.WasCustomizedFromPoseDefault(data.tracking);
-            var legacyPolicy = hasCustomInlineTracking
-                ? new PoseTrackingPolicyPresetData
-                {
-                    present = true,
-                    tracking = TrackingPolicyUtility.Copy(data.tracking),
-                    useFullBodyTrackingOverride = false,
-                    fullBodyTracking = TrackingPolicyData.DefaultForPose(),
-                    generateResetOnExit = true
-                }
-                : null;
-            ApplyTrackingPolicyComponents(
-                pose.gameObject,
-                pose.GetComponents<PoseTrackingPolicy>(),
-                legacyPolicy,
-                PoseTunePresetApplyMode.Replace);
-            pose.tracking = TrackingPolicyData.DefaultForPose();
         }
 
         private static void ApplyTrackingPolicyComponents(
@@ -430,9 +367,16 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
-            var primary = policies.FirstOrDefault();
+            var primary = policies.FirstOrDefault(PoseTuneAuthoringInclusion.ComponentEnabled);
             if (primary == null)
             {
+                foreach (var disabledOnTarget in policies.Where(policy =>
+                             policy.gameObject == addTarget &&
+                             !PoseTuneAuthoringInclusion.ComponentEnabled(policy)))
+                {
+                    Undo.DestroyObjectImmediate(disabledOnTarget);
+                }
+
                 primary = Undo.AddComponent<PoseTrackingPolicy>(addTarget);
             }
 
@@ -448,7 +392,7 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
-            foreach (var duplicate in policies.Skip(1))
+            foreach (var duplicate in policies.Where(policy => policy != null && policy != primary))
             {
                 Undo.DestroyObjectImmediate(duplicate);
             }
@@ -543,125 +487,37 @@ namespace Gokoukotori.PoseTune.Editor
             return root.GetComponentsInChildren<Transform>(true)
                        .FirstOrDefault(transform =>
                            NearestRoot(transform) == root &&
-                           (transform.name == PoseGroupsRootName || transform.name == LegacyPoseGroupsRootName))
+                           transform.name == PoseGroupsRootName)
                    ?? root.transform;
         }
 
         private static PoseGroup MatchGroup(
             IReadOnlyList<PoseGroup> groups,
             ISet<PoseGroup> used,
-            ISet<string> reservedStableGuids,
-            PoseGroupPresetData data,
-            int groupIndex,
-            ICollection<string> errors)
+            PoseGroupPresetData data)
         {
-            var available = groups.Where(group => !used.Contains(group)).ToList();
             var stableGuid = NormalizeGuid(data.groupStableGuid);
-            if (!string.IsNullOrEmpty(stableGuid))
-            {
-                return UniqueOrError(
-                    available.Where(group => ReadStableGuid(group) == stableGuid).ToList(),
-                    $"group[{groupIndex}] stable GUID '{stableGuid}'",
-                    errors);
-            }
-
-            available = available
-                .Where(group => !reservedStableGuids.Contains(ReadStableGuid(group)))
-                .ToList();
-
-            if (!string.IsNullOrWhiteSpace(data.parameterName))
-            {
-                var parameterMatches = available.Where(group =>
-                        group.kind == data.kind &&
-                        string.Equals(group.parameterName, data.parameterName, StringComparison.Ordinal))
-                    .ToList();
-                if (parameterMatches.Count > 0)
-                {
-                    return UniqueOrError(parameterMatches, $"group[{groupIndex}] kind/parameter fallback", errors);
-                }
-            }
-
-            if (!string.IsNullOrWhiteSpace(data.displayName))
-            {
-                var displayMatches = available.Where(group =>
-                        group.kind == data.kind &&
-                        string.Equals(group.displayName, data.displayName, StringComparison.Ordinal))
-                    .ToList();
-                if (displayMatches.Count > 0)
-                {
-                    return UniqueOrError(displayMatches, $"group[{groupIndex}] kind/display-name fallback", errors);
-                }
-            }
-
-            var kindMatches = available.Where(group => group.kind == data.kind).ToList();
-            return kindMatches.Count > 0
-                ? UniqueOrError(kindMatches, $"group[{groupIndex}] kind fallback", errors)
-                : null;
+            return groups.FirstOrDefault(group =>
+                !used.Contains(group) && ReadStableGuid(group) == stableGuid);
         }
 
         private static PoseClip MatchPose(
             IReadOnlyList<PoseClip> poses,
             ISet<PoseClip> used,
-            ISet<string> reservedStableGuids,
-            PoseClipPresetData data,
-            int groupIndex,
-            int poseIndex,
-            ICollection<string> errors)
+            PoseClipPresetData data)
         {
-            var available = poses.Where(pose => !used.Contains(pose)).ToList();
             var stableGuid = NormalizeGuid(data.poseStableGuid);
-            if (!string.IsNullOrEmpty(stableGuid))
-            {
-                return UniqueOrError(
-                    available.Where(pose => ReadStableGuid(pose) == stableGuid).ToList(),
-                    $"group[{groupIndex}].pose[{poseIndex}] stable GUID '{stableGuid}'",
-                    errors);
-            }
-
-            available = available
-                .Where(pose => !reservedStableGuids.Contains(ReadStableGuid(pose)))
-                .ToList();
-
-            if (data.clip != null)
-            {
-                var clipMatches = available.Where(pose => ClipMatches(pose.clip, data.clip)).ToList();
-                if (clipMatches.Count > 0)
-                {
-                    return UniqueOrError(clipMatches, $"group[{groupIndex}].pose[{poseIndex}] clip fallback", errors);
-                }
-            }
-
-            if (!string.IsNullOrWhiteSpace(data.displayName))
-            {
-                var displayMatches = available.Where(pose =>
-                        string.Equals(pose.displayName, data.displayName, StringComparison.Ordinal))
-                    .ToList();
-                if (displayMatches.Count > 0)
-                {
-                    return UniqueOrError(displayMatches, $"group[{groupIndex}].pose[{poseIndex}] display-name fallback", errors);
-                }
-            }
-
-            return null;
-        }
-
-        private static T UniqueOrError<T>(
-            IReadOnlyList<T> matches,
-            string description,
-            ICollection<string> errors)
-            where T : Object
-        {
-            if (matches.Count <= 1)
-            {
-                return matches.Count == 1 ? matches[0] : null;
-            }
-
-            errors.Add($"Ambiguous preset match for {description}: {matches.Count} candidates.");
-            return null;
+            return poses.FirstOrDefault(pose =>
+                !used.Contains(pose) && ReadStableGuid(pose) == stableGuid);
         }
 
         private static void ValidatePresetData(PoseTunePreset preset, ICollection<string> errors)
         {
+            if (preset.rootTrackingPolicy == null)
+            {
+                errors.Add("Preset rootTrackingPolicy is null.");
+            }
+
             var groupGuids = new Dictionary<string, int>(StringComparer.Ordinal);
             var poseGuids = new Dictionary<string, string>(StringComparer.Ordinal);
             for (var groupIndex = 0; groupIndex < preset.groups.Count; groupIndex++)
@@ -675,6 +531,11 @@ namespace Gokoukotori.PoseTune.Editor
 
                 ValidateGuid(group.groupStableGuid, $"Preset group[{groupIndex}]", errors);
                 AddUniquePresetGuid(groupGuids, NormalizeGuid(group.groupStableGuid), groupIndex, "group", errors);
+                if (group.trackingPolicy == null)
+                {
+                    errors.Add($"Preset group[{groupIndex}].trackingPolicy is null.");
+                }
+
                 if (group.poses == null)
                 {
                     errors.Add($"Preset group[{groupIndex}].poses is null.");
@@ -819,7 +680,13 @@ namespace Gokoukotori.PoseTune.Editor
 
         private static void ValidateGuid(string value, string location, ICollection<string> errors)
         {
-            if (!string.IsNullOrWhiteSpace(value) && !Guid.TryParse(value.Trim(), out _))
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                errors.Add($"{location} requires a non-empty stable GUID.");
+                return;
+            }
+
+            if (!Guid.TryParse(value.Trim(), out _))
             {
                 errors.Add($"{location} has an invalid stable GUID '{value.Trim()}'.");
             }
@@ -830,17 +697,6 @@ namespace Gokoukotori.PoseTune.Editor
             return root != null
                 ? root.GetComponentsInChildren<T>(true).Where(component => NearestRoot(component) == root)
                 : Enumerable.Empty<T>();
-        }
-
-        private static IEnumerable<PoseTrackingPolicy> RootPolicies(PoseTuneRoot root)
-        {
-            return OwnedComponents<PoseTrackingPolicy>(root)
-                .Where(policy => policy.transform == root.transform ||
-                                 policy.transform.parent == root.transform &&
-                                 policy.GetComponent<PoseGroup>() == null &&
-                                 policy.GetComponent<PoseClip>() == null)
-                .OrderBy(policy => policy.transform == root.transform ? 0 : 1)
-                .ThenBy(policy => policy.transform.GetSiblingIndex());
         }
 
         private static PoseTuneRoot NearestRoot(Component component)
@@ -866,21 +722,5 @@ namespace Gokoukotori.PoseTune.Editor
             }
         }
 
-        private static bool ClipMatches(AnimationClip left, AnimationClip right)
-        {
-            if (left == null || right == null)
-            {
-                return false;
-            }
-
-            if (left == right)
-            {
-                return true;
-            }
-
-            var leftPath = AssetDatabase.GetAssetPath(left);
-            var rightPath = AssetDatabase.GetAssetPath(right);
-            return !string.IsNullOrWhiteSpace(leftPath) && leftPath == rightPath;
-        }
     }
 }

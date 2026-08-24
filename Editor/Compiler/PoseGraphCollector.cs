@@ -34,7 +34,7 @@ namespace Gokoukotori.PoseTune.Editor
                 return graph;
             }
 
-            PoseTuneTrackingPolicyResolver.CollectRootPolicy(root, graph);
+            PoseTuneTrackingPolicyResolver.CollectRootPolicyCount(root, graph);
 
             var usedParameters = new HashSet<string>();
             var usedLayerNames = new HashSet<string>();

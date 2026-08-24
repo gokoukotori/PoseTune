@@ -1,13 +1,11 @@
 using nadena.dev.ndmf;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 namespace Gokoukotori.PoseTune
 {
     [AddComponentMenu("PoseTune/Pose Height Adjust")]
     public sealed class PoseHeightAdjust : MonoBehaviour, INDMFEditorOnly
     {
-        [FormerlySerializedAs("enabled")]
         [InspectorName("ビルドに含める")]
         public bool includeInBuild = true;
         [InspectorName("パラメータ名")]

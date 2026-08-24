@@ -108,24 +108,6 @@ namespace Gokoukotori.PoseTune.Editor
                     report);
             }
 
-            foreach (var legacyName in new[] { "PTI/TrackingContext" })
-            {
-                if (parameters.Any(parameter => parameter != null && parameter.name == legacyName))
-                {
-                    report.Error(
-                        PoseTuneDiagnostics.AnimatorTrackingResetStateMissing.Code,
-                        "廃止済みの Tracking parameter が残っています: " + legacyName,
-                        graph.RootComponent);
-                }
-            }
-
-            if (Layers(controller).Any(layer => layer != null && layer.name == "PT_ResetTracking"))
-            {
-                report.Error(
-                    PoseTuneDiagnostics.AnimatorTrackingResetStateMissing.Code,
-                    "廃止済みの全身 Tracking reset layer が残っています: PT_ResetTracking",
-                    graph.RootComponent);
-            }
         }
 
         private static void ValidateParameter(
@@ -204,12 +186,25 @@ namespace Gokoukotori.PoseTune.Editor
                          .Where(group => group != null && ParameterAllocator.RequiresTrackingVote(graph, group)))
             {
                 var expected = group.Poses
-                    .Where(pose => pose != null && pose.EmitTrackingControl)
+                    .Where(pose => pose != null)
                     .SelectMany(pose => ExpectedVariants(
                         graph,
                         group,
                         pose,
                         PoseStateNaming.DuplicateBaseNames(group.Poses.Where(candidate => candidate != null))))
+                    .Select(variant => variant.Policy)
+                    .Where(policy => !TrackingPolicyUtility.IsNoChange(policy))
+                    .Aggregate(
+                        new List<TrackingPolicyData>(),
+                        (profiles, policy) =>
+                        {
+                            if (!profiles.Any(existing => TrackingPolicyUtility.AreEqual(existing, policy)))
+                            {
+                                profiles.Add(policy);
+                            }
+
+                            return profiles;
+                        })
                     .ToList();
                 var actual = graph.TrackingVotes.Votes
                     .Where(vote => vote.GroupId == (group.Id ?? ""))
@@ -219,7 +214,7 @@ namespace Gokoukotori.PoseTune.Editor
                 {
                     report.Error(
                         PoseTuneDiagnostics.AnimatorTrackingResetStateMissing.Code,
-                        $"Tracking vote 定義数が variant 数と一致しません: {group.DisplayName} " +
+                        $"Tracking vote 定義数が distinct profile 数と一致しません: {group.DisplayName} " +
                         $"(actual={actual.Count}, expected={expected.Count})",
                         group.Source != null ? group.Source : graph.RootComponent);
                 }
@@ -229,21 +224,29 @@ namespace Gokoukotori.PoseTune.Editor
                 {
                     report.Error(
                         PoseTuneDiagnostics.AnimatorTrackingResetStateMissing.Code,
-                        "Tracking vote は group 内の各 variant に固有の正値である必要があります: " + group.DisplayName,
+                        "Tracking vote は group 内の各 distinct profile に固有の正値である必要があります: " + group.DisplayName,
                         group.Source != null ? group.Source : graph.RootComponent);
                 }
 
-                foreach (var variant in expected)
+                if (actual.Select(vote => vote.Policy)
+                    .Where(policy => policy != null)
+                    .GroupBy(policy => actual.Count(candidate =>
+                        TrackingPolicyUtility.AreEqual(candidate.Policy, policy)))
+                    .Any(grouping => grouping.Key != 1))
                 {
-                    var vote = actual.SingleOrDefault(candidate =>
-                        candidate.PoseId == (variant.PoseId ?? "") &&
-                        candidate.Variant == variant.VariantKey);
-                    if (vote == null || !TrackingPolicyUtility.AreEqual(vote.Policy, variant.Policy))
+                    report.Error(
+                        PoseTuneDiagnostics.AnimatorTrackingResetStateMissing.Code,
+                        "Tracking vote の policy profile が重複しています: " + group.DisplayName,
+                        group.Source != null ? group.Source : graph.RootComponent);
+                }
+
+                foreach (var policy in expected)
+                {
+                    if (actual.Count(candidate => TrackingPolicyUtility.AreEqual(candidate.Policy, policy)) != 1)
                     {
                         report.Error(
                             PoseTuneDiagnostics.AnimatorTrackingResetStateMissing.Code,
-                            $"Tracking vote の variant/policy 対応が不正です: {group.DisplayName}/" +
-                            $"{variant.PoseId}/{variant.VariantKey}",
+                            $"Tracking vote の policy 対応が不正です: {group.DisplayName}",
                             graph.RootComponent);
                     }
                 }
@@ -857,18 +860,22 @@ namespace Gokoukotori.PoseTune.Editor
 
                 ValidateVrModeInvalidExit(pose, variant, state, handoff, report);
 
-                var vote = graph.TrackingVotes.Votes.SingleOrDefault(candidate =>
-                    candidate.GroupId == (group.Id ?? "") &&
-                    candidate.PoseId == (variant.PoseId ?? "") &&
-                    candidate.Variant == variant.VariantKey);
-                if (pose.EmitTrackingControl && ParameterAllocator.RequiresTrackingVote(graph, group) &&
-                    (vote == null || !ParametersSetBy(state).Any(parameter =>
-                        parameter.name == PoseTuneNames.TrackingVoteParameter(group) &&
-                        Mathf.Approximately(parameter.value, vote.Id))))
+                var vote = TrackingPolicyUtility.IsNoChange(variant.Policy)
+                    ? null
+                    : graph.TrackingVotes.Votes.SingleOrDefault(candidate =>
+                        candidate.GroupId == (group.Id ?? "") &&
+                        TrackingPolicyUtility.AreEqual(candidate.Policy, variant.Policy));
+                var voteWrites = ParametersSetBy(state)
+                    .Where(parameter => parameter.name == PoseTuneNames.TrackingVoteParameter(group))
+                    .ToList();
+                var voteIsValid = TrackingPolicyUtility.IsNoChange(variant.Policy)
+                    ? voteWrites.Count == 0
+                    : vote != null && voteWrites.Any(parameter => Mathf.Approximately(parameter.value, vote.Id));
+                if (!voteIsValid)
                 {
                     report.Error(
                         PoseTuneDiagnostics.AnimatorTrackingResetStateMissing.Code,
-                        "Pose variant が固有の tracking vote を設定していません: " + variant.StateName,
+                        "Pose variant が対応する tracking policy profile ID を設定していません: " + variant.StateName,
                         pose.Source);
                 }
 
@@ -889,8 +896,12 @@ namespace Gokoukotori.PoseTune.Editor
                 graph.RootComponent,
                 group,
                 pose)
-                ? PoseStateVariantRules.DesktopLowerBodyTrackingPolicy(pose.TrackingPolicy)
-                : pose.TrackingPolicy;
+                ? PoseStateVariantRules.DesktopLowerBodyTrackingPolicy(group.TrackingPolicy)
+                : group.TrackingPolicy;
+            if (!group.EmitTrackingControl)
+            {
+                basePolicy = TrackingPolicyUtility.NoChange();
+            }
             AnimatorConditionMode? baseVrModeInvalidExit = null;
             var baseVrModeInvalidExitThreshold = 0f;
             if (needsDesktopLowerBodyLockVariant)
@@ -908,8 +919,6 @@ namespace Gokoukotori.PoseTune.Editor
                 Variant(
                     PoseStateNaming.Name(pose, duplicateStateBaseNames),
                     PoseStateNaming.CleanupName(pose, duplicateStateBaseNames),
-                    pose,
-                    "Base",
                     basePolicy,
                     baseVrModeInvalidExit,
                     baseVrModeInvalidExitThreshold)
@@ -919,9 +928,7 @@ namespace Gokoukotori.PoseTune.Editor
                 variants.Add(Variant(
                     PoseStateNaming.Name(pose, duplicateStateBaseNames, "_Desktop"),
                     PoseStateNaming.CleanupName(pose, duplicateStateBaseNames, "_Desktop"),
-                    pose,
-                    "Desktop",
-                    PoseStateVariantRules.DesktopLowerBodyTrackingPolicy(pose.TrackingPolicy),
+                    PoseStateVariantRules.DesktopLowerBodyTrackingPolicy(group.TrackingPolicy),
                     AnimatorConditionMode.Greater,
                     0f));
             }
@@ -931,22 +938,22 @@ namespace Gokoukotori.PoseTune.Editor
                 variants.Add(Variant(
                     PoseStateNaming.Name(pose, duplicateStateBaseNames, "_VR"),
                     PoseStateNaming.CleanupName(pose, duplicateStateBaseNames, "_VR"),
-                    pose,
-                    "VR",
-                    pose.TrackingPolicy,
+                    group.EmitTrackingControl
+                        ? group.TrackingPolicy
+                        : TrackingPolicyUtility.NoChange(),
                     AnimatorConditionMode.Less,
                     1f));
             }
 
-            if (pose.HasFullBodyTrackingOverride &&
+            if (group.HasFullBodyTrackingOverride &&
                 graph.RootComponent.advancedSettings?.allowFullBodyTracking == true)
             {
                 variants.Add(Variant(
                     PoseStateNaming.Name(pose, duplicateStateBaseNames, "_FBT"),
                     PoseStateNaming.CleanupName(pose, duplicateStateBaseNames, "_FBT"),
-                    pose,
-                    "FBT",
-                    pose.FullBodyTrackingPolicy));
+                    group.EmitTrackingControl
+                        ? group.FullBodyTrackingPolicy
+                        : TrackingPolicyUtility.NoChange()));
             }
 
             return variants;
@@ -955,8 +962,6 @@ namespace Gokoukotori.PoseTune.Editor
         private static ExpectedPoseVariant Variant(
             string stateName,
             string handoffName,
-            PoseDefinition pose,
-            string variantKey,
             TrackingPolicyData policy,
             AnimatorConditionMode? vrModeInvalidExit = null,
             float vrModeInvalidExitThreshold = 0f)
@@ -965,13 +970,9 @@ namespace Gokoukotori.PoseTune.Editor
             {
                 StateName = stateName,
                 HandoffName = handoffName,
-                PoseId = pose.Id,
-                VariantKey = variantKey,
                 VrModeInvalidExit = vrModeInvalidExit,
                 VrModeInvalidExitThreshold = vrModeInvalidExitThreshold,
-                Policy = pose.EmitTrackingControl
-                    ? TrackingPolicyUtility.Copy(policy)
-                    : TrackingPolicyUtility.NoChange()
+                Policy = TrackingPolicyUtility.Copy(policy)
             };
         }
 
@@ -1015,7 +1016,7 @@ namespace Gokoukotori.PoseTune.Editor
         {
             var writes = ParametersSetBy(handoff).ToList();
             var voteName = PoseTuneNames.TrackingVoteParameter(group);
-            if (pose.EmitTrackingControl && ParameterAllocator.RequiresTrackingVote(graph, group) &&
+            if (group.EmitTrackingControl && ParameterAllocator.RequiresTrackingVote(graph, group) &&
                 !writes.Any(parameter => parameter.name == voteName && Mathf.Approximately(parameter.value, 0f)))
             {
                 report.Error(
@@ -1024,7 +1025,7 @@ namespace Gokoukotori.PoseTune.Editor
                     pose.Source);
             }
 
-            var expectedResets = pose.GenerateResetOnExit
+            var expectedResets = group.GenerateResetOnExit
                 ? new HashSet<string>(TrackingArbiterCompiler.ControlledParts(outgoingPolicy)
                     .Select(PoseTuneNames.TrackingResetParameter))
                 : new HashSet<string>();
@@ -1406,8 +1407,6 @@ namespace Gokoukotori.PoseTune.Editor
         {
             public string StateName;
             public string HandoffName;
-            public string PoseId;
-            public string VariantKey;
             public AnimatorConditionMode? VrModeInvalidExit;
             public float VrModeInvalidExitThreshold;
             public TrackingPolicyData Policy;

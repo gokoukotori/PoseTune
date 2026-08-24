@@ -59,7 +59,6 @@ namespace Gokoukotori.PoseTune.Editor
                     ? source.Rotate
                     : 0f;
             pose.recenterRootXZToHead = options.rootRecenterMode == KawaiiRootRecenterMode.FirstRootKeyApproximation;
-            pose.emitTrackingControl = group.emitTrackingControl;
             pose.suppressIconGeneration = iconsDisabled;
             ApplyMotionTime(pose, source, options, report);
             ApplyPoseSpace(pose, options);

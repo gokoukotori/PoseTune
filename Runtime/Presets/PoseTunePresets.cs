@@ -3,14 +3,13 @@ using UnityEngine;
 
 namespace Gokoukotori.PoseTune
 {
-    [CreateAssetMenu(menuName = "PoseTune/PoseTune プリセット")]
     public sealed class PoseTunePreset : ScriptableObject
     {
-        public const int CurrentSchemaVersion = 2;
+        public const int CurrentSchemaVersion = 3;
 
         [HideInInspector]
         // Assets created before schema v2 have no serialized version field and must remain legacy-safe.
-        // Capture writes CurrentSchemaVersion explicitly for every newly authored preset.
+        // Editor creation and capture paths assign CurrentSchemaVersion explicitly.
         public int schemaVersion = 1;
         [InspectorName("プリセット名")]
         public string presetName = "";

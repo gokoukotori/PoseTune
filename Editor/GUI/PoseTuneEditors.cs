@@ -9,7 +9,7 @@ namespace Gokoukotori.PoseTune.Editor
     {
         private static readonly string[] Tabs =
         {
-            "ポーズ", "メニュー", "トラッキング", "高さ", "インポート", "プレビュー", "プリセット", "検証"
+            "ポーズ", "メニュー", "トラッキング", "高さ", "プレビュー", "プリセット", "検証"
         };
 
         public override void OnInspectorGUI()
@@ -50,15 +50,12 @@ namespace Gokoukotori.PoseTune.Editor
                     PoseTuneAssistantHeightTab.Draw(root);
                     break;
                 case 4:
-                    PoseTuneAssistantImportTab.Draw(root);
-                    break;
-                case 5:
                     PoseTuneAssistantPreviewTab.Draw(root);
                     break;
-                case 6:
+                case 5:
                     PoseTuneAssistantPresetTab.Draw(root);
                     break;
-                case 7:
+                case 6:
                     PoseTuneAssistantValidationTab.Draw(root);
                     break;
             }

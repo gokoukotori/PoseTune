@@ -20,6 +20,22 @@ namespace Gokoukotori.PoseTune.Editor
             };
         }
 
+        public static void ApplyResolved(
+            PoseTrackingPolicy target,
+            ResolvedGroupTrackingPolicy source)
+        {
+            if (target == null || source == null)
+            {
+                return;
+            }
+
+            target.tracking = Copy(source.Policy);
+            target.useFullBodyTrackingOverride = source.HasFullBodyTrackingOverride;
+            target.fullBodyTracking = Copy(source.FullBodyTrackingPolicy);
+            target.generateResetOnExit = source.GenerateResetOnExit;
+            target.enabled = true;
+        }
+
         public static TrackingPolicyData NoChange()
         {
             return new TrackingPolicyData
@@ -92,6 +108,11 @@ namespace Gokoukotori.PoseTune.Editor
                    left.rightFingers == right.rightFingers &&
                    left.eyes == right.eyes &&
                    left.mouth == right.mouth;
+        }
+
+        public static bool IsNoChange(TrackingPolicyData value)
+        {
+            return value != null && AreEqual(value, NoChange());
         }
 
         public static bool WasCustomizedFromPoseDefault(TrackingPolicyData value)

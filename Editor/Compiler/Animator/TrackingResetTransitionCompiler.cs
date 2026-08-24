@@ -25,12 +25,12 @@ namespace Gokoukotori.PoseTune.Editor
             var hold = AnimatorLayerFactory.ResetHoldClip(clipName, CriticalStateHoldSeconds);
             state.motion = hold;
             result.GeneratedAssets.Add(hold);
-            if (pose.EmitTrackingControl && ParameterAllocator.RequiresTrackingVote(graph, group))
+            if (group.EmitTrackingControl && ParameterAllocator.RequiresTrackingVote(graph, group))
             {
                 ParameterDriverCompiler.SetTrackingVote(state, group, 0);
             }
 
-            if (pose.GenerateResetOnExit)
+            if (group.GenerateResetOnExit)
             {
                 ParameterDriverCompiler.RequestTrackingReset(
                     state,

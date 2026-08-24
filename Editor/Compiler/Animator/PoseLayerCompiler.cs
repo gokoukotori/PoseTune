@@ -234,7 +234,7 @@ namespace Gokoukotori.PoseTune.Editor
                         PoseStateNaming.CleanupName(pose, duplicates, "_VR"));
                 }
 
-                if (pose.HasFullBodyTrackingOverride &&
+                if (group.HasFullBodyTrackingOverride &&
                     graph.RootComponent.advancedSettings?.allowFullBodyTracking == true)
                 {
                     AddVariantHandoff(

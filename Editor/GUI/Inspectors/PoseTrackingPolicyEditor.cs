@@ -13,7 +13,7 @@ namespace Gokoukotori.PoseTune.Editor
                 new PoseTuneFieldLabel("tracking", "トラッキング"),
                 new PoseTuneFieldLabel("useFullBodyTrackingOverride", "FBT 用トラッキングを上書き"),
                 new PoseTuneFieldLabel("fullBodyTracking", "FBT 用トラッキング"),
-                new PoseTuneFieldLabel("generateResetOnExit", "終了時にリセットを生成", "Pose 終了時に、この policy が明示変更した部位だけを Tracking へ戻す reset request を生成します。"));
+                new PoseTuneFieldLabel("generateResetOnExit", "終了時にリセットを生成", "Group 内の Pose 終了時に、この policy が明示変更した部位だけを Tracking へ戻す reset request を生成します。"));
         }
     }
 }

@@ -210,7 +210,8 @@ namespace Gokoukotori.PoseTune.Editor
             return graph != null &&
                    group != null &&
                    NeedsTrackingArbiter(graph) &&
-                   group.Poses.Any(pose => pose.EmitTrackingControl);
+                   group.EmitTrackingControl &&
+                   group.Poses.Any(pose => TrackingArbiterCompiler.ControlledParts(graph, group, pose).Count > 0);
         }
 
     }

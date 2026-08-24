@@ -156,14 +156,7 @@ namespace Gokoukotori.PoseTune.Editor
                     continue;
                 }
 
-                if (issue.Severity == ValidationSeverity.Error)
-                {
-                    filtered.Error(issue.Code, issue.Message, issue.Context);
-                }
-                else
-                {
-                    filtered.Warning(issue.Code, issue.Message, issue.Context);
-                }
+                filtered.Add(issue);
             }
 
             if (filtered.Issues.Any())
@@ -186,32 +179,12 @@ namespace Gokoukotori.PoseTune.Editor
 
             foreach (var issue in source.Issues)
             {
-                if (issue.Severity == ValidationSeverity.Error)
-                {
-                    destination.Error(issue.Code, issue.Message, issue.Context);
-                }
-                else
-                {
-                    destination.Warning(issue.Code, issue.Message, issue.Context);
-                }
+                destination.Add(issue);
             }
         }
 
         private static void LogReport(Object context, ValidationReport report)
         {
-            foreach (var issue in report.Issues)
-            {
-                var message = $"{issue.Code}: {issue.Message}";
-                if (issue.Severity == ValidationSeverity.Error)
-                {
-                    PoseTuneLog.Error(message, issue.Context != null ? issue.Context : context);
-                }
-                else
-                {
-                    PoseTuneLog.Warning(message, issue.Context != null ? issue.Context : context);
-                }
-            }
-
             PoseTuneNdmfErrorReporter.Report(report, context);
         }
 

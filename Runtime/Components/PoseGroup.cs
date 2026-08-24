@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using nadena.dev.ndmf;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 namespace Gokoukotori.PoseTune
 {
@@ -19,7 +18,6 @@ namespace Gokoukotori.PoseTune
         [InspectorName("アイコン")]
         public Texture2D icon;
 
-        [FormerlySerializedAs("enabled")]
         [InspectorName("ビルドに含める")]
         public bool includeInBuild = true;
         [InspectorName("排他")]

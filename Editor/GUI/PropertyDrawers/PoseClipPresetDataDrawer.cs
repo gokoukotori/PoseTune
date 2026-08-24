@@ -28,8 +28,6 @@ namespace Gokoukotori.PoseTune.Editor
             new("cameraOffset", "カメラオフセット"),
             new("priority", "優先度"),
             new("blendMode", "ブレンドモード"),
-            new("emitTrackingControl", "トラッキング制御を生成"),
-            new("trackingPolicy", "トラッキングポリシー"),
             new("suppressIconGeneration", "アイコン生成を抑止"),
             new("motionTime", "モーション時間"),
             new("poseSpace", "ポーズ空間"),

@@ -48,9 +48,9 @@ namespace Gokoukotori.PoseTune.Editor
                    group != null &&
                    group.Kind == PoseGroupKind.Standing &&
                    pose != null &&
-                   pose.EmitTrackingControl &&
+                   group.EmitTrackingControl &&
                    !PoseSpaceIsVrOnly(pose) &&
-                   !LowerBodyAlreadyAnimation(pose.TrackingPolicy);
+                   !LowerBodyAlreadyAnimation(group.TrackingPolicy);
         }
 
         private static bool PoseSpaceIsVrOnly(PoseDefinition pose)

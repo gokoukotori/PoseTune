@@ -1,6 +1,8 @@
 using System.Collections.Generic;
+using System.Linq;
 using Gokoukotori.PoseTune;
 using nadena.dev.ndmf;
+using nadena.dev.ndmf.ui;
 using UnityEngine;
 using UnityEngine.UIElements;
 using Object = UnityEngine.Object;
@@ -11,7 +13,7 @@ namespace Gokoukotori.PoseTune.Editor
     {
         public static IError ToNdmfError(ValidationIssue issue)
         {
-            return new PoseTuneNdmfError(issue);
+            return new PoseTuneNdmfError(new ValidationIssueGroup(issue));
         }
 
         public static void Report(ValidationReport report, Object fallbackContext = null)
@@ -21,11 +23,25 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
-            foreach (var issue in report.Issues)
+            foreach (var group in ValidationIssueGrouping.Group(
+                         report.Issues.Where(issue => issue.Severity != ValidationSeverity.Information)))
             {
-                using (ErrorReport.WithContextObject(issue.Context != null ? issue.Context : fallbackContext))
+                var error = new PoseTuneNdmfError(group);
+                foreach (var context in group.Contexts)
                 {
-                    ErrorReport.ReportError(ToNdmfError(issue));
+                    error.AddReference(ObjectRegistry.GetReference(context));
+                }
+
+                if (group.Contexts.Any())
+                {
+                    ErrorReport.ReportError(error);
+                }
+                else
+                {
+                    using (ErrorReport.WithContextObject(fallbackContext))
+                    {
+                        ErrorReport.ReportError(error);
+                    }
                 }
             }
         }
@@ -33,44 +49,84 @@ namespace Gokoukotori.PoseTune.Editor
 
     internal sealed class PoseTuneNdmfError : IError
     {
-        private readonly ValidationIssue issue;
+        private readonly ValidationIssueGroup group;
         private readonly List<ObjectReference> references = new();
 
-        public PoseTuneNdmfError(ValidationIssue issue)
+        public PoseTuneNdmfError(ValidationIssueGroup group)
         {
-            this.issue = issue;
+            this.group = group;
         }
 
-        public ErrorSeverity Severity => issue.Severity == ValidationSeverity.Error
-            ? ErrorSeverity.Error
-            : ErrorSeverity.NonFatal;
+        public ErrorSeverity Severity
+        {
+            get
+            {
+                switch (group.Severity)
+                {
+                    case ValidationSeverity.Error:
+                        return ErrorSeverity.Error;
+                    case ValidationSeverity.Warning:
+                        return ErrorSeverity.NonFatal;
+                    case ValidationSeverity.Information:
+                        return ErrorSeverity.Information;
+                    default:
+                        return ErrorSeverity.NonFatal;
+                }
+            }
+        }
 
         public VisualElement CreateVisualElement(ErrorReport report)
         {
-            var messageType = Severity == ErrorSeverity.Error
-                ? HelpBoxMessageType.Error
-                : HelpBoxMessageType.Warning;
+            var messageType = MessageTypeFor(Severity);
             var helpBox = new HelpBox(ToMessage(), messageType);
             helpBox.style.flexGrow = 1f;
             helpBox.style.alignSelf = Align.Stretch;
             helpBox.style.whiteSpace = WhiteSpace.Normal;
-            return helpBox;
+
+            var root = new VisualElement();
+            root.Add(helpBox);
+            if (references.Count > 0)
+            {
+                var foldout = new Foldout
+                {
+                    text = references.Count == 1 ? "対象" : $"対象（{references.Count}件）",
+                    value = false
+                };
+                foreach (var reference in references)
+                {
+                    if (ObjectSelector.TryCreate(report, reference, out var selector))
+                    {
+                        foldout.Add(selector);
+                    }
+                }
+
+                root.Add(foldout);
+            }
+
+            return root;
         }
 
         public string ToMessage()
         {
             var lines = new List<string>
             {
-                "[PoseTune] " + issue.Code + ": " + issue.Message
+                "[PoseTune] " + group.Code + ": " + group.Message
             };
 
-            var contextLabel = ContextLabel(issue.Context);
-            if (!string.IsNullOrWhiteSpace(contextLabel))
+            if (group.TargetCount > 1)
             {
-                lines.Add("対象: " + contextLabel);
+                lines.Add($"対象: {group.TargetCount}件");
+            }
+            else
+            {
+                var contextLabel = ContextLabel(group.Issues.FirstOrDefault()?.Context);
+                if (!string.IsNullOrWhiteSpace(contextLabel))
+                {
+                    lines.Add("対象: " + contextLabel);
+                }
             }
 
-            var fixHint = PoseTuneDiagnostics.FixHint(issue.Code);
+            var fixHint = PoseTuneDiagnostics.FixHint(group.Code);
             if (!string.IsNullOrWhiteSpace(fixHint))
             {
                 lines.Add("対処: " + fixHint);
@@ -81,9 +137,23 @@ namespace Gokoukotori.PoseTune.Editor
 
         public void AddReference(ObjectReference obj)
         {
-            if (obj != null)
+            if (obj != null && !references.Contains(obj))
             {
                 references.Add(obj);
+            }
+        }
+
+        private static HelpBoxMessageType MessageTypeFor(ErrorSeverity severity)
+        {
+            switch (severity)
+            {
+                case ErrorSeverity.Error:
+                case ErrorSeverity.InternalError:
+                    return HelpBoxMessageType.Error;
+                case ErrorSeverity.Information:
+                    return HelpBoxMessageType.Info;
+                default:
+                    return HelpBoxMessageType.Warning;
             }
         }
 

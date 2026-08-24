@@ -114,8 +114,7 @@ namespace Gokoukotori.PoseTune.Editor
             {
                 parameter = parameter,
                 valueType = ParameterValueType.Bool,
-                op = op,
-                boolValue = op == ConditionOperator.If
+                op = op
             };
         }
     }

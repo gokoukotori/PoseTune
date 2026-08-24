@@ -1,5 +1,6 @@
 using Gokoukotori.PoseTune;
 using UnityEditor;
+using UnityEngine;
 
 namespace Gokoukotori.PoseTune.Editor
 {
@@ -7,6 +8,19 @@ namespace Gokoukotori.PoseTune.Editor
     [CanEditMultipleObjects]
     public sealed class PoseTunePresetEditor : PoseTuneLocalizedEditor
     {
+        [MenuItem("Assets/Create/PoseTune/PoseTune プリセット", false, 110)]
+        private static void CreatePresetAsset()
+        {
+            ProjectWindowUtil.CreateAsset(CreateCurrentPreset(), "New PoseTune Preset.asset");
+        }
+
+        internal static PoseTunePreset CreateCurrentPreset()
+        {
+            var preset = ScriptableObject.CreateInstance<PoseTunePreset>();
+            preset.schemaVersion = PoseTunePreset.CurrentSchemaVersion;
+            return preset;
+        }
+
         public override void OnInspectorGUI()
         {
             DrawFields(

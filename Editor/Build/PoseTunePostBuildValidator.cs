@@ -127,14 +127,9 @@ namespace Gokoukotori.PoseTune.Editor
             var animatorReport = virtualController != null
                 ? animatorValidator.Validate(graph, virtualController)
                 : animatorValidator.Validate(graph, targetController);
-            foreach (var error in animatorReport.Errors)
+            foreach (var issue in animatorReport.Issues)
             {
-                report.Errors.Add(error);
-            }
-
-            foreach (var warning in animatorReport.Warnings)
-            {
-                report.Warnings.Add(warning);
+                report.Add(issue);
             }
         }
 

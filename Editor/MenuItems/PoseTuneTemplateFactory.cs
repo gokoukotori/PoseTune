@@ -9,7 +9,6 @@ namespace Gokoukotori.PoseTune.Editor
     public static class PoseTuneTemplateFactory
     {
         private const string PoseGroupsRootName = "ポーズグループ";
-        private const string LegacyPoseGroupsRootName = "Pose Groups";
 
         [MenuItem("GameObject/PoseTune/テンプレート", false, 30)]
         private static void AddTemplateMenuItem()
@@ -91,7 +90,7 @@ namespace Gokoukotori.PoseTune.Editor
         internal static Transform FindPoseGroupsRoot(PoseTuneRoot root)
         {
             return root.GetComponentsInChildren<Transform>(true)
-                       .FirstOrDefault(t => t.name == PoseGroupsRootName || t.name == LegacyPoseGroupsRootName)
+                       .FirstOrDefault(t => t.name == PoseGroupsRootName)
                    ?? root.transform;
         }
 

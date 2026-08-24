@@ -37,8 +37,9 @@ namespace Gokoukotori.PoseTune.Editor
                 PoseTuneMotionTimeValidator.Validate(graph, pose, report);
                 PoseTuneTrackingValidator.ValidatePose(graph, pose, report);
                 PoseTunePoseOutputValidator.Validate(graph, pose, report);
-                PoseTuneIconValidator.Validate(graph, pose, report);
             }
+
+            PoseTuneIconValidator.Validate(graph, report);
 
             PoseTuneParameterValidator.Validate(context, report);
             PoseTuneConditionValidator.Validate(graph, report);

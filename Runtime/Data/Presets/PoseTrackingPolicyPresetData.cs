@@ -6,7 +6,8 @@ namespace Gokoukotori.PoseTune
     [Serializable]
     public sealed class PoseTrackingPolicyPresetData
     {
-        [InspectorName("コンポーネントあり")]
+        [InspectorName("有効なコンポーネントあり")]
+        [Tooltip("ON の場合は有効な PoseTrackingPolicy を表します。無効な component は存在しないものとして扱います。")]
         public bool present;
         [InspectorName("トラッキング")]
         public TrackingPolicyData tracking = TrackingPolicyData.DefaultForPose();

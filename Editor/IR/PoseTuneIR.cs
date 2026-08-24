@@ -19,10 +19,6 @@ namespace Gokoukotori.PoseTune.Editor
         public int GoroneSystemExCompatibilityCount;
         public PoseTuneOptions Options = new();
         public bool HasPoseOptions;
-        public TrackingPolicyData RootTrackingPolicy = TrackingPolicyData.DefaultForPose();
-        public bool HasCustomRootTrackingPolicy;
-        public bool RootGenerateResetOnExit = true;
-        public bool HasCustomRootGenerateResetOnExit;
         public int RootTrackingPolicyCount;
         internal TrackingVoteRegistry TrackingVotes = new();
         public ValidationReport Validation = new();
@@ -49,6 +45,10 @@ namespace Gokoukotori.PoseTune.Editor
         public AutoPoseSelectionMode AutoPoseSelectionMode;
         public AutoContextProfile AutoContextProfile = AutoContextProfile.Standard;
         public bool EmitTrackingControl = true;
+        public bool GenerateResetOnExit = true;
+        public TrackingPolicyData TrackingPolicy = TrackingPolicyData.DefaultForPose();
+        public bool HasFullBodyTrackingOverride;
+        public TrackingPolicyData FullBodyTrackingPolicy = TrackingPolicyData.DefaultForPose();
         public bool SuppressIconGeneration;
         public Texture2D Icon;
         public PoseGroup Source;
@@ -79,12 +79,7 @@ namespace Gokoukotori.PoseTune.Editor
         public PoseGroupDefinition Group;
         public PoseClipPriority Priority = PoseClipPriority.Normal;
         public PoseClipBlendMode BlendMode = PoseClipBlendMode.Override;
-        public bool GenerateResetOnExit = true;
-        public TrackingPolicyData TrackingPolicy = TrackingPolicyData.DefaultForPose();
-        public bool EmitTrackingControl = true;
         public bool SuppressIconGeneration;
-        public bool HasFullBodyTrackingOverride;
-        public TrackingPolicyData FullBodyTrackingPolicy = TrackingPolicyData.DefaultForPose();
         public PoseSpacePolicy PoseSpace = new();
         public MotionTimeSettings MotionTime = new();
         public List<ParameterConditionData> Conditions = new();

@@ -57,11 +57,7 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Hashing
                 root != null ? root.advancedSettings.actionWeightControlMode.ToString() : "");
             Append(builder, "trackingGuardProfile",
                 root != null ? TrackingGuardCompiler.RootEntryProfile(root).ToString() : "");
-            Append(builder, "root.hasCustomRootTrackingPolicy", graph != null && graph.HasCustomRootTrackingPolicy);
-            Append(builder, "root.hasCustomRootGenerateResetOnExit", graph != null && graph.HasCustomRootGenerateResetOnExit);
-            Append(builder, "root.generateResetOnExit", graph != null && graph.RootGenerateResetOnExit);
             AppendGoroneSystemExCompatibility(builder, graph);
-            AppendTracking(builder, graph != null ? graph.RootTrackingPolicy : null);
         }
 
         private static void AppendGoroneSystemExCompatibility(StringBuilder builder, PoseGraph graph)
@@ -132,6 +128,13 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Hashing
             Append(builder, "group.autoPoseSelectionMode", group.AutoPoseSelectionMode.ToString());
             Append(builder, "group.autoContextProfile", group.AutoContextProfile.ToString());
             Append(builder, "group.emitTrackingControl", group.EmitTrackingControl);
+            Append(builder, "group.generateResetOnExit", group.GenerateResetOnExit);
+            AppendTracking(builder, group.TrackingPolicy);
+            Append(builder, "group.hasFullBodyTrackingOverride", group.HasFullBodyTrackingOverride);
+            if (group.HasFullBodyTrackingOverride)
+            {
+                AppendTracking(builder, group.FullBodyTrackingPolicy);
+            }
             Append(builder, "group.suppressIconGeneration", group.SuppressIconGeneration);
             AppendConditions(builder, "group.condition", group.Conditions);
             foreach (var pose in group.Poses)
@@ -162,16 +165,7 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Hashing
             Append(builder, "pose.menuOrder", pose.MenuOrder);
             Append(builder, "pose.priority", pose.Priority.ToString());
             Append(builder, "pose.blendMode", pose.BlendMode.ToString());
-            Append(builder, "pose.generateResetOnExit", pose.GenerateResetOnExit);
-            Append(builder, "pose.emitTrackingControl", pose.EmitTrackingControl);
             Append(builder, "pose.suppressIconGeneration", pose.SuppressIconGeneration);
-            AppendTracking(builder, pose.TrackingPolicy);
-            Append(builder, "pose.hasFullBodyTrackingOverride", pose.HasFullBodyTrackingOverride);
-            if (pose.HasFullBodyTrackingOverride)
-            {
-                AppendTracking(builder, pose.FullBodyTrackingPolicy);
-            }
-
             AppendPoseSpace(builder, pose.PoseSpace);
             AppendMotionTime(builder, pose.MotionTime);
             AppendConditions(builder, "pose.condition", pose.Conditions);
@@ -226,7 +220,6 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Hashing
                 Append(builder, prefix + ".op", condition.op.ToString());
                 Append(builder, prefix + ".floatValue", condition.floatValue);
                 Append(builder, prefix + ".intValue", condition.intValue);
-                Append(builder, prefix + ".boolValue", condition.boolValue);
             }
         }
 

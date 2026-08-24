@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.2.0] - 2026-08-25
+
+### Changed
+
+- **破壊的変更:** tracking policy の最低単位を `PoseGroup` に統一し、`PoseClip.tracking`、`PoseClip.emitTrackingControl`、`PoseClipPresetData` の tracking 関連 field、および `PoseDefinition` の pose 単位 tracking field を削除
+- **破壊的変更:** 汎用 Animator Controller import component、Assistant の import UI、関連する公開 API と diagnostic を削除
+- **破壊的変更:** Bool 条件を `If`／`IfNot` のみに限定し、Bool の `Equals`／`NotEquals` と serialized `boolValue` を削除。Int の `Equals`／`NotEquals` は維持
+- **破壊的変更:** 廃止予定だった Editor API shim と preset の英語名 `Pose Groups` fallback を削除
+- `PoseTrackingPolicy` の解決順を `Group component → Root component → GroupKind default` に変更し、Group 内の全 Pose で Base／Desktop／VR／FBT policy と `generateResetOnExit` を共有
+- tracking vote を Pose variant 単位から Group 内の distinct policy profile 単位へ変更し、同一 profile の Pose／Base／VR が vote ID を共有、全 `NoChange` profile は vote を生成しないように変更
+- `PoseTunePreset` を schema v3 に更新して Root／Group policy のみを保存し、schema v1/v2 および空／不正な Stable GUID を変更前に原子的に拒否。Group／Pose の照合は Stable GUID のみに統一
+- 無効な `PoseTrackingPolicy` を resolver、validation、preset capture で「存在しない」として扱い、preset Replace だけが物理 component の有無を完全一致させる契約に統一
+- 旧 `PoseClip.tracking`／`PoseClip.emitTrackingControl` の inline YAML は自動移行せず、再シリアライズ時に失われ得る非互換境界として明文化
+
+### Fixed
+
+- 検証結果を diagnostic 単位で集約し、静的 pose の 0 秒 clip、KawaiiPosing の静的 root curve、全件未生成の thumbnail が大量の warning になる問題を修正
+- NDMF build 時に同じ validation warning が PoseTune と NDMF の両方から二重出力される問題を修正
+- Root／Group 以外に置かれた `PoseTrackingPolicy` を `PT-T004` validation error として build 前に検出。自動移行は行わず、Group policyへの手動移行を要求
+- InspectorからGroup policyを追加しただけでbase／FBT／reset実効値が変わる問題を修正し、emission無効時は全`NoChange`の実効値を保持
+- 削除済みのPose単位tracking fieldがPoseClip／preset drawerのproperty一覧に残っていた問題を修正
+- 新規作成した`PoseTunePreset`がlegacy schemaとして拒否される問題を修正し、schema v3のnull policyデータはReplace前に原子的に拒否
+
 ## [0.1.3] - 2026-07-23
 
 ### Changed

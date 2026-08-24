@@ -34,7 +34,6 @@ namespace Gokoukotori.PoseTune.Editor
             new ClearGroupParameterAutoFix(PoseTuneDiagnostics.GroupGeneratedParameterConflict.Code, "この group の明示 parameter 名をクリア"),
             new AlignLoopSettingAutoFix(),
             new GenerateThumbnailAutoFix(),
-            new ConvertLegacyTrackingPolicyAutoFix(),
             new DisableFbtGuardAutoFix(),
             new AllowFbtAutoFix(),
             new FillKawaiiSourceMotionAutoFix()
@@ -45,42 +44,6 @@ namespace Gokoukotori.PoseTune.Editor
         public IEnumerable<IPoseTuneAutoFix> FindFixes(ValidationIssue issue, PoseGraph graph)
         {
             return fixes.Where(fix => fix.Code == issue.Code && fix.CanFix(issue, graph));
-        }
-    }
-
-    internal sealed class ConvertLegacyTrackingPolicyAutoFix : PoseTuneAutoFixBase
-    {
-        public ConvertLegacyTrackingPolicyAutoFix() : base(
-            PoseTuneDiagnostics.LegacyInlineTrackingPolicy.Code,
-            "旧 tracking 値を PoseTrackingPolicy へ変換",
-            AutoFixSafety.Reversible)
-        {
-        }
-
-        public override bool CanFix(ValidationIssue issue, PoseGraph graph)
-        {
-            return issue.Context is PoseClip pose &&
-                   pose.GetComponent<PoseTrackingPolicy>() == null &&
-                   TrackingPolicyUtility.WasCustomizedFromPoseDefault(pose.tracking);
-        }
-
-        public override void Apply(ValidationIssue issue, PoseGraph graph)
-        {
-            if (issue.Context is not PoseClip pose || pose.GetComponent<PoseTrackingPolicy>() != null)
-            {
-                return;
-            }
-
-            var legacyTracking = TrackingPolicyUtility.Copy(pose.tracking);
-            Undo.RecordObject(pose, Label);
-            var policy = Undo.AddComponent<PoseTrackingPolicy>(pose.gameObject);
-            Undo.RecordObject(policy, Label);
-            policy.tracking = legacyTracking;
-            policy.useFullBodyTrackingOverride = false;
-            policy.generateResetOnExit = true;
-            pose.tracking = TrackingPolicyData.DefaultForPose();
-            EditorUtility.SetDirty(pose);
-            EditorUtility.SetDirty(policy);
         }
     }
 
@@ -201,7 +164,8 @@ namespace Gokoukotori.PoseTune.Editor
 
         public override bool CanFix(ValidationIssue issue, PoseGraph graph)
         {
-            return graph?.RootComponent != null && RootPolicies(graph.RootComponent).Count() > 1;
+            return graph?.RootComponent != null &&
+                   PoseTuneTrackingPolicyResolver.RootPolicies(graph.RootComponent, false).Count > 1;
         }
 
         public override void Apply(ValidationIssue issue, PoseGraph graph)
@@ -211,7 +175,7 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
-            foreach (var policy in RootPolicies(graph.RootComponent).Skip(1))
+            foreach (var policy in PoseTuneTrackingPolicyResolver.RootPolicies(graph.RootComponent, false).Skip(1))
             {
                 Undo.RecordObject(policy, Label);
                 policy.enabled = false;
@@ -219,26 +183,6 @@ namespace Gokoukotori.PoseTune.Editor
             }
         }
 
-        private static IEnumerable<PoseTrackingPolicy> RootPolicies(PoseTuneRoot root)
-        {
-            return root.GetComponentsInChildren<PoseTrackingPolicy>(true)
-                .Where(policy => policy != null && IsRootLevelPolicy(root, policy))
-                .Where(PoseTuneAuthoringInclusion.ComponentEnabled)
-                .OrderBy(policy => policy.transform == root.transform ? 0 : 1)
-                .ThenBy(policy => policy.transform.GetSiblingIndex());
-        }
-
-        private static bool IsRootLevelPolicy(PoseTuneRoot root, PoseTrackingPolicy policy)
-        {
-            if (policy.transform == root.transform)
-            {
-                return true;
-            }
-
-            return policy.transform.parent == root.transform &&
-                   policy.GetComponent<PoseGroup>() == null &&
-                   policy.GetComponent<PoseClip>() == null;
-        }
     }
 
     internal sealed class DisableFbtGuardAutoFix : PoseTuneAutoFixBase

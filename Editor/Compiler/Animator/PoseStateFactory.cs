@@ -26,18 +26,18 @@ namespace Gokoukotori.PoseTune.Editor
                 graph.RootComponent,
                 group,
                 pose)
-                ? PoseStateVariantRules.DesktopLowerBodyTrackingPolicy(pose.TrackingPolicy)
-                : pose.TrackingPolicy;
+                ? PoseStateVariantRules.DesktopLowerBodyTrackingPolicy(group.TrackingPolicy)
+                : group.TrackingPolicy;
             var desktopLowerBodyTrackingPolicy =
-                PoseStateVariantRules.DesktopLowerBodyTrackingPolicy(pose.TrackingPolicy);
+                PoseStateVariantRules.DesktopLowerBodyTrackingPolicy(group.TrackingPolicy);
             var motionResult = BuildMotion(result, graph, pose);
             result.GeneratedAssets.AddRange(motionResult.GeneratedAssets);
-            var hasFullBodyTrackingVariant = pose.HasFullBodyTrackingOverride &&
+            var hasFullBodyTrackingVariant = group.HasFullBodyTrackingOverride &&
                                              graph.RootComponent.advancedSettings.allowFullBodyTracking;
-            baseTrackingPolicy = EffectiveTrackingPolicy(pose, baseTrackingPolicy);
-            desktopLowerBodyTrackingPolicy = EffectiveTrackingPolicy(pose, desktopLowerBodyTrackingPolicy);
-            var vrTrackingPolicy = EffectiveTrackingPolicy(pose, pose.TrackingPolicy);
-            var fullBodyTrackingPolicy = EffectiveTrackingPolicy(pose, pose.FullBodyTrackingPolicy);
+            baseTrackingPolicy = EffectiveTrackingPolicy(group, baseTrackingPolicy);
+            desktopLowerBodyTrackingPolicy = EffectiveTrackingPolicy(group, desktopLowerBodyTrackingPolicy);
+            var vrTrackingPolicy = EffectiveTrackingPolicy(group, group.TrackingPolicy);
+            var fullBodyTrackingPolicy = EffectiveTrackingPolicy(group, group.FullBodyTrackingPolicy);
 
             var variants = new PoseStateVariants
             {
@@ -47,15 +47,15 @@ namespace Gokoukotori.PoseTune.Editor
                 DesktopLowerBodyTrackingPolicy = desktopLowerBodyTrackingPolicy,
                 VrTrackingPolicy = vrTrackingPolicy,
                 FullBodyTrackingPolicy = fullBodyTrackingPolicy,
-                BaseTrackingVoteId = TrackingVoteId(graph, group, pose, "Base", baseTrackingPolicy),
+                BaseTrackingVoteId = TrackingVoteId(graph, group, baseTrackingPolicy),
                 DesktopLowerBodyTrackingVoteId = needsDesktopLowerBodyLockVariant
-                    ? TrackingVoteId(graph, group, pose, "Desktop", desktopLowerBodyTrackingPolicy)
+                    ? TrackingVoteId(graph, group, desktopLowerBodyTrackingPolicy)
                     : 0,
                 VrTrackingVoteId = needsPoseSpaceVrVariant
-                    ? TrackingVoteId(graph, group, pose, "VR", vrTrackingPolicy)
+                    ? TrackingVoteId(graph, group, vrTrackingPolicy)
                     : 0,
                 FullBodyTrackingVoteId = hasFullBodyTrackingVariant
-                    ? TrackingVoteId(graph, group, pose, "FBT", fullBodyTrackingPolicy)
+                    ? TrackingVoteId(graph, group, fullBodyTrackingPolicy)
                     : 0
             };
 
@@ -167,28 +167,26 @@ namespace Gokoukotori.PoseTune.Editor
         private static int TrackingVoteId(
             PoseGraph graph,
             PoseGroupDefinition group,
-            PoseDefinition pose,
-            string variant,
             TrackingPolicyData policy)
         {
-            if (graph == null || !ParameterAllocator.NeedsTrackingArbiter(graph) || pose == null)
+            if (graph == null || !ParameterAllocator.NeedsTrackingArbiter(graph) || group == null)
             {
                 return 0;
             }
 
-            if (!pose.EmitTrackingControl)
+            if (!group.EmitTrackingControl)
             {
                 return 0;
             }
 
-            return graph.TrackingVotes.GetOrAdd(group, pose, variant, policy);
+            return graph.TrackingVotes.GetOrAdd(group, policy);
         }
 
         private static TrackingPolicyData EffectiveTrackingPolicy(
-            PoseDefinition pose,
+            PoseGroupDefinition group,
             TrackingPolicyData policy)
         {
-            return pose != null && pose.EmitTrackingControl
+            return group != null && group.EmitTrackingControl
                 ? TrackingPolicyUtility.Copy(policy)
                 : TrackingPolicyUtility.NoChange();
         }

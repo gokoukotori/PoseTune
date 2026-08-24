@@ -8,13 +8,6 @@ namespace Gokoukotori.PoseTune.Editor
     {
         private readonly PoseTuneIconCacheService iconCache = new();
 
-        [System.Obsolete("Use Apply(PoseGraph). Icon generation is handled by the thumbnail cache pipeline.")]
-        public void Apply(PoseGraph graph, bool allowGenerate)
-        {
-            _ = allowGenerate;
-            Apply(graph);
-        }
-
         public void Apply(PoseGraph graph)
         {
             if (graph == null || graph.RootComponent == null)

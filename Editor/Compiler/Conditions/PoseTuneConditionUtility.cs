@@ -20,8 +20,7 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Conditions
                 valueType = condition.valueType,
                 op = condition.op,
                 floatValue = condition.floatValue,
-                intValue = condition.intValue,
-                boolValue = condition.boolValue
+                intValue = condition.intValue
             };
         }
 
@@ -146,28 +145,10 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Conditions
             switch (condition.op)
             {
                 case ConditionOperator.Equals:
-                    if (condition.valueType == ParameterValueType.Bool)
-                    {
-                        transition.AddCondition(condition.boolValue ? AnimatorConditionMode.If : AnimatorConditionMode.IfNot,
-                            0, condition.parameter);
-                    }
-                    else
-                    {
-                        transition.AddCondition(AnimatorConditionMode.Equals, AnimatorThreshold(condition), condition.parameter);
-                    }
-
+                    transition.AddCondition(AnimatorConditionMode.Equals, AnimatorThreshold(condition), condition.parameter);
                     break;
                 case ConditionOperator.NotEquals:
-                    if (condition.valueType == ParameterValueType.Bool)
-                    {
-                        transition.AddCondition(condition.boolValue ? AnimatorConditionMode.IfNot : AnimatorConditionMode.If,
-                            0, condition.parameter);
-                    }
-                    else
-                    {
-                        transition.AddCondition(AnimatorConditionMode.NotEqual, AnimatorThreshold(condition), condition.parameter);
-                    }
-
+                    transition.AddCondition(AnimatorConditionMode.NotEqual, AnimatorThreshold(condition), condition.parameter);
                     break;
                 case ConditionOperator.Greater:
                     transition.AddCondition(AnimatorConditionMode.Greater, AnimatorThreshold(condition), condition.parameter);
@@ -204,8 +185,6 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Conditions
         {
             switch (condition.valueType)
             {
-                case ParameterValueType.Bool:
-                    return snapshot.Bool(condition.parameter) ? 1f : 0f;
                 case ParameterValueType.Int:
                     return snapshot.Int(condition.parameter);
                 default:
@@ -217,8 +196,6 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Conditions
         {
             switch (condition.valueType)
             {
-                case ParameterValueType.Bool:
-                    return condition.boolValue ? 1f : 0f;
                 case ParameterValueType.Int:
                     return condition.intValue;
                 default:

@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEditor.Animations;
@@ -11,16 +10,6 @@ namespace Gokoukotori.PoseTune.Editor
         public AnimatorController TargetController;
         public AnimatorController FxController;
         public List<Object> GeneratedAssets = new();
-
-        [Obsolete("Use GeneratedAssets.")]
-        public List<Object> GeneratedSubAssets => GeneratedAssets;
-
-        [Obsolete("Use TargetController.")]
-        public AnimatorController ActionController
-        {
-            get => TargetController;
-            set => TargetController = value;
-        }
 
         public IEnumerable<Object> EnumerateGeneratedAssets()
         {

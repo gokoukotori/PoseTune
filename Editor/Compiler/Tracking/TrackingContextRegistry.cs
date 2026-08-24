@@ -25,17 +25,17 @@ namespace Gokoukotori.PoseTune.Editor
 
         public int GetOrAdd(
             PoseGroupDefinition group,
-            PoseDefinition pose,
-            string variant,
             TrackingPolicyData policy)
         {
-            var copy = policy != null
-                ? TrackingPolicyUtility.Copy(policy)
-                : TrackingPolicyUtility.NoChange();
+            if (policy == null || TrackingPolicyUtility.IsNoChange(policy))
+            {
+                return 0;
+            }
+
+            var copy = TrackingPolicyUtility.Copy(policy);
             var existing = votes.FirstOrDefault(vote =>
                 vote.GroupId == (group?.Id ?? "") &&
-                vote.PoseId == (pose?.Id ?? "") &&
-                vote.Variant == (variant ?? ""));
+                TrackingPolicyUtility.AreEqual(vote.Policy, copy));
             if (existing != null)
             {
                 return existing.Id;
@@ -48,8 +48,6 @@ namespace Gokoukotori.PoseTune.Editor
                     .DefaultIfEmpty(0)
                     .Max() + 1,
                 GroupId = group?.Id ?? "",
-                PoseId = pose?.Id ?? "",
-                Variant = variant ?? "",
                 Policy = copy
             };
             votes.Add(definition);
@@ -61,8 +59,6 @@ namespace Gokoukotori.PoseTune.Editor
     {
         public int Id { get; set; }
         public string GroupId { get; set; }
-        public string PoseId { get; set; }
-        public string Variant { get; set; }
         public TrackingPolicyData Policy { get; set; }
     }
 }

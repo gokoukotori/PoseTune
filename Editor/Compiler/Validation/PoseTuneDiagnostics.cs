@@ -33,10 +33,10 @@ namespace Gokoukotori.PoseTune.Editor
             "PoseClip に AnimationClip または sourceMotion を設定してください。");
         public static readonly PoseTuneDiagnosticDescriptor ClipZeroLength = new(
             "PT-C002",
-            "AnimationClip に 0 秒より長いキーを入れるか、不要な PoseClip を削除してください。");
+            "AnimationClip に curve を追加するか、Motion Time を無効にするか、不要な PoseClip を削除してください。");
         public static readonly PoseTuneDiagnosticDescriptor ClipRootTransformCurves = new(
             "PT-C003",
-            "root transform の移動・回転カーブを削除し、姿勢は Humanoid / Transform / BlendShape のカーブで作ってください。");
+            "時間変化する root curve を削除し、静的な補正は PoseClip の root offset 設定へ移してください。");
         public static readonly PoseTuneDiagnosticDescriptor ClipUnsupportedCurves = new(
             "PT-C004",
             "PoseTune で扱わない curve を削除し、transform / blendshape のみを残してください。");
@@ -93,16 +93,15 @@ namespace Gokoukotori.PoseTune.Editor
         public static readonly PoseTuneDiagnosticDescriptor BuildMenuControlMissing = new("PT-B006");
         public static readonly PoseTuneDiagnosticDescriptor BuildPlayableLayerMissing = new("PT-B007");
         public static readonly PoseTuneDiagnosticDescriptor BuildGeneratedAnimatorAssetsSaveFailed = new("PT-B010");
-        public static readonly PoseTuneDiagnosticDescriptor ImportNoCandidatesMatched = new("PT-I001");
         public static readonly PoseTuneDiagnosticDescriptor MenuControlLimitExceeded = new("PT-M001");
         public static readonly PoseTuneDiagnosticDescriptor MotionTimeAnimatorStateMenuUnavailable = new("PT-M002");
         public static readonly PoseTuneDiagnosticDescriptor ManualControlMenuMissing = new("PT-M003");
         public static readonly PoseTuneDiagnosticDescriptor MissingThumbnail = new("PT-M004");
         public static readonly PoseTuneDiagnosticDescriptor DuplicateRootTrackingPolicies = new("PT-T001");
         public static readonly PoseTuneDiagnosticDescriptor TrackingResetDisabledForFbt = new("PT-T002");
-        public static readonly PoseTuneDiagnosticDescriptor LegacyInlineTrackingPolicy = new(
-            "PT-T003",
-            "PoseTrackingPolicy component へ変換してください。");
+        public static readonly PoseTuneDiagnosticDescriptor UnsupportedTrackingPolicyOwner = new(
+            "PT-T004",
+            "PoseTrackingPolicy を PoseTuneRoot 直下または PoseGroup と同じ GameObject へ移してください。");
         public static readonly PoseTuneDiagnosticDescriptor FullBodyTrackingDisabled = new(
             "PT-FBT001",
             "FBT でも PoseTune を有効にしたい場合は PoseTuneRoot の Disable When Full Body Tracking を OFF にしてください。");
@@ -145,7 +144,6 @@ namespace Gokoukotori.PoseTune.Editor
         public static readonly PoseTuneDiagnosticDescriptor KawaiiSourceAutoImportAvatarAnimationsUnsupported =
             KawaiiAdditiveAdjustmentHumanoidCurveRequiresRebake;
         public static readonly PoseTuneDiagnosticDescriptor KawaiiActiveSourceSystemRisk = new("PT-KS001");
-        public static readonly PoseTuneDiagnosticDescriptor CompressedPoseIdUnsupported = new("PT-KS003");
         public static readonly PoseTuneDiagnosticDescriptor KawaiiHeightProfileApproximation = new("PT-KH001");
         public static readonly PoseTuneDiagnosticDescriptor AdjustmentPresetAvatarHashMismatch = new("PT-PRESET001");
         public static readonly PoseTuneDiagnosticDescriptor AdjustmentPresetPoseStableGuidMissing = new("PT-PRESET002");
@@ -207,14 +205,13 @@ namespace Gokoukotori.PoseTune.Editor
             BuildMenuControlMissing,
             BuildPlayableLayerMissing,
             BuildGeneratedAnimatorAssetsSaveFailed,
-            ImportNoCandidatesMatched,
             MenuControlLimitExceeded,
             MotionTimeAnimatorStateMenuUnavailable,
             ManualControlMenuMissing,
             MissingThumbnail,
             DuplicateRootTrackingPolicies,
             TrackingResetDisabledForFbt,
-            LegacyInlineTrackingPolicy,
+            UnsupportedTrackingPolicyOwner,
             FullBodyTrackingDisabled,
             FbtOverrideRequiresCompatibilityMode,
             FbtOverrideLowerBodyAnimationRisk,
@@ -252,7 +249,6 @@ namespace Gokoukotori.PoseTune.Editor
             KawaiiAdditiveAdjustmentObjectCurveFallback,
             KawaiiAdditiveAdjustmentHumanoidCurveRequiresRebake,
             KawaiiActiveSourceSystemRisk,
-            CompressedPoseIdUnsupported,
             KawaiiHeightProfileApproximation,
             AdjustmentPresetAvatarHashMismatch,
             AdjustmentPresetPoseStableGuidMissing,

@@ -28,7 +28,7 @@ namespace Gokoukotori.PoseTune.Editor
         public static TrackingGuardProfile PoseEntryProfile(PoseTuneRoot root, PoseDefinition pose, bool fullBodyVariant)
         {
             if (pose != null &&
-                pose.HasFullBodyTrackingOverride &&
+                pose.Group?.HasFullBodyTrackingOverride == true &&
                 root != null &&
                 root.advancedSettings.allowFullBodyTracking)
             {

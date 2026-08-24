@@ -21,16 +21,12 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
                 ValidateDuplicateOwner(group.Source, report, "PoseGroup");
             }
 
-            foreach (var pose in graph.Poses.Where(pose => pose.Source != null))
+            foreach (var policy in PoseTuneTrackingPolicyResolver.UnsupportedPolicies(graph.RootComponent))
             {
-                ValidateDuplicateOwner(pose.Source, report, "PoseClip");
-                if (pose.Source.GetComponent<PoseTrackingPolicy>() == null &&
-                    TrackingPolicyUtility.WasCustomizedFromPoseDefault(pose.Source.tracking))
-                {
-                    report.Warning(PoseTuneDiagnostics.LegacyInlineTrackingPolicy.Code,
-                        "旧形式の PoseClip.tracking を読み取り互換で使用しています。PoseTrackingPolicy component へ変換してください。",
-                        pose.Source);
-                }
+                report.Error(PoseTuneDiagnostics.UnsupportedTrackingPolicyOwner.Code,
+                    "PoseTrackingPolicy の owner は PoseTuneRoot 直下または PoseGroup と同じ GameObject に限定されています。" +
+                    "編集可能な Scene instance または Prefab Stage で移動してください。",
+                    policy);
             }
         }
 
@@ -42,7 +38,8 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
 
         private static void ValidateDuplicateOwner(Component owner, ValidationReport report, string ownerName)
         {
-            if (owner.GetComponents<PoseTrackingPolicy>().Length <= 1)
+            if (owner.GetComponents<PoseTrackingPolicy>()
+                    .Count(PoseTuneAuthoringInclusion.ComponentEnabled) <= 1)
             {
                 return;
             }
@@ -65,19 +62,19 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
 
         private static void ValidateFbtOverrides(PoseGraph graph, ValidationReport report)
         {
-            foreach (var pose in graph.Poses.Where(pose => pose.HasFullBodyTrackingOverride))
+            foreach (var group in graph.Groups.Where(group => group.HasFullBodyTrackingOverride))
             {
                 if (!graph.RootComponent.advancedSettings.allowFullBodyTracking)
                 {
-                    report.Warning(PoseTuneDiagnostics.FbtOverrideRequiresCompatibilityMode.Code, "FBT override がありますが、FBT 互換モードが無効なため FBT 用 state は生成されません。", pose.Source);
+                    report.Warning(PoseTuneDiagnostics.FbtOverrideRequiresCompatibilityMode.Code, "FBT override がありますが、FBT 互換モードが無効なため FBT 用 state は生成されません。", group.Source);
                 }
 
-                var policy = pose.FullBodyTrackingPolicy ?? TrackingPolicyData.DefaultForPose();
+                var policy = group.FullBodyTrackingPolicy ?? TrackingPolicyData.DefaultForPose();
                 if (policy.hip == TrackingMode.Animation ||
                     policy.leftFoot == TrackingMode.Animation ||
                     policy.rightFoot == TrackingMode.Animation)
                 {
-                    report.Warning(PoseTuneDiagnostics.FbtOverrideLowerBodyAnimationRisk.Code, "FBT override で Hip/Feet を Animation にするため、VRChat runtime / FBT 実機確認が必要です。", pose.Source);
+                    report.Warning(PoseTuneDiagnostics.FbtOverrideLowerBodyAnimationRisk.Code, "FBT override で Hip/Feet を Animation にするため、VRChat runtime / FBT 実機確認が必要です。", group.Source);
                 }
             }
         }

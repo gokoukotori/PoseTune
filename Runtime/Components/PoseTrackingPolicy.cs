@@ -14,7 +14,7 @@ namespace Gokoukotori.PoseTune
         [InspectorName("FBT 用トラッキング")]
         public TrackingPolicyData fullBodyTracking = TrackingPolicyData.DefaultForPose();
         [InspectorName("終了時にリセットを生成")]
-        [Tooltip("Pose 終了時に、この policy が明示変更した部位だけを Tracking へ戻す reset request を生成します。")]
+        [Tooltip("Group 内の Pose 終了時に、この policy が明示変更した部位だけを Tracking へ戻す reset request を生成します。")]
         public bool generateResetOnExit = true;
     }
 }

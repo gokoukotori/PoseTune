@@ -19,7 +19,7 @@ namespace Gokoukotori.PoseTune.Editor
                 return Array.Empty<TrackingPart>();
             }
 
-            foreach (var pose in graph.Poses.Where(pose => pose != null && pose.EmitTrackingControl))
+            foreach (var pose in graph.Poses.Where(pose => pose?.Group?.EmitTrackingControl == true))
             {
                 required.UnionWith(ControlledParts(graph, pose.Group, pose));
             }
@@ -44,12 +44,12 @@ namespace Gokoukotori.PoseTune.Editor
             PoseDefinition pose)
         {
             var controlled = new HashSet<TrackingPart>();
-            if (graph == null || pose == null || !pose.EmitTrackingControl)
+            if (graph == null || pose == null || group == null || !group.EmitTrackingControl)
             {
                 return Array.Empty<TrackingPart>();
             }
 
-            AddControlledParts(controlled, pose.TrackingPolicy);
+            AddControlledParts(controlled, group.TrackingPolicy);
             if (PoseStateVariantRules.NeedsDesktopLowerBodyLockVariant(graph.RootComponent, group, pose) ||
                 PoseStateVariantRules.LocksExistingDesktopPoseState(graph.RootComponent, group, pose))
             {
@@ -58,10 +58,10 @@ namespace Gokoukotori.PoseTune.Editor
                 controlled.Add(TrackingPart.RightFoot);
             }
 
-            if (pose.HasFullBodyTrackingOverride &&
+            if (group.HasFullBodyTrackingOverride &&
                 graph.RootComponent?.advancedSettings?.allowFullBodyTracking == true)
             {
-                AddControlledParts(controlled, pose.FullBodyTrackingPolicy);
+                AddControlledParts(controlled, group.FullBodyTrackingPolicy);
             }
 
             return Parts.Where(controlled.Contains).ToList();

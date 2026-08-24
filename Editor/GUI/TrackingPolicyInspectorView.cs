@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Gokoukotori.PoseTune;
 using UnityEditor;
@@ -27,7 +28,7 @@ namespace Gokoukotori.PoseTune.Editor
             DrawDirectEditor(root, selectedObject);
         }
 
-        public static TrackingPolicySummary ResolveEffectivePolicy(PoseTuneRoot root, Object selectedObject)
+        public static ResolvedGroupTrackingPolicy ResolveEffectivePolicy(PoseTuneRoot root, Object selectedObject)
         {
             return PoseTuneTrackingPolicyResolver.ResolveEffectivePolicy(root, selectedObject);
         }
@@ -55,7 +56,7 @@ namespace Gokoukotori.PoseTune.Editor
             }
         }
 
-        private static void DrawSummary(TrackingPolicySummary summary)
+        private static void DrawSummary(ResolvedGroupTrackingPolicy summary)
         {
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Effective policy", EditorStyles.boldLabel);
@@ -87,10 +88,10 @@ namespace Gokoukotori.PoseTune.Editor
             switch (selectedObject)
             {
                 case PoseClip pose:
-                    DrawPoseEditor(pose);
+                    DrawPoseEditor(root, pose);
                     break;
                 case PoseGroup group:
-                    DrawPolicyComponentEditor(group.gameObject, "Group policy を追加");
+                    DrawGroupPolicyEditor(root, group);
                     break;
                 default:
                     DrawRootPolicyEditor(root);
@@ -98,39 +99,30 @@ namespace Gokoukotori.PoseTune.Editor
             }
         }
 
-        private static void DrawPoseEditor(PoseClip pose)
+        private static void DrawPoseEditor(PoseTuneRoot root, PoseClip pose)
         {
-            var policy = pose.GetComponents<PoseTrackingPolicy>().FirstOrDefault();
-            if (policy != null)
+            var group = pose != null ? pose.GetComponentInParent<PoseGroup>(true) : null;
+            if (group == null)
             {
-                DrawPolicyObject(policy);
+                EditorGUILayout.HelpBox("所属する PoseGroup が見つかりません。", MessageType.Error);
                 return;
             }
 
-            if (TrackingPolicyUtility.WasCustomizedFromPoseDefault(pose.tracking))
+            EditorGUILayout.HelpBox(
+                "Tracking policy は Pose 単位では編集できません。所属 Group の全 Pose に共通で適用されます。",
+                MessageType.Info);
+            if (GUILayout.Button($"Group '{group.displayName}' を編集"))
             {
-                EditorGUILayout.HelpBox(
-                    "この PoseClip には旧形式の inline tracking 値があります。Build 互換のため読み取られますが、新規編集は PoseTrackingPolicy に変換してください。",
-                    MessageType.Warning);
-                if (GUILayout.Button("旧 tracking 値を PoseTrackingPolicy へ変換"))
-                {
-                    ConvertLegacyInlinePolicy(pose);
-                }
-
-                return;
+                Selection.activeObject = group;
             }
 
-            if (GUILayout.Button("PoseTrackingPolicy component を追加"))
-            {
-                Undo.AddComponent<PoseTrackingPolicy>(pose.gameObject);
-            }
+            DrawGroupPolicyEditor(root, group);
         }
 
         private static void DrawRootPolicyEditor(PoseTuneRoot root)
         {
             var policy = PoseTuneTrackingPolicyResolver.RootPolicy(root) ??
-                         root.GetComponentsInChildren<PoseTrackingPolicy>(true)
-                             .FirstOrDefault(candidate => IsRootLevelPolicy(root, candidate));
+                         PoseTuneTrackingPolicyResolver.RootPolicies(root, true).FirstOrDefault();
             if (policy != null)
             {
                 DrawPolicyObject(policy);
@@ -143,18 +135,76 @@ namespace Gokoukotori.PoseTune.Editor
             }
         }
 
-        private static void DrawPolicyComponentEditor(GameObject gameObject, string addLabel)
+        private static void DrawGroupPolicyEditor(PoseTuneRoot root, PoseGroup group)
         {
-            var policy = gameObject.GetComponents<PoseTrackingPolicy>().FirstOrDefault();
+            var policy = PoseTuneTrackingPolicyResolver.GroupPolicy(group);
             if (policy != null)
             {
                 DrawPolicyObject(policy);
                 return;
             }
 
-            if (GUILayout.Button(addLabel))
+            if (group.GetComponents<PoseTrackingPolicy>().Any())
             {
-                Undo.AddComponent<PoseTrackingPolicy>(gameObject);
+                EditorGUILayout.HelpBox(
+                    "無効な Group policy は effective policy では存在しないものとして扱います。追加すると新しい有効な component へ置き換えます。",
+                    MessageType.Info);
+            }
+
+            if (GUILayout.Button("Group policy を追加"))
+            {
+                AddGroupPolicyPreservingEffective(root, group);
+            }
+        }
+
+        internal static PoseTrackingPolicy AddGroupPolicyPreservingEffective(PoseTuneRoot root, PoseGroup group)
+        {
+            if (root == null || group == null || group.GetComponentInParent<PoseTuneRoot>(true) != root)
+            {
+                return null;
+            }
+
+            var existing = PoseTuneTrackingPolicyResolver.GroupPolicy(group);
+            if (existing != null)
+            {
+                return existing;
+            }
+
+            if (EditorUtility.IsPersistent(group) || PrefabUtility.IsPartOfImmutablePrefab(group))
+            {
+                return null;
+            }
+
+            var effective = PoseTuneTrackingPolicyResolver.ResolveGroupPolicy(root, group);
+            const string undoName = "Group policy を追加";
+            Undo.IncrementCurrentGroup();
+            var undoGroup = Undo.GetCurrentGroup();
+            Undo.SetCurrentGroupName(undoName);
+            try
+            {
+                foreach (var disabled in group.GetComponents<PoseTrackingPolicy>()
+                             .Where(policy => policy != null && !PoseTuneAuthoringInclusion.ComponentEnabled(policy)))
+                {
+                    Undo.DestroyObjectImmediate(disabled);
+                }
+
+                var policy = Undo.AddComponent<PoseTrackingPolicy>(group.gameObject);
+                Undo.RecordObject(policy, undoName);
+                TrackingPolicyUtility.ApplyResolved(policy, effective);
+                EditorUtility.SetDirty(policy);
+                if (PrefabUtility.IsPartOfPrefabInstance(policy))
+                {
+                    PrefabUtility.RecordPrefabInstancePropertyModifications(policy);
+                }
+
+                Undo.CollapseUndoOperations(undoGroup);
+                return policy;
+            }
+            catch (Exception exception)
+            {
+                Undo.RevertAllDownToGroup(undoGroup);
+                Debug.LogException(exception, group);
+                return null;
             }
         }
 
@@ -183,25 +233,6 @@ namespace Gokoukotori.PoseTune.Editor
             serializedPolicy.ApplyModifiedProperties();
         }
 
-        private static void ConvertLegacyInlinePolicy(PoseClip pose)
-        {
-            if (pose == null || pose.GetComponent<PoseTrackingPolicy>() != null)
-            {
-                return;
-            }
-
-            var legacyTracking = TrackingPolicyUtility.Copy(pose.tracking);
-            Undo.RecordObject(pose, "旧 tracking 値を PoseTrackingPolicy へ変換");
-            var policy = Undo.AddComponent<PoseTrackingPolicy>(pose.gameObject);
-            Undo.RecordObject(policy, "旧 tracking 値を PoseTrackingPolicy へ変換");
-            policy.tracking = legacyTracking;
-            policy.useFullBodyTrackingOverride = false;
-            policy.generateResetOnExit = true;
-            pose.tracking = TrackingPolicyData.DefaultForPose();
-            EditorUtility.SetDirty(pose);
-            EditorUtility.SetDirty(policy);
-        }
-
         private static bool IsValidSelection(PoseTuneRoot root, Object selectedObject)
         {
             if (selectedObject == null || selectedObject == root)
@@ -210,19 +241,6 @@ namespace Gokoukotori.PoseTune.Editor
             }
 
             return selectedObject is Component component && component.GetComponentInParent<PoseTuneRoot>(true) == root;
-        }
-
-        private static bool IsRootLevelPolicy(PoseTuneRoot root, PoseTrackingPolicy policy)
-        {
-            if (root == null || policy == null)
-            {
-                return false;
-            }
-
-            return policy.transform == root.transform ||
-                   (policy.transform.parent == root.transform &&
-                    policy.GetComponent<PoseGroup>() == null &&
-                    policy.GetComponent<PoseClip>() == null);
         }
 
     }
