@@ -10,7 +10,7 @@ namespace Gokoukotori.PoseTune.Editor
         public override void OnInspectorGUI()
         {
             DrawFields(
-                new PoseTuneFieldLabel("rootGuid", "Root GUID"),
+                new PoseTuneFieldLabel("rootKey", "Root Key"),
                 new PoseTuneFieldLabel("generatedVersion", "生成バージョン"),
                 new PoseTuneFieldLabel("graphHash", "グラフハッシュ"),
                 new PoseTuneFieldLabel("generatedAt", "生成日時"));

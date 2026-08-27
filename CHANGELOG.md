@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.3.0] - 2026-08-27
+
+### Removed
+
+- **破壊的変更:** custom Stable GUID、`StableComponentGuid`、Root／Group／PoseのStable GUID API、修復menu、重複diagnostic `PT-R007`／`PT-G007`／`PT-C011`を削除
+- **破壊的変更:** `PoseTunePreset`、`AvatarAdjustmentPreset`、Preset data／適用API／Inspector／Assistantタブを削除
+
+### Changed
+
+- Editor永続Assetの識別をComponentの`GlobalObjectId` hashへ変更し、未保存Sceneではthumbnail生成とKawaii migrationを変更前に停止
+- NDMF build内のRoot／Group／Pose、Animator名、内部parameter、graph hash、generated marker照合を、Component型・Avatar相対sibling-index path・同型Component indexから生成する構造IDへ統一
+- Kawaii migration manifestをRoot／Poseの`GlobalObjectId`を保存する新形式へ変更し、run単位の生成先とrollbackを新しい識別子へ切り替え
+- `PT-C004`をbuildを停止しないwarningへ変更し、NDMF build中の生成clipからTransform／Animator／BlendShape以外のsource curveを除外
+
+### Fixed
+
+- HierarchyでPoseTune GameObjectを複製すると複製前の識別子を共有し、`PT-C011`などの重複errorでbuildできなくなる問題を解消
+
 ## [0.2.0] - 2026-08-25
 
 ### Changed

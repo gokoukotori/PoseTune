@@ -13,7 +13,6 @@ namespace Gokoukotori.PoseTune.Editor
                 return report;
             }
 
-            PoseTuneStableGuidValidator.Validate(graph, report);
             var context = PoseTuneValidationContext.Create(graph);
 
             PoseTuneGroupValidator.ValidateGroups(graph, report);

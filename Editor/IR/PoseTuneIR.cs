@@ -10,6 +10,7 @@ namespace Gokoukotori.PoseTune.Editor
         public PoseTuneRoot RootComponent;
         public VRCAvatarDescriptor AvatarDescriptor;
         public GameObject AvatarRoot;
+        public string RootId = "";
         public List<PoseGroupDefinition> Groups = new();
         public List<PoseDefinition> Poses = new();
         public PoseMenu Menu;

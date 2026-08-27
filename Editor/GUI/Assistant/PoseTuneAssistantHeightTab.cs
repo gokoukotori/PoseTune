@@ -72,19 +72,6 @@ namespace Gokoukotori.PoseTune.Editor
                         EditorUtility.SetDirty(pose);
                     }
 
-                    if (GUILayout.Button("調整プリセットとして保存"))
-                    {
-                        var avatar = root.GetComponentInParent<VRC.SDK3.Avatars.Components.VRCAvatarDescriptor>(true);
-                        var captured = PoseGroundingPresetFactory.CreateAdjustmentPreset(
-                            avatar != null ? avatar.gameObject.name : "",
-                            pose,
-                            suggestion);
-                        var target = PoseTuneAssistantAssetFactory.Create<AvatarAdjustmentPreset>(root, "GroundingAdjustmentPreset");
-                        EditorUtility.CopySerialized(captured, target);
-                        UnityEngine.Object.DestroyImmediate(captured);
-                        EditorUtility.SetDirty(target);
-                        AssetDatabase.SaveAssets();
-                    }
                 }
             }
         }

@@ -20,7 +20,6 @@ namespace Gokoukotori.PoseTune.Editor
     internal sealed class KawaiiMigrationAssetStore : IKawaiiMigrationAssetStore
     {
         private readonly GameObject avatarRoot;
-        private readonly PoseTuneRoot root;
         private readonly KawaiiMigrationReport report;
         private readonly string runGuid = Guid.NewGuid().ToString("N");
         private readonly List<string> createdAssetPaths = new();
@@ -35,13 +34,20 @@ namespace Gokoukotori.PoseTune.Editor
             KawaiiMigrationReport report)
         {
             this.avatarRoot = avatarRoot != null ? avatarRoot : throw new ArgumentNullException(nameof(avatarRoot));
-            this.root = root != null ? root : throw new ArgumentNullException(nameof(root));
+            root = root != null ? root : throw new ArgumentNullException(nameof(root));
             this.report = report ?? throw new ArgumentNullException(nameof(report));
+            if (!PoseTuneObjectIdentity.TryGetPersistentId(avatarRoot.transform, out var avatarGlobalObjectId) ||
+                !PoseTuneObjectIdentity.TryGetPersistentId(root, out var rootGlobalObjectId))
+            {
+                throw new InvalidOperationException(
+                    "Kawaii migration requires saved Scene or Prefab objects with valid GlobalObjectIds.");
+            }
+
             manifest = ScriptableObject.CreateInstance<KawaiiMigrationManifest>();
             manifest.name = "PoseTune Kawaii Migration Manifest";
             manifest.runGuid = runGuid;
-            manifest.avatarGlobalObjectId = GlobalObjectId.GetGlobalObjectIdSlow(avatarRoot).ToString();
-            manifest.rootStableGuid = root.StableGuid;
+            manifest.avatarGlobalObjectId = avatarGlobalObjectId;
+            manifest.rootGlobalObjectId = rootGlobalObjectId;
         }
 
         public IReadOnlyCollection<PoseClip> BakedPoses => bakedPoses;
@@ -95,13 +101,20 @@ namespace Gokoukotori.PoseTune.Editor
                 asset.hideFlags = HideFlags.None;
             }
 
-            var folder = KawaiiMigrationAssetPathUtility.MotionsPath(avatarRoot, root);
+            if (!KawaiiMigrationAssetPathUtility.TryMotionsPath(avatarRoot, runGuid, out var folder) ||
+                !KawaiiMigrationAssetPathUtility.TryMotionFileName(
+                    pose,
+                    pose.displayName,
+                    rootMotion is AnimationClip,
+                    out var fileName))
+            {
+                throw new InvalidOperationException(
+                    "Kawaii migration could not resolve persistent GlobalObjectIds for generated Motion assets.");
+            }
+
             EnsureTrackedFolder(folder);
             var isClip = rootMotion is AnimationClip;
-            var candidate = folder + "/" + KawaiiMigrationAssetPathUtility.MotionFileName(
-                pose.displayName,
-                pose.StableGuid,
-                isClip);
+            var candidate = folder + "/" + fileName;
             var path = AssetDatabase.GenerateUniqueAssetPath(candidate);
             AssetDatabase.CreateAsset(rootMotion, path);
             createdAssetPaths.Add(path);
@@ -160,7 +173,7 @@ namespace Gokoukotori.PoseTune.Editor
 
                 manifest.sources.Add(new KawaiiMigrationSourceManifestEntry
                 {
-                    globalObjectId = GlobalObjectId.GetGlobalObjectIdSlow(source.gameObject).ToString(),
+                    globalObjectId = PersistentIdOrThrow(source),
                     hierarchyPath = HierarchyPath(source.transform),
                     previousTag = source.gameObject.tag,
                     previousActive = source.gameObject.activeSelf,
@@ -168,7 +181,12 @@ namespace Gokoukotori.PoseTune.Editor
                 });
             }
 
-            var folder = KawaiiMigrationAssetPathUtility.ReportsPath(avatarRoot, root);
+            if (!KawaiiMigrationAssetPathUtility.TryReportsPath(avatarRoot, runGuid, out var folder))
+            {
+                throw new InvalidOperationException(
+                    "Kawaii migration could not resolve the Avatar GlobalObjectId for the manifest path.");
+            }
+
             EnsureTrackedFolder(folder);
             var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
             var path = AssetDatabase.GenerateUniqueAssetPath($"{folder}/Migration_{timestamp}_{runGuid}.asset");
@@ -293,10 +311,21 @@ namespace Gokoukotori.PoseTune.Editor
         {
             manifest.motions.Add(new KawaiiMigrationMotionManifestEntry
             {
-                poseStableGuid = pose.StableGuid,
+                poseGlobalObjectId = PersistentIdOrThrow(pose),
                 assetPath = path ?? "",
                 motionType = motion != null ? motion.GetType().FullName : ""
             });
+        }
+
+        private static string PersistentIdOrThrow(Object target)
+        {
+            if (PoseTuneObjectIdentity.TryGetPersistentId(target, out var id))
+            {
+                return id;
+            }
+
+            throw new InvalidOperationException(
+                "Kawaii migration requires saved Scene or Prefab objects with valid GlobalObjectIds.");
         }
 
         private static string HierarchyPath(Transform transform)

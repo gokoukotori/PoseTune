@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Gokoukotori.PoseTune;
+using Gokoukotori.PoseTune.Editor.Compiler.Validation;
 using UnityEditor.Animations;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -12,6 +13,7 @@ namespace Gokoukotori.PoseTune.Editor
         public GameObject AvatarRoot;
         public PoseTuneRoot RootComponent;
         public AnimatorBuildResult BuildResult;
+        public bool SanitizeUnsupportedSourceCurves;
 
         public static PoseMotionPreparationContext Empty()
         {
@@ -24,7 +26,8 @@ namespace Gokoukotori.PoseTune.Editor
             {
                 AvatarRoot = graph != null ? graph.AvatarRoot : null,
                 RootComponent = graph != null ? graph.RootComponent : null,
-                BuildResult = result
+                BuildResult = result,
+                SanitizeUnsupportedSourceCurves = true
             };
         }
     }
@@ -42,6 +45,7 @@ namespace Gokoukotori.PoseTune.Editor
             string name,
             PoseMotionPreparationContext context)
         {
+            context ??= PoseMotionPreparationContext.Empty();
             var source = pose?.SourceMotion != null ? pose.SourceMotion : pose?.Clip;
             if (pose == null || source == null)
             {
@@ -50,13 +54,21 @@ namespace Gokoukotori.PoseTune.Editor
 
             if (source is BlendTree tree)
             {
-                var prepareLeafClips = PosePreparedClipBuilder.RequiresPreparedMotion(pose);
+                var prepareLeafClips = PosePreparedClipBuilder.RequiresPreparedMotion(pose) ||
+                                       context.SanitizeUnsupportedSourceCurves &&
+                                       MotionTreeCloneUtility.EnumerateMotions(tree)
+                                           .OfType<AnimationClip>()
+                                           .Any(PoseTuneCurveBindingPolicy.HasUnsupportedCurves);
                 var cloned = (BlendTree)MotionTreeCloneUtility.Clone(
                     tree,
                     name + "_Motion",
                     new List<Object>(),
                     (clip, cloneName) => prepareLeafClips
-                        ? PosePreparedClipBuilder.ClonePreparedClip(pose, clip, cloneName)
+                        ? PosePreparedClipBuilder.ClonePreparedClip(
+                            pose,
+                            clip,
+                            cloneName,
+                            context.SanitizeUnsupportedSourceCurves)
                         : CloneClip(clip, cloneName),
                     ChildMotionName);
                 var assets = MotionTreeCloneUtility.EnumerateMotions(cloned).Cast<Object>().ToList();
@@ -72,12 +84,17 @@ namespace Gokoukotori.PoseTune.Editor
                 return new PoseMotionPreparationResult { Motion = source };
             }
 
-            if (!PosePreparedClipBuilder.RequiresPreparedMotion(pose))
+            if (!PosePreparedClipBuilder.RequiresPreparedMotion(pose) &&
+                (!context.SanitizeUnsupportedSourceCurves ||
+                 !PoseTuneCurveBindingPolicy.HasUnsupportedCurves(clip)))
             {
                 return new PoseMotionPreparationResult { Motion = clip };
             }
 
-            var generated = PosePreparedClipBuilder.ClonePreparedClip(pose, name);
+            var generated = PosePreparedClipBuilder.ClonePreparedClip(
+                pose,
+                name,
+                context.SanitizeUnsupportedSourceCurves);
             return new PoseMotionPreparationResult
             {
                 Motion = generated,

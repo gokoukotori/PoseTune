@@ -27,11 +27,15 @@ namespace Gokoukotori.PoseTune.Editor
                 return null;
             }
 
+            if (!TryGetThumbnailAssetPath(pose, folder, out var path))
+            {
+                PoseTuneLog.Error("thumbnail生成には保存済みSceneまたはPrefab上のPoseClipが必要です。", pose);
+                return null;
+            }
+
             PoseTuneProjectAssetUtility.EnsureFolder(folder);
             var size = Mathf.Clamp(root != null ? root.previewSettings.thumbnailSize : 256, 64, 1024);
             var texture = RenderPose(pose, root, size) ?? CreateFallbackTexture(size, root);
-            var path = ThumbnailAssetPath(pose, folder);
-
             return PersistThumbnail(pose, path, texture);
         }
 
@@ -66,9 +70,9 @@ namespace Gokoukotori.PoseTune.Editor
             }
         }
 
-        public static string ThumbnailAssetPath(PoseClip pose, string folder)
+        public static bool TryGetThumbnailAssetPath(PoseClip pose, string folder, out string path)
         {
-            return new PoseTuneIconCacheService().ThumbnailAssetPath(pose, folder);
+            return new PoseTuneIconCacheService().TryGetThumbnailAssetPath(pose, folder, out path);
         }
 
         private static Texture2D RenderPose(PoseClip pose, PoseTuneRoot root, int size)

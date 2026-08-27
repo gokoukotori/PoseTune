@@ -28,6 +28,9 @@ namespace Gokoukotori.PoseTune.Editor
                 HasPoseOptions = hasPoseOptions
             };
             graph.AvatarRoot = graph.AvatarDescriptor != null ? graph.AvatarDescriptor.gameObject : null;
+            graph.RootId = root != null
+                ? PoseTuneObjectIdentity.BuildKey(root, graph.AvatarRoot != null ? graph.AvatarRoot.transform : root.transform.root)
+                : "";
 
             if (root == null)
             {

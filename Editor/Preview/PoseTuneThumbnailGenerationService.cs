@@ -15,7 +15,13 @@ namespace Gokoukotori.PoseTune.Editor
             }
 
             var graph = new PoseGraphCollector().Collect(root);
-            return ThumbnailRenderer.GenerateThumbnail(pose, iconCache.IconsFolder(graph), root);
+            if (!iconCache.TryGetIconsFolder(graph, out var folder))
+            {
+                PoseTuneLog.Error("thumbnail生成には保存済みSceneまたはPrefab上のPoseTuneRootが必要です。", root);
+                return null;
+            }
+
+            return ThumbnailRenderer.GenerateThumbnail(pose, folder, root);
         }
     }
 }

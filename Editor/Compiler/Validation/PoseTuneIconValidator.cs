@@ -27,7 +27,9 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
                 .ToList();
             var hasLoadedCache = probes.Any(probe => probe.Cache.Status == PoseTuneThumbnailCacheStatus.Loaded);
             var hasInvalidCache = probes.Any(probe => probe.Cache.Status == PoseTuneThumbnailCacheStatus.Invalid);
-            var allMissing = probes.Count > 0 && !hasLoadedCache && !hasInvalidCache;
+            var hasUnavailableIdentity = probes.Any(probe =>
+                probe.Cache.Status == PoseTuneThumbnailCacheStatus.IdentityUnavailable);
+            var allMissing = probes.Count > 0 && !hasLoadedCache && !hasInvalidCache && !hasUnavailableIdentity;
 
             foreach (var probe in probes)
             {
@@ -48,6 +50,11 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
                     case PoseTuneThumbnailCacheStatus.Invalid:
                         report.Warning(PoseTuneDiagnostics.MissingThumbnail.Code,
                             "メニュー用 thumbnail cache を読み込めません。cacheを再生成してください。",
+                            probe.Pose.Source);
+                        break;
+                    case PoseTuneThumbnailCacheStatus.IdentityUnavailable:
+                        report.Warning(PoseTuneDiagnostics.PersistentObjectIdUnavailable.Code,
+                            "thumbnailを識別できません。SceneまたはPrefabを保存してから再生成してください。",
                             probe.Pose.Source);
                         break;
                 }

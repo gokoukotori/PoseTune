@@ -17,7 +17,6 @@ namespace Gokoukotori.PoseTune.Editor
         internal List<KawaiiPosingSystemDto> Dtos = new();
         internal KawaiiMigrationOptions Options;
         internal KawaiiMigrationReport Report;
-        internal string PlannedRootStableGuid = "";
 
         internal bool IsValid => Report != null && !Report.HasErrors;
     }
@@ -78,15 +77,6 @@ namespace Gokoukotori.PoseTune.Editor
                 {
                     throw new KawaiiMigrationAbortException("PoseTuneRoot could not be prepared.");
                 }
-
-                if (string.IsNullOrEmpty(ReadStableGuid(root)))
-                {
-                    Undo.RecordObject(root, UndoName);
-                    root.SetStableGuid(plan.PlannedRootStableGuid);
-                    KawaiiAuthoringObjectUtility.RecordPrefabModifications(root);
-                }
-
-                EnsureOwnedStableGuids(root);
 
                 assetStore = assetStoreFactory(plan.AvatarRoot, root, report) ??
                              throw new InvalidOperationException("Kawaii migration asset store factory returned null.");
@@ -293,20 +283,6 @@ namespace Gokoukotori.PoseTune.Editor
                 }
             }
 
-            var currentGuid = !options.createNewPoseTuneRoot && options.existingRoot != null
-                ? ReadStableGuid(options.existingRoot)
-                : "";
-            var parsedGuid = Guid.Empty;
-            if (!string.IsNullOrEmpty(currentGuid) && !Guid.TryParse(currentGuid, out parsedGuid))
-            {
-                plan.Report.Error(TargetMismatchCode, "既存 PoseTuneRoot の Stable GUID が不正です。", options.existingRoot);
-                plan.PlannedRootStableGuid = "";
-                return;
-            }
-
-            plan.PlannedRootStableGuid = !string.IsNullOrEmpty(currentGuid)
-                ? parsedGuid.ToString("N")
-                : Guid.NewGuid().ToString("N");
         }
 
         private static void ValidateSources(KawaiiMigrationPlan plan)
@@ -434,14 +410,18 @@ namespace Gokoukotori.PoseTune.Editor
 
         private static void ValidateAssetDestination(KawaiiMigrationPlan plan)
         {
-            if (string.IsNullOrEmpty(plan.PlannedRootStableGuid))
+            if (!KawaiiMigrationAssetPathUtility.TryMigrationRoot(
+                    plan.AvatarRoot,
+                    "preflight",
+                    out var path))
             {
+                plan.Report.Error(
+                    AssetPreflightCode,
+                    "Kawaii migrationでAssetを生成するには、保存済みSceneまたはPrefab上のAvatarが必要です。",
+                    plan.AvatarRoot);
                 return;
             }
 
-            var path = KawaiiMigrationAssetPathUtility.MigrationRoot(
-                plan.AvatarRoot.name,
-                plan.PlannedRootStableGuid);
             if (!path.StartsWith("Assets/", StringComparison.Ordinal) || path.Contains(".."))
             {
                 plan.Report.Error(AssetPreflightCode, "生成 asset path が Assets 配下の安全な path ではありません: " + path, plan.AvatarRoot);
@@ -540,39 +520,6 @@ namespace Gokoukotori.PoseTune.Editor
 
                 report.Warning(issue.Code, issue.Message, issue.Context != null ? issue.Context : root);
             }
-        }
-
-        private static void EnsureOwnedStableGuids(PoseTuneRoot root)
-        {
-            foreach (var group in root.GetComponentsInChildren<PoseGroup>(true)
-                         .Where(group => group.GetComponentInParent<PoseTuneRoot>(true) == root))
-            {
-                EnsureStableGuidWithUndo(group);
-            }
-
-            foreach (var pose in root.GetComponentsInChildren<PoseClip>(true)
-                         .Where(pose => pose.GetComponentInParent<PoseTuneRoot>(true) == root))
-            {
-                EnsureStableGuidWithUndo(pose);
-            }
-
-            Undo.FlushUndoRecordObjects();
-        }
-
-        private static void EnsureStableGuidWithUndo(UnityEngine.Object component)
-        {
-            using var serialized = new SerializedObject(component);
-            var property = serialized.FindProperty("stableGuid.value");
-            if (property == null || !string.IsNullOrWhiteSpace(property.stringValue))
-            {
-                return;
-            }
-
-            Undo.RegisterCompleteObjectUndo(component, UndoName);
-            property.stringValue = Guid.NewGuid().ToString("N");
-            serialized.ApplyModifiedPropertiesWithoutUndo();
-            EditorUtility.SetDirty(component);
-            KawaiiAuthoringObjectUtility.RecordPrefabModifications(component);
         }
 
         private static void PostprocessSources(
@@ -706,22 +653,6 @@ namespace Gokoukotori.PoseTune.Editor
                   ?? selected.GetComponentInParent<VRCAvatarDescriptor>(true)
                   ?? selected.GetComponentInChildren<VRCAvatarDescriptor>(true)
                 : null;
-        }
-
-        private static string ReadStableGuid(PoseTuneRoot root)
-        {
-            return ReadStableGuid((UnityEngine.Object)root);
-        }
-
-        private static string ReadStableGuid(UnityEngine.Object component)
-        {
-            if (component == null)
-            {
-                return "";
-            }
-
-            using var serialized = new SerializedObject(component);
-            return serialized.FindProperty("stableGuid.value")?.stringValue?.Trim() ?? "";
         }
 
         private static string HierarchyPath(Transform transform)

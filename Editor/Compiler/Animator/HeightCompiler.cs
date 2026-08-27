@@ -29,11 +29,28 @@ namespace Gokoukotori.PoseTune.Editor
                 enabled,
                 parameterName,
                 minOffset,
+                maxOffset,
+                PoseMotionPreparationContext.Empty());
+        }
+
+        public HeightBuildResult BuildMotionWithAssets(
+            PoseDefinition pose,
+            bool enabled,
+            string parameterName,
+            float minOffset,
+            float maxOffset,
+            PoseMotionPreparationContext context)
+        {
+            return BuildMotionWithAssets(
+                pose,
+                enabled,
+                parameterName,
+                minOffset,
                 0f,
                 maxOffset,
                 HeightApplyMode.RootOrHipsYOffset,
                 null,
-                PoseMotionPreparationContext.Empty());
+                context ?? PoseMotionPreparationContext.Empty());
         }
 
         public HeightBuildResult BuildMotionWithAssets(

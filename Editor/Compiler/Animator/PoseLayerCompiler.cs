@@ -59,7 +59,7 @@ namespace Gokoukotori.PoseTune.Editor
                     group,
                     pose,
                     PoseStateNaming.CleanupName(pose, duplicateStateBaseNames),
-                    layerName + "_" + PoseTuneNames.ShortGuid(pose.Id) + "_HandoffHold",
+                    layerName + "_" + PoseTuneNames.ShortId(pose.Id) + "_HandoffHold",
                     new Vector3(x + 1120, y),
                     controlsActionPlayable,
                     activeParameter,
@@ -70,7 +70,7 @@ namespace Gokoukotori.PoseTune.Editor
                     variants.DesktopLowerBodyHandoff = CreateCleanupState(
                         result, layer, graph, group, pose,
                         PoseStateNaming.CleanupName(pose, duplicateStateBaseNames, "_Desktop"),
-                        layerName + "_" + PoseTuneNames.ShortGuid(pose.Id) + "_Desktop_HandoffHold",
+                        layerName + "_" + PoseTuneNames.ShortId(pose.Id) + "_Desktop_HandoffHold",
                         new Vector3(x + 1260, y), controlsActionPlayable, activeParameter,
                         poseActiveParameters, variants.DesktopLowerBodyTrackingPolicy);
                 }
@@ -80,7 +80,7 @@ namespace Gokoukotori.PoseTune.Editor
                     variants.VrHandoff = CreateCleanupState(
                         result, layer, graph, group, pose,
                         PoseStateNaming.CleanupName(pose, duplicateStateBaseNames, "_VR"),
-                        layerName + "_" + PoseTuneNames.ShortGuid(pose.Id) + "_VR_HandoffHold",
+                        layerName + "_" + PoseTuneNames.ShortId(pose.Id) + "_VR_HandoffHold",
                         new Vector3(x + 1400, y), controlsActionPlayable, activeParameter,
                         poseActiveParameters, variants.VrTrackingPolicy);
                 }
@@ -90,7 +90,7 @@ namespace Gokoukotori.PoseTune.Editor
                     variants.FullBodyHandoff = CreateCleanupState(
                         result, layer, graph, group, pose,
                         PoseStateNaming.CleanupName(pose, duplicateStateBaseNames, "_FBT"),
-                        layerName + "_" + PoseTuneNames.ShortGuid(pose.Id) + "_FBT_HandoffHold",
+                        layerName + "_" + PoseTuneNames.ShortId(pose.Id) + "_FBT_HandoffHold",
                         new Vector3(x + 1540, y), controlsActionPlayable, activeParameter,
                         poseActiveParameters, variants.FullBodyTrackingPolicy);
                 }

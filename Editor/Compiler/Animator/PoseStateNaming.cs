@@ -17,7 +17,7 @@ namespace Gokoukotori.PoseTune.Editor
             var baseName = BaseName(pose);
             if (duplicateBaseNames != null && duplicateBaseNames.Contains(baseName))
             {
-                baseName += "_" + PoseTuneNames.ShortGuid(pose.Id);
+                baseName += "_" + PoseTuneNames.ShortId(pose.Id);
             }
 
             return baseName + suffix;

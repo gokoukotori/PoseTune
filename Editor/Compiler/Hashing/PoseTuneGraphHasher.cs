@@ -39,7 +39,7 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Hashing
         private static void AppendRoot(StringBuilder builder, PoseGraph graph)
         {
             var root = graph?.RootComponent;
-            Append(builder, "rootGuid", root != null ? root.StableGuid : "");
+            Append(builder, "root.id", graph?.RootId ?? "");
             Append(builder, "displayName", root != null ? root.displayName : "");
             Append(builder, "parameterNamespace", root != null ? root.parameterNamespace : "");
             Append(builder, "buildMode", root != null ? root.buildMode.ToString() : "");

@@ -213,7 +213,8 @@ namespace Gokoukotori.PoseTune.Editor
                 false,
                 PoseTuneNames.HeightParameter(graph.RootComponent, graph.HeightAdjust),
                 graph.HeightAdjust != null ? graph.HeightAdjust.min : -1f,
-                graph.HeightAdjust != null ? graph.HeightAdjust.max : 1f);
+                graph.HeightAdjust != null ? graph.HeightAdjust.max : 1f,
+                PoseMotionPreparationContext.FromGraph(graph, result));
         }
 
         private static void ApplyMotionTime(AnimatorState state, PoseGraph graph, PoseDefinition pose)

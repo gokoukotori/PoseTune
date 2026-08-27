@@ -14,14 +14,14 @@ namespace Gokoukotori.PoseTune.Editor
         public const string SupineFlag = "SupineFlag";
         public const string GeneratedRootName = "PoseTune Generated";
 
-        public static string ShortGuid(string guid)
+        public static string ShortId(string id)
         {
-            if (string.IsNullOrWhiteSpace(guid))
+            if (string.IsNullOrWhiteSpace(id))
             {
                 return "unknown";
             }
 
-            return guid.Length <= 8 ? guid : guid.Substring(0, 8);
+            return id.Length <= 16 ? id : id.Substring(0, 16);
         }
 
         public static string HeightParameter(PoseTuneRoot root, PoseHeightAdjust height)
@@ -41,12 +41,12 @@ namespace Gokoukotori.PoseTune.Editor
 
         public static string GroupActiveParameter(PoseGroupDefinition group, PoseClipBlendMode blendMode)
         {
-            return "PTI/GroupActive/" + ShortGuid(group != null ? group.Id : "") + "/" + blendMode;
+            return "PTI/GroupActive/" + ShortId(group != null ? group.Id : "") + "/" + blendMode;
         }
 
         public static string PoseActiveParameter(PoseDefinition pose)
         {
-            return "PTI/PoseActive/" + ShortGuid(pose != null ? pose.Id : "");
+            return "PTI/PoseActive/" + ShortId(pose != null ? pose.Id : "");
         }
 
         public static string TrackingVoteParameter(PoseGroupDefinition group)

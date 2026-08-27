@@ -21,7 +21,7 @@ namespace Gokoukotori.PoseTune.Editor
             }
 
             var markers = graph.AvatarRoot.GetComponentsInChildren<PoseTuneGeneratedMarker>(true)
-                .Where(marker => marker.rootGuid == graph.RootComponent.StableGuid)
+                .Where(marker => marker.rootKey == graph.RootId)
                 .ToList();
             if (markers.Count == 0)
             {

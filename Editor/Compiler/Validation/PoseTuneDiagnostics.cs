@@ -14,7 +14,6 @@ namespace Gokoukotori.PoseTune.Editor
         public static readonly PoseTuneDiagnosticDescriptor RootNamespaceTooLong = new(
             "PT-R006",
             "PoseTuneRoot の Parameter Namespace を短くしてください。");
-        public static readonly PoseTuneDiagnosticDescriptor DuplicateRootStableGuid = new("PT-R007");
         public static readonly PoseTuneDiagnosticDescriptor GroupHasNoPose = new(
             "PT-G001",
             "PoseClip を追加するか、不要な PoseGroup を削除してください。");
@@ -27,7 +26,6 @@ namespace Gokoukotori.PoseTune.Editor
         public static readonly PoseTuneDiagnosticDescriptor GroupParameterConflict = new("PT-G002");
         public static readonly PoseTuneDiagnosticDescriptor GroupGeneratedParameterConflict = new("PT-G005");
         public static readonly PoseTuneDiagnosticDescriptor GroupNonExclusiveOverridePose = new("PT-G006");
-        public static readonly PoseTuneDiagnosticDescriptor DuplicateGroupStableGuid = new("PT-G007");
         public static readonly PoseTuneDiagnosticDescriptor ClipMotionMissing = new(
             "PT-C001",
             "PoseClip に AnimationClip または sourceMotion を設定してください。");
@@ -39,7 +37,7 @@ namespace Gokoukotori.PoseTune.Editor
             "時間変化する root curve を削除し、静的な補正は PoseClip の root offset 設定へ移してください。");
         public static readonly PoseTuneDiagnosticDescriptor ClipUnsupportedCurves = new(
             "PT-C004",
-            "PoseTune で扱わない curve を削除し、transform / blendshape のみを残してください。");
+            "警告を解消するには、元の clip から Transform / Animator / BlendShape 以外の curve を削除してください。");
         public static readonly PoseTuneDiagnosticDescriptor ClipMultipleInitial = new(
             "PT-C005",
             "同じ PoseGroup 内で Initial を ON にする PoseClip を 1 つだけにしてください。");
@@ -48,7 +46,6 @@ namespace Gokoukotori.PoseTune.Editor
             "PoseClip の Loop と AnimationClip の Loop Time を同じ設定にしてください。");
         public static readonly PoseTuneDiagnosticDescriptor AdditivePoseOutputOffset = new("PT-C009");
         public static readonly PoseTuneDiagnosticDescriptor AutoPosePriorityAmbiguous = new("PT-C010");
-        public static readonly PoseTuneDiagnosticDescriptor DuplicatePoseStableGuid = new("PT-C011");
         public static readonly PoseTuneDiagnosticDescriptor ClipConfigurationInvalid = new("PT-C006");
         public static readonly PoseTuneDiagnosticDescriptor MotionTimeInvalid = ClipConfigurationInvalid;
         public static readonly PoseTuneDiagnosticDescriptor ClipMenuValueInvalid = ClipConfigurationInvalid;
@@ -97,6 +94,9 @@ namespace Gokoukotori.PoseTune.Editor
         public static readonly PoseTuneDiagnosticDescriptor MotionTimeAnimatorStateMenuUnavailable = new("PT-M002");
         public static readonly PoseTuneDiagnosticDescriptor ManualControlMenuMissing = new("PT-M003");
         public static readonly PoseTuneDiagnosticDescriptor MissingThumbnail = new("PT-M004");
+        public static readonly PoseTuneDiagnosticDescriptor PersistentObjectIdUnavailable = new(
+            "PT-M005",
+            "SceneまたはPrefabを保存してからthumbnailを再生成してください。");
         public static readonly PoseTuneDiagnosticDescriptor DuplicateRootTrackingPolicies = new("PT-T001");
         public static readonly PoseTuneDiagnosticDescriptor TrackingResetDisabledForFbt = new("PT-T002");
         public static readonly PoseTuneDiagnosticDescriptor UnsupportedTrackingPolicyOwner = new(
@@ -145,9 +145,6 @@ namespace Gokoukotori.PoseTune.Editor
             KawaiiAdditiveAdjustmentHumanoidCurveRequiresRebake;
         public static readonly PoseTuneDiagnosticDescriptor KawaiiActiveSourceSystemRisk = new("PT-KS001");
         public static readonly PoseTuneDiagnosticDescriptor KawaiiHeightProfileApproximation = new("PT-KH001");
-        public static readonly PoseTuneDiagnosticDescriptor AdjustmentPresetAvatarHashMismatch = new("PT-PRESET001");
-        public static readonly PoseTuneDiagnosticDescriptor AdjustmentPresetPoseStableGuidMissing = new("PT-PRESET002");
-        public static readonly PoseTuneDiagnosticDescriptor AdjustmentPresetDuplicatePoseStableGuid = new("PT-PRESET003");
 
         private static readonly PoseTuneDiagnosticDescriptor[] All =
         {
@@ -158,14 +155,12 @@ namespace Gokoukotori.PoseTune.Editor
             AvatarAnimatorNonHumanoid,
             MultipleRootComponents,
             RootNamespaceTooLong,
-            DuplicateRootStableGuid,
             GroupHasNoPose,
             GroupHasNoEnabledPose,
             GroupSyncedParameterBudgetExceeded,
             GroupParameterConflict,
             GroupGeneratedParameterConflict,
             GroupNonExclusiveOverridePose,
-            DuplicateGroupStableGuid,
             ClipMotionMissing,
             ClipZeroLength,
             ClipRootTransformCurves,
@@ -174,7 +169,6 @@ namespace Gokoukotori.PoseTune.Editor
             ClipLoopMismatch,
             AdditivePoseOutputOffset,
             AutoPosePriorityAmbiguous,
-            DuplicatePoseStableGuid,
             ClipConfigurationInvalid,
             MotionTimeGeneratedHeightConflict,
             HeightRuntimeAutoCorrectionRequiresVerification,
@@ -209,6 +203,7 @@ namespace Gokoukotori.PoseTune.Editor
             MotionTimeAnimatorStateMenuUnavailable,
             ManualControlMenuMissing,
             MissingThumbnail,
+            PersistentObjectIdUnavailable,
             DuplicateRootTrackingPolicies,
             TrackingResetDisabledForFbt,
             UnsupportedTrackingPolicyOwner,
@@ -249,10 +244,7 @@ namespace Gokoukotori.PoseTune.Editor
             KawaiiAdditiveAdjustmentObjectCurveFallback,
             KawaiiAdditiveAdjustmentHumanoidCurveRequiresRebake,
             KawaiiActiveSourceSystemRisk,
-            KawaiiHeightProfileApproximation,
-            AdjustmentPresetAvatarHashMismatch,
-            AdjustmentPresetPoseStableGuidMissing,
-            AdjustmentPresetDuplicatePoseStableGuid
+            KawaiiHeightProfileApproximation
         };
         private static readonly Dictionary<string, string> FixHints = All
             .Where(descriptor => !string.IsNullOrWhiteSpace(descriptor.FixHint))

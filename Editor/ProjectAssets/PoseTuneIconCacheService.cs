@@ -9,7 +9,8 @@ namespace Gokoukotori.PoseTune.Editor
     {
         Loaded,
         Missing,
-        Invalid
+        Invalid,
+        IdentityUnavailable
     }
 
     internal readonly struct PoseTuneThumbnailCacheProbe
@@ -26,9 +27,16 @@ namespace Gokoukotori.PoseTune.Editor
 
     public sealed class PoseTuneIconCacheService
     {
-        public string IconsFolder(PoseGraph graph)
+        public bool TryGetIconsFolder(PoseGraph graph, out string folder)
         {
-            return PoseTuneProjectAssetPaths.BakeRootPath(graph) + "/Icons";
+            if (!PoseTuneProjectAssetPaths.TryGetBakeRootPath(graph, out var rootPath))
+            {
+                folder = "";
+                return false;
+            }
+
+            folder = rootPath + "/Icons";
+            return true;
         }
 
         public Texture2D LoadCachedThumbnail(PoseGraph graph, PoseDefinition pose)
@@ -43,7 +51,12 @@ namespace Gokoukotori.PoseTune.Editor
                 return new PoseTuneThumbnailCacheProbe(PoseTuneThumbnailCacheStatus.Missing, null);
             }
 
-            var path = ThumbnailAssetPath(pose.Source, IconsFolder(graph));
+            if (!TryGetIconsFolder(graph, out var folder) ||
+                !TryGetThumbnailAssetPath(pose.Source, folder, out var path))
+            {
+                return new PoseTuneThumbnailCacheProbe(PoseTuneThumbnailCacheStatus.IdentityUnavailable, null);
+            }
+
             var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
             if (texture != null)
             {
@@ -58,13 +71,26 @@ namespace Gokoukotori.PoseTune.Editor
             return new PoseTuneThumbnailCacheProbe(PoseTuneThumbnailCacheStatus.Missing, null);
         }
 
-        public string ThumbnailAssetPath(PoseClip pose, string folder)
+        public bool TryGetThumbnailAssetPath(PoseClip pose, string folder, out string path)
         {
-            return folder.TrimEnd('/') + "/" + MakeFileName(pose) + ".png";
+            path = "";
+            if (string.IsNullOrWhiteSpace(folder) || !TryMakeFileName(pose, out var fileName))
+            {
+                return false;
+            }
+
+            path = folder.TrimEnd('/') + "/" + fileName + ".png";
+            return true;
         }
 
-        private static string MakeFileName(PoseClip pose)
+        private static bool TryMakeFileName(PoseClip pose, out string fileName)
         {
+            fileName = "";
+            if (pose == null || !PoseTuneObjectIdentity.TryGetPersistentHash(pose, out var objectHash))
+            {
+                return false;
+            }
+
             var value = pose != null ? pose.displayName : "";
             var safe = string.IsNullOrWhiteSpace(value) ? "Pose" : value.Trim();
             foreach (var c in Path.GetInvalidFileNameChars())
@@ -72,8 +98,8 @@ namespace Gokoukotori.PoseTune.Editor
                 safe = safe.Replace(c, '_');
             }
 
-            var guid = pose != null ? PoseTuneNames.ShortGuid(pose.StableGuid) : "unknown";
-            return safe + "_" + guid;
+            fileName = safe + "_" + objectHash;
+            return true;
         }
     }
 }

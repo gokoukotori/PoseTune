@@ -18,7 +18,9 @@ namespace Gokoukotori.PoseTune.Editor
             var tracking = PoseTuneTrackingPolicyResolver.ResolveGroupPolicy(root, group);
             var definition = new PoseGroupDefinition
             {
-                Id = group.StableGuid,
+                Id = PoseTuneObjectIdentity.BuildKey(
+                    group,
+                    graph.AvatarRoot != null ? graph.AvatarRoot.transform : root.transform.root),
                 DisplayName = string.IsNullOrWhiteSpace(group.displayName) ? group.name : group.displayName,
                 Kind = group.kind,
                 MenuOrder = group.menuOrder,
@@ -54,7 +56,9 @@ namespace Gokoukotori.PoseTune.Editor
                 var conditionBranches = PoseTuneConditionBranchCollector.Collect(graph, group, clip);
                 var pose = new PoseDefinition
                 {
-                    Id = clip.StableGuid,
+                    Id = PoseTuneObjectIdentity.BuildKey(
+                        clip,
+                        graph.AvatarRoot != null ? graph.AvatarRoot.transform : root.transform.root),
                     DisplayName = string.IsNullOrWhiteSpace(clip.displayName)
                         ? (effectiveMotion != null ? effectiveMotion.name : clip.name)
                         : clip.displayName,

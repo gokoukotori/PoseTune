@@ -5,13 +5,18 @@ namespace Gokoukotori.PoseTune.Editor
 {
     public static class PoseTuneProjectAssetPaths
     {
-        public static string BakeRootPath(PoseGraph graph)
+        public static bool TryGetBakeRootPath(PoseGraph graph, out string path)
         {
+            path = "";
+            if (graph?.RootComponent == null ||
+                !PoseTuneObjectIdentity.TryGetPersistentHash(graph.RootComponent, out var rootHash))
+            {
+                return false;
+            }
+
             var avatarName = Sanitize(graph?.AvatarRoot != null ? graph.AvatarRoot.name : "Avatar");
-            var rootGuid = graph?.RootComponent != null
-                ? PoseTuneNames.ShortGuid(graph.RootComponent.StableGuid)
-                : "unknown";
-            return "Assets/PoseTuneGenerated/" + avatarName + "/" + rootGuid;
+            path = "Assets/PoseTuneGenerated/" + avatarName + "/" + rootHash;
+            return true;
         }
 
         private static string Sanitize(string value)

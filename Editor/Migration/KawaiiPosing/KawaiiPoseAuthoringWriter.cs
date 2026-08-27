@@ -197,7 +197,7 @@ namespace Gokoukotori.PoseTune.Editor
 
             var definition = new PoseDefinition
             {
-                Id = pose.StableGuid,
+                Id = PoseTuneObjectIdentity.BuildKey(pose, pose.transform.root),
                 DisplayName = pose.displayName,
                 Clip = pose.clip,
                 SourceMotion = pose.sourceMotion,

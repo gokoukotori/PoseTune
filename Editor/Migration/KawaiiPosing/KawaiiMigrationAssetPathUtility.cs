@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Linq;
-using Gokoukotori.PoseTune;
 using UnityEngine;
 
 namespace Gokoukotori.PoseTune.Editor
@@ -15,35 +14,60 @@ namespace Gokoukotori.PoseTune.Editor
             "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
         };
 
-        public static string MigrationRoot(GameObject avatarRoot, PoseTuneRoot root)
+        public static bool TryMigrationRoot(GameObject avatarRoot, string runId, out string path)
         {
-            return MigrationRoot(
-                avatarRoot != null ? avatarRoot.name : "Avatar",
-                root != null ? root.StableGuid : "unknown");
+            path = "";
+            if (avatarRoot == null ||
+                !PoseTuneObjectIdentity.TryGetPersistentHash(avatarRoot.transform, out var avatarId))
+            {
+                return false;
+            }
+
+            var safeAvatarName = SanitizeSegment(avatarRoot.name, "Avatar", 64);
+            var safeRunId = SanitizeSegment(runId, "run", 64);
+            path = $"Assets/PoseTuneGenerated/KawaiiMigration/{safeAvatarName}_{avatarId}/{safeRunId}";
+            return true;
         }
 
-        public static string MigrationRoot(string avatarName, string rootStableGuid)
+        public static bool TryMotionsPath(GameObject avatarRoot, string runId, out string path)
         {
-            var safeAvatarName = SanitizeSegment(avatarName, "Avatar", 64);
-            var rootGuid = NormalizeGuid(rootStableGuid);
-            return $"Assets/PoseTuneGenerated/KawaiiMigration/{safeAvatarName}/{rootGuid}";
+            path = "";
+            if (!TryMigrationRoot(avatarRoot, runId, out var root))
+            {
+                return false;
+            }
+
+            path = Combine(root, "Motions");
+            return true;
         }
 
-        public static string MotionsPath(GameObject avatarRoot, PoseTuneRoot root)
+        public static bool TryReportsPath(GameObject avatarRoot, string runId, out string path)
         {
-            return Combine(MigrationRoot(avatarRoot, root), "Motions");
+            path = "";
+            if (!TryMigrationRoot(avatarRoot, runId, out var root))
+            {
+                return false;
+            }
+
+            path = Combine(root, "Reports");
+            return true;
         }
 
-        public static string ReportsPath(GameObject avatarRoot, PoseTuneRoot root)
+        public static bool TryMotionFileName(
+            PoseClip pose,
+            string displayName,
+            bool animationClip,
+            out string fileName)
         {
-            return Combine(MigrationRoot(avatarRoot, root), "Reports");
-        }
+            fileName = "";
+            if (!PoseTuneObjectIdentity.TryGetPersistentHash(pose, out var poseId))
+            {
+                return false;
+            }
 
-        public static string MotionFileName(string displayName, string poseStableGuid, bool animationClip)
-        {
             var name = SanitizeSegment(displayName, "Pose", 48);
-            var guid = NormalizeGuid(poseStableGuid);
-            return $"{name}_{guid}{(animationClip ? ".anim" : ".asset")}";
+            fileName = $"{name}_{poseId}{(animationClip ? ".anim" : ".asset")}";
+            return true;
         }
 
         public static string SanitizeSegment(string value, string fallback, int maxLength)
@@ -61,17 +85,6 @@ namespace Gokoukotori.PoseTune.Editor
             }
 
             return value.Length <= maxLength ? value : value.Substring(0, maxLength).TrimEnd('.', ' ');
-        }
-
-        private static string NormalizeGuid(string value)
-        {
-            if (Guid.TryParse(value, out var guid))
-            {
-                return guid.ToString("N");
-            }
-
-            var normalized = string.IsNullOrWhiteSpace(value) ? "unknown" : value.Trim();
-            return SanitizeSegment(normalized, "unknown", 64);
         }
 
         private static string Combine(string parent, string child)

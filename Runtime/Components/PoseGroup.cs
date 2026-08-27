@@ -42,26 +42,8 @@ namespace Gokoukotori.PoseTune
         public List<ParameterConditionData> groupConditions = new();
         [InspectorName("ポーズ空間")]
         public PoseSpacePolicy poseSpace = new();
-        [SerializeField, HideInInspector] private StableComponentGuid stableGuid = new();
-
-        public string StableGuid => stableGuid.Value;
-
-        public void SetStableGuid(string value)
-        {
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                stableGuid.Value = value;
-            }
-        }
-
-        public void RegenerateStableGuid()
-        {
-            stableGuid.Regenerate();
-        }
-
         private void OnValidate()
         {
-            stableGuid.Ensure();
             if (string.IsNullOrWhiteSpace(displayName))
             {
                 displayName = ObjectNamesFallback.Nicify(gameObject.name);

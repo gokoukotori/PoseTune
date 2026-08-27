@@ -37,23 +37,6 @@ namespace Gokoukotori.PoseTune
         public PoseTunePreviewSettings previewSettings = new();
         [InspectorName("詳細設定")]
         public PoseTuneAdvancedSettings advancedSettings = new();
-        [SerializeField, HideInInspector] private StableComponentGuid stableGuid = new();
-
-        public string StableGuid => stableGuid.Value;
-
-        public void SetStableGuid(string value)
-        {
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                stableGuid.Value = value;
-            }
-        }
-
-        public void RegenerateStableGuid()
-        {
-            stableGuid.Regenerate();
-        }
-
         public string Parameter(string localName)
         {
             var ns = string.IsNullOrWhiteSpace(parameterNamespace) ? "PT" : parameterNamespace.Trim('/');
@@ -62,7 +45,6 @@ namespace Gokoukotori.PoseTune
 
         private void OnValidate()
         {
-            stableGuid.Ensure();
             if (string.IsNullOrWhiteSpace(parameterNamespace))
             {
                 parameterNamespace = "PT";

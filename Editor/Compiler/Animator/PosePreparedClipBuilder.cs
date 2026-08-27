@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Gokoukotori.PoseTune;
+using Gokoukotori.PoseTune.Editor.Compiler.Validation;
 using UnityEditor;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -29,15 +30,27 @@ namespace Gokoukotori.PoseTune.Editor
                 .Any(clip => AnimationUtility.GetAnimationClipSettings(clip).loopTime != pose.Loop);
         }
 
-        public static AnimationClip ClonePreparedClip(PoseDefinition pose, string name)
+        public static AnimationClip ClonePreparedClip(
+            PoseDefinition pose,
+            string name,
+            bool sanitizeUnsupportedSourceCurves = false)
         {
             var source = pose.SourceMotion as AnimationClip ?? pose.Clip;
-            return ClonePreparedClip(pose, source, name);
+            return ClonePreparedClip(pose, source, name, sanitizeUnsupportedSourceCurves);
         }
 
-        public static AnimationClip ClonePreparedClip(PoseDefinition pose, AnimationClip source, string name)
+        public static AnimationClip ClonePreparedClip(
+            PoseDefinition pose,
+            AnimationClip source,
+            string name,
+            bool sanitizeUnsupportedSourceCurves = false)
         {
             var clip = CloneClip(source, name);
+            if (sanitizeUnsupportedSourceCurves)
+            {
+                PoseTuneCurveBindingPolicy.RemoveUnsupportedCurves(clip);
+            }
+
             ApplyAdjustmentClip(clip, pose.AdjustmentClip, pose.AdjustmentApplyMode);
             ApplyRootOffset(clip, pose.RootOffset);
             ApplyHumanoidOrientationOffsetY(clip, pose.HumanoidOrientationOffsetYDegrees);

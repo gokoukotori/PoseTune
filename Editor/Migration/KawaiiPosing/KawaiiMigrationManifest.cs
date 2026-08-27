@@ -8,7 +8,7 @@ namespace Gokoukotori.PoseTune.Editor
     [Serializable]
     internal sealed class KawaiiMigrationMotionManifestEntry
     {
-        public string poseStableGuid = "";
+        public string poseGlobalObjectId = "";
         public string assetPath = "";
         public string motionType = "";
     }
@@ -86,10 +86,10 @@ namespace Gokoukotori.PoseTune.Editor
 
     internal sealed class KawaiiMigrationManifest : ScriptableObject
     {
-        public int schemaVersion = 1;
+        public int schemaVersion = 2;
         public string runGuid = "";
         public string avatarGlobalObjectId = "";
-        public string rootStableGuid = "";
+        public string rootGlobalObjectId = "";
         public string optionsSummary = "";
         public KawaiiMigrationOptionsSnapshot options = new();
         public string manifestAssetPath = "";

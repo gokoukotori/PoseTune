@@ -15,13 +15,13 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
-            var rootsByGuid = avatarRoot.GetComponentsInChildren<PoseTuneRoot>(true)
+            var rootsByKey = avatarRoot.GetComponentsInChildren<PoseTuneRoot>(true)
                 .Where(root => root != null)
-                .GroupBy(root => root.StableGuid)
+                .GroupBy(root => PoseTuneObjectIdentity.BuildKey(root, avatarRoot.transform))
                 .ToDictionary(group => group.Key, group => group.First());
             var markers = avatarRoot.GetComponentsInChildren<PoseTuneGeneratedMarker>(true).ToArray();
             var generatedTransforms = markers
-                .Where(marker => !ShouldKeepGeneratedObject(marker, rootsByGuid))
+                .Where(marker => !ShouldKeepGeneratedObject(marker, rootsByKey))
                 .Select(marker => marker.transform)
                 .OrderByDescending(PoseTuneGeneratedObjectCleaner.GetDepth)
                 .ToList();
@@ -83,14 +83,14 @@ namespace Gokoukotori.PoseTune.Editor
 
         private static bool ShouldKeepGeneratedObject(
             PoseTuneGeneratedMarker marker,
-            IReadOnlyDictionary<string, PoseTuneRoot> rootsByGuid)
+            IReadOnlyDictionary<string, PoseTuneRoot> rootsByKey)
         {
-            if (marker == null || string.IsNullOrWhiteSpace(marker.rootGuid))
+            if (marker == null || string.IsNullOrWhiteSpace(marker.rootKey))
             {
                 return false;
             }
 
-            return rootsByGuid.TryGetValue(marker.rootGuid, out var root) &&
+            return rootsByKey.TryGetValue(marker.rootKey, out var root) &&
                    root != null &&
                    root.advancedSettings.keepGeneratedObjectsInBuild;
         }

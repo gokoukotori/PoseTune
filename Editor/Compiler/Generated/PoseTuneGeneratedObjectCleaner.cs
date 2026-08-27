@@ -19,7 +19,7 @@ namespace Gokoukotori.PoseTune.Editor
             var generatedTransforms = avatarRoot.GetComponentsInChildren<PoseTuneGeneratedMarker>(true)
                 .Where(marker => marker != null)
                 .Where(marker => marker.gameObject != avatarRoot)
-                .Where(marker => marker.rootGuid == graph.RootComponent.StableGuid)
+                .Where(marker => marker.rootKey == graph.RootId)
                 .Select(marker => marker.transform)
                 .OrderByDescending(GetDepth)
                 .ToArray();

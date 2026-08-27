@@ -29,7 +29,7 @@ namespace Gokoukotori.PoseTune.Editor
         private static string ControllerName(PoseGraph graph, string layer)
         {
             var suffix = graph?.RootComponent != null
-                ? PoseTuneNames.ShortGuid(graph.RootComponent.StableGuid)
+                ? PoseTuneNames.ShortId(graph.RootId)
                 : "";
             return string.IsNullOrWhiteSpace(suffix)
                 ? "PoseTune_" + layer

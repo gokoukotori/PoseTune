@@ -39,10 +39,12 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
                     "AnimationClip に静的な root position / rotation offset が含まれています。", pose.Source);
             }
 
-            if (floatBindings.Any(IsUnsupportedCurveBinding) ||
-                AnimationUtility.GetObjectReferenceCurveBindings(pose.Clip).Any(IsUnsupportedObjectReferenceBinding))
+            if (PoseTuneCurveBindingPolicy.HasUnsupportedCurves(pose.Clip))
             {
-                report.Error(PoseTuneDiagnostics.ClipUnsupportedCurves.Code, "Base / Action target の PoseClip には Transform / Animator 以外の curve を含められません。", pose.Source);
+                report.Warning(
+                    PoseTuneDiagnostics.ClipUnsupportedCurves.Code,
+                    "Base / Action target の PoseClip に Transform / Animator / BlendShape 以外の curve が含まれているため、PoseTune の生成出力から除外します。",
+                    pose.Source);
             }
 
             var settings = AnimationUtility.GetAnimationClipSettings(pose.Clip);
@@ -192,27 +194,6 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
             return separator >= 0 ? propertyName.Substring(separator + 1) : propertyName;
         }
 
-        private static bool IsUnsupportedCurveBinding(EditorCurveBinding binding)
-        {
-            if (binding.type == typeof(Transform) || binding.type == typeof(Animator))
-            {
-                return false;
-            }
-
-            if (binding.type == typeof(SkinnedMeshRenderer) &&
-                binding.propertyName.StartsWith("blendShape."))
-            {
-                return false;
-            }
-
-            return true;
-        }
-
-        private static bool IsUnsupportedObjectReferenceBinding(EditorCurveBinding binding)
-        {
-            return binding.type != typeof(Transform);
-        }
-
         private static PoseDefinition ClipPose(PoseDefinition source, AnimationClip clip)
         {
             return new PoseDefinition
@@ -332,6 +313,53 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
                 return Mathf.Abs(Mathf.DeltaAngle(first.x, second.x)) > RotationToleranceDegrees ||
                        Mathf.Abs(Mathf.DeltaAngle(first.y, second.y)) > RotationToleranceDegrees ||
                        Mathf.Abs(Mathf.DeltaAngle(first.z, second.z)) > RotationToleranceDegrees;
+            }
+        }
+    }
+
+    internal static class PoseTuneCurveBindingPolicy
+    {
+        public static bool HasUnsupportedCurves(AnimationClip clip)
+        {
+            return clip != null &&
+                   (AnimationUtility.GetCurveBindings(clip).Any(binding => !IsAllowedFloatCurve(binding)) ||
+                    AnimationUtility.GetObjectReferenceCurveBindings(clip)
+                        .Any(binding => !IsAllowedObjectReferenceCurve(binding)));
+        }
+
+        public static bool IsAllowedFloatCurve(EditorCurveBinding binding)
+        {
+            if (binding.type == typeof(Transform) || binding.type == typeof(Animator))
+            {
+                return true;
+            }
+
+            return binding.type == typeof(SkinnedMeshRenderer) &&
+                   binding.propertyName.StartsWith("blendShape.");
+        }
+
+        public static bool IsAllowedObjectReferenceCurve(EditorCurveBinding binding)
+        {
+            return binding.type == typeof(Transform);
+        }
+
+        public static void RemoveUnsupportedCurves(AnimationClip generatedClip)
+        {
+            if (generatedClip == null)
+            {
+                return;
+            }
+
+            foreach (var binding in AnimationUtility.GetCurveBindings(generatedClip)
+                         .Where(binding => !IsAllowedFloatCurve(binding)))
+            {
+                AnimationUtility.SetEditorCurve(generatedClip, binding, null);
+            }
+
+            foreach (var binding in AnimationUtility.GetObjectReferenceCurveBindings(generatedClip)
+                         .Where(binding => !IsAllowedObjectReferenceCurve(binding)))
+            {
+                AnimationUtility.SetObjectReferenceCurve(generatedClip, binding, null);
             }
         }
     }

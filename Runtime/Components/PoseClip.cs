@@ -61,26 +61,8 @@ namespace Gokoukotori.PoseTune
         public bool suppressIconGeneration;
         [InspectorName("クリップ条件")]
         public List<ParameterConditionData> clipConditions = new();
-        [SerializeField, HideInInspector] private StableComponentGuid stableGuid = new();
-
-        public string StableGuid => stableGuid.Value;
-
-        public void SetStableGuid(string value)
-        {
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                stableGuid.Value = value;
-            }
-        }
-
-        public void RegenerateStableGuid()
-        {
-            stableGuid.Regenerate();
-        }
-
         private void OnValidate()
         {
-            stableGuid.Ensure();
             if (string.IsNullOrWhiteSpace(displayName))
             {
                 var sourceName = clip != null ? clip.name : sourceMotion != null ? sourceMotion.name : gameObject.name;

@@ -46,7 +46,7 @@ namespace Gokoukotori.PoseTune.Editor
             var go = new GameObject(PoseTuneNames.GeneratedRootName);
             go.transform.SetParent(graph.AvatarRoot.transform, false);
             var markerComponent = go.AddComponent<PoseTuneGeneratedMarker>();
-            markerComponent.rootGuid = graph.RootComponent.StableGuid;
+            markerComponent.rootKey = graph.RootId;
             markerComponent.generatedVersion = PoseTunePackageInfo.Version;
             markerComponent.graphHash = PoseTuneGraphHasher.Compute(graph);
             markerComponent.generatedAt = DateTime.UtcNow.ToString("O");
