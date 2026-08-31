@@ -50,7 +50,6 @@ namespace Gokoukotori.PoseTune.Editor
         public TrackingPolicyData TrackingPolicy = TrackingPolicyData.DefaultForPose();
         public bool HasFullBodyTrackingOverride;
         public TrackingPolicyData FullBodyTrackingPolicy = TrackingPolicyData.DefaultForPose();
-        public bool SuppressIconGeneration;
         public Texture2D Icon;
         public PoseGroup Source;
         public List<ParameterConditionData> Conditions = new();
@@ -70,7 +69,6 @@ namespace Gokoukotori.PoseTune.Editor
         public float HumanoidOrientationOffsetYDegrees;
         public bool RecenterRootXZToHead;
         public Vector3 RootOffset;
-        public Vector3 CameraOffset;
         public Texture2D Icon;
         public int MenuValue;
         public int SourceSyncedParameterValue;
@@ -80,7 +78,6 @@ namespace Gokoukotori.PoseTune.Editor
         public PoseGroupDefinition Group;
         public PoseClipPriority Priority = PoseClipPriority.Normal;
         public PoseClipBlendMode BlendMode = PoseClipBlendMode.Override;
-        public bool SuppressIconGeneration;
         public PoseSpacePolicy PoseSpace = new();
         public MotionTimeSettings MotionTime = new();
         public List<ParameterConditionData> Conditions = new();

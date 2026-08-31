@@ -22,6 +22,15 @@ namespace Gokoukotori.PoseTune.Editor
                    group.AutoPoseSelectionMode == AutoPoseSelectionMode.SelectedPosePerGroup;
         }
 
+        public static bool UsesSelectedPoseAutoSelection(PoseTuneRoot root, PoseGroupDefinition group)
+        {
+            return root != null &&
+                   group != null &&
+                   root.enableAutoContextSwitch &&
+                   group.ActivationMode != PoseGroupActivationMode.Manual &&
+                   group.AutoPoseSelectionMode == AutoPoseSelectionMode.SelectedPosePerGroup;
+        }
+
         public static bool ControlsActionPlayable(PoseTuneRoot root)
         {
             return root != null &&

@@ -15,7 +15,6 @@ namespace Gokoukotori.PoseTune.Editor
     internal sealed class PoseGroundingSuggestion
     {
         public float SuggestedRootYOffset;
-        public Vector3 SuggestedCameraOffset;
         public string Reason = "";
         public bool RequiresManualReview;
     }
@@ -77,7 +76,6 @@ namespace Gokoukotori.PoseTune.Editor
                 return new PoseGroundingSuggestion
                 {
                     SuggestedRootYOffset = pose.rootOffset.y + deltaToFloor,
-                    SuggestedCameraOffset = pose.cameraOffset,
                     Reason = $"renderer bounds lowest Y {lowestY:0.###}; floor Y {floorY:0.###}.",
                     RequiresManualReview = IsManualReviewPose(pose)
                 };
@@ -101,7 +99,6 @@ namespace Gokoukotori.PoseTune.Editor
             return new PoseGroundingSuggestion
             {
                 SuggestedRootYOffset = pose.rootOffset.y,
-                SuggestedCameraOffset = pose.cameraOffset,
                 Reason = reason,
                 RequiresManualReview = requiresManualReview
             };

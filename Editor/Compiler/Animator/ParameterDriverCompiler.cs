@@ -27,22 +27,28 @@ namespace Gokoukotori.PoseTune.Editor
             });
         }
 
-        public static void ResetExclusiveGroups(AnimatorState state, IEnumerable<PoseGroupDefinition> groups)
+        public static void ResetExclusiveParameters(
+            AnimatorState state,
+            IEnumerable<string> parameterNames,
+            bool localOnly)
         {
-            var targets = groups?.ToList() ?? new List<PoseGroupDefinition>();
+            var targets = parameterNames?
+                .Where(parameter => !string.IsNullOrWhiteSpace(parameter))
+                .Distinct()
+                .ToList() ?? new List<string>();
             if (targets.Count == 0)
             {
                 return;
             }
 
             var behavior = state.AddStateMachineBehaviour<VRCAvatarParameterDriver>();
-            behavior.localOnly = false;
+            behavior.localOnly = localOnly;
             behavior.debugString = "PoseTune Commit Exclusive Pose";
-            foreach (var group in targets)
+            foreach (var parameterName in targets)
             {
                 behavior.parameters.Add(new VRC_AvatarParameterDriver.Parameter
                 {
-                    name = group.ParameterName,
+                    name = parameterName,
                     type = VRC_AvatarParameterDriver.ChangeType.Set,
                     value = 0f
                 });

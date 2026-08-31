@@ -8,6 +8,7 @@ namespace Gokoukotori.PoseTune.Editor
     {
         public List<ParameterDefinition> Parameters = new();
         public List<string> DuplicateParameterNames = new();
+        public PoseSelectionPlan PoseSelection = new();
 
         public int SyncedCost => Parameters.Where(p => !p.LocalOnly && p.SyncType != PoseTuneParameterSyncType.NotSynced)
             .Sum(p => p.SyncType == PoseTuneParameterSyncType.Bool ? 1 : 8);

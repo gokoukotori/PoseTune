@@ -31,10 +31,6 @@ namespace Gokoukotori.PoseTune
         public float humanoidOrientationOffsetYDegrees;
         [InspectorName("Root XZ を first key 基準で再中心化")]
         public bool recenterRootXZToHead;
-        [InspectorName("カメラオフセット")]
-        [Tooltip("サムネイル生成時のカメラ位置補正です。VRChat 実行時の視点位置は変更しません。")]
-        public Vector3 cameraOffset;
-
         [InspectorName("初期ポーズ")]
         public bool isInitial;
         [InspectorName("ループ")]
@@ -57,8 +53,6 @@ namespace Gokoukotori.PoseTune
         public MotionTimeSettings motionTime = new();
         [InspectorName("ポーズ空間")]
         public PoseSpacePolicy poseSpace = new();
-        [InspectorName("アイコン生成を抑止")]
-        public bool suppressIconGeneration;
         [InspectorName("クリップ条件")]
         public List<ParameterConditionData> clipConditions = new();
         private void OnValidate()

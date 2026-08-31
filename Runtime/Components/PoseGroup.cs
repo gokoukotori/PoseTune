@@ -36,8 +36,6 @@ namespace Gokoukotori.PoseTune
         public AutoContextProfile autoContextProfile = AutoContextProfile.Standard;
         [InspectorName("トラッキング制御を生成")]
         public bool emitTrackingControl = true;
-        [InspectorName("アイコン生成を抑止")]
-        public bool suppressIconGeneration;
         [InspectorName("グループ条件")]
         public List<ParameterConditionData> groupConditions = new();
         [InspectorName("ポーズ空間")]

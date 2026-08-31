@@ -19,8 +19,9 @@ namespace Gokoukotori.PoseTune.Editor
 
             PoseTuneTrackingValidator.ValidateRootPolicies(graph, report);
             PoseTuneGroupValidator.ValidateParameterConflicts(graph, report);
+            PoseSelectionValidator.Validate(context, report);
             PoseTuneMenuValidator.Validate(context, report);
-            PoseTuneGroupValidator.ValidateSyncedGroupIntCount(graph, report);
+            PoseTuneGroupValidator.ValidateSyncedGroupIntCount(context, report);
 
             foreach (var pose in graph.Poses)
             {
@@ -37,8 +38,6 @@ namespace Gokoukotori.PoseTune.Editor
                 PoseTuneTrackingValidator.ValidatePose(graph, pose, report);
                 PoseTunePoseOutputValidator.Validate(graph, pose, report);
             }
-
-            PoseTuneIconValidator.Validate(graph, report);
 
             PoseTuneParameterValidator.Validate(context, report);
             PoseTuneConditionValidator.Validate(graph, report);

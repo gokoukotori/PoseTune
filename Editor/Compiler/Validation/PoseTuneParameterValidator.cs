@@ -45,7 +45,10 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
             "IsAnimatorEnabled"
         };
 
-        public static void Validate(PoseGraph graph, ValidationReport report)
+        private static void Validate(
+            PoseGraph graph,
+            PoseSelectionPlan poseSelection,
+            ValidationReport report)
         {
             var seen = new Dictionary<string, PoseTuneParameterSyncType>();
             var reserved = ReservedParameterNames(graph);
@@ -55,10 +58,12 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
                     graph.GoroneSystemExCompatibility);
             }
 
-            foreach (var group in PoseGraphBuildFilter.BuildableGroups(graph)
-                         .Where(group => PoseTuneCompilerRules.RequiresPoseSelectionParameter(graph.RootComponent, group)))
+            foreach (var channel in poseSelection.Channels)
             {
-                Check(group.ParameterName, PoseTuneParameterSyncType.Int, group.Source);
+                Check(
+                    channel.ParameterName,
+                    PoseTuneParameterSyncType.Int,
+                    (Object)channel.Groups.FirstOrDefault()?.Source ?? graph.RootComponent);
             }
 
             if (ParameterAllocator.NeedsGeneratedHeightParameter(graph))
@@ -134,7 +139,7 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
 
         public static void Validate(PoseTuneValidationContext context, ValidationReport report)
         {
-            Validate(context.Graph, report);
+            Validate(context.Graph, context.Parameters.PoseSelection, report);
             PoseTuneAvatarParameterValidator.Validate(context, report);
         }
 

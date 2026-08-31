@@ -56,8 +56,6 @@ namespace Gokoukotori.PoseTune.Editor
                 poseGroup.autoPoseSelectionMode = AutoPoseSelectionMode.InitialPoseOnly;
                 poseGroup.autoContextProfile = AutoContextProfile.KawaiiHeadHeightApproximation;
                 poseGroup.emitTrackingControl = options.addTrackingPolicy;
-                poseGroup.suppressIconGeneration = dto.IsIconDisabled;
-
                 if (options.addTrackingPolicy)
                 {
                     var policy = Undo.AddComponent<PoseTrackingPolicy>(group);

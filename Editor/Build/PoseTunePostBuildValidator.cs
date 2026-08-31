@@ -69,11 +69,25 @@ namespace Gokoukotori.PoseTune.Editor
             var parameters = new ParameterAllocator().Allocate(graph);
             foreach (var parameter in parameters.Parameters.Where(parameter => !parameter.AnimatorOnly))
             {
-                if (!HasExpressionParameter(descriptor.expressionParameters, parameter.Name))
+                var matches = ExpressionParameters(descriptor.expressionParameters, parameter.Name).ToList();
+                if (matches.Count == 0)
                 {
                     report.Error(PoseTuneDiagnostics.BuildExpressionParameterMissing.Code, "最終 Expression Parameters に PoseTune パラメータがありません: " + parameter.Name,
                         graph.RootComponent);
                     return;
+                }
+
+                var expectedNetworkSynced = !parameter.LocalOnly &&
+                                            parameter.SyncType != PoseTuneParameterSyncType.NotSynced;
+                if (matches.Count != 1 ||
+                    matches[0].valueType != ToVrcValueType(parameter.ValueType) ||
+                    matches[0].saved != parameter.Saved ||
+                    matches[0].networkSynced != expectedNetworkSynced)
+                {
+                    report.Error(
+                        PoseTuneDiagnostics.BuildExpressionParameterMetadataMismatch.Code,
+                        $"最終 Expression Parameter の型または属性が一致しません: {parameter.Name} (期待: {parameter.ValueType}, saved={parameter.Saved}, synced={expectedNetworkSynced})",
+                        graph.RootComponent);
                 }
             }
 
@@ -125,19 +139,34 @@ namespace Gokoukotori.PoseTune.Editor
 
             var animatorValidator = new PoseTuneAnimatorValidator();
             var animatorReport = virtualController != null
-                ? animatorValidator.Validate(graph, virtualController)
-                : animatorValidator.Validate(graph, targetController);
+                ? animatorValidator.Validate(graph, virtualController, parameters)
+                : animatorValidator.Validate(graph, targetController, parameters);
             foreach (var issue in animatorReport.Issues)
             {
                 report.Add(issue);
             }
         }
 
-        private static bool HasExpressionParameter(VRCExpressionParameters parameters, string name)
+        private static System.Collections.Generic.IEnumerable<VRCExpressionParameters.Parameter> ExpressionParameters(
+            VRCExpressionParameters parameters,
+            string name)
         {
-            return parameters != null &&
-                   parameters.parameters != null &&
-                   parameters.parameters.Any(parameter => parameter != null && parameter.name == name);
+            return parameters?.parameters?
+                       .Where(parameter => parameter != null && parameter.name == name) ??
+                   Enumerable.Empty<VRCExpressionParameters.Parameter>();
+        }
+
+        private static VRCExpressionParameters.ValueType ToVrcValueType(PoseTuneParameterValueType type)
+        {
+            switch (type)
+            {
+                case PoseTuneParameterValueType.Bool:
+                    return VRCExpressionParameters.ValueType.Bool;
+                case PoseTuneParameterValueType.Int:
+                    return VRCExpressionParameters.ValueType.Int;
+                default:
+                    return VRCExpressionParameters.ValueType.Float;
+            }
         }
 
         private static AnimatorController ControllerForLayer(

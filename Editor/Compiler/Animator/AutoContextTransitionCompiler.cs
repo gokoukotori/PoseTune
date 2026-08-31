@@ -47,14 +47,16 @@ namespace Gokoukotori.PoseTune.Editor
             AnimatorStateTransition transition,
             PoseTuneRoot root,
             PoseGroupDefinition group,
-            PoseDefinition pose)
+            PoseDefinition pose,
+            PoseSelectionPlan poseSelection)
         {
             if (!UsesSelectedPoseAutoEntry(group))
             {
                 return;
             }
 
-            transition.AddCondition(AnimatorConditionMode.Equals, pose.SelectionValue(root), group.ParameterName);
+            var binding = poseSelection.Find(pose);
+            transition.AddCondition(AnimatorConditionMode.Equals, binding.Value, binding.ParameterName);
         }
 
         private static void AddSelectedPoseAutoExitTransition(
@@ -62,7 +64,8 @@ namespace Gokoukotori.PoseTune.Editor
             AnimatorState cleanup,
             PoseTuneRoot root,
             PoseGroupDefinition group,
-            PoseDefinition pose)
+            PoseDefinition pose,
+            PoseSelectionPlan poseSelection)
         {
             if (!UsesSelectedPoseAutoEntry(group))
             {
@@ -73,7 +76,8 @@ namespace Gokoukotori.PoseTune.Editor
             transition.hasExitTime = false;
             transition.duration = 0f;
             transition.AddCondition(AnimatorConditionMode.Equals, 1, root.Parameter(PoseTuneNames.Mode));
-            transition.AddCondition(AnimatorConditionMode.NotEqual, pose.SelectionValue(root), group.ParameterName);
+            var binding = poseSelection.Find(pose);
+            transition.AddCondition(AnimatorConditionMode.NotEqual, binding.Value, binding.ParameterName);
         }
 
         private static List<ParameterConditionData> AutoContextConditions(PoseTuneRoot root, PoseGroupDefinition group)

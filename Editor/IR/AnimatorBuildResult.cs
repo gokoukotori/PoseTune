@@ -9,6 +9,7 @@ namespace Gokoukotori.PoseTune.Editor
     {
         public AnimatorController TargetController;
         public AnimatorController FxController;
+        public ParameterPlan Parameters;
         public List<Object> GeneratedAssets = new();
 
         public IEnumerable<Object> EnumerateGeneratedAssets()

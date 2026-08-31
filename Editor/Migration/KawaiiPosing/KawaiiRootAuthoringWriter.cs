@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Linq;
 using Gokoukotori.PoseTune;
 using UnityEditor;
@@ -11,12 +10,11 @@ namespace Gokoukotori.PoseTune.Editor
         public static PoseTuneRoot PrepareRoot(
             GameObject avatarRoot,
             KawaiiMigrationOptions options,
-            IReadOnlyList<KawaiiPosingSystemDto> dtos,
             KawaiiMigrationReport report,
             string undoName)
         {
             var root = ResolveTargetRoot(avatarRoot, options, report, undoName);
-            ApplyRootOptions(root, options, dtos, report, undoName);
+            ApplyRootOptions(root, options, report, undoName);
             EnsureGroupsRoot(root, report, undoName);
             EnsureMenu(root, report, undoName);
             KawaiiHeightAuthoringWriter.EnsureHeight(root, options, report, undoName);
@@ -56,7 +54,6 @@ namespace Gokoukotori.PoseTune.Editor
         private static void ApplyRootOptions(
             PoseTuneRoot root,
             KawaiiMigrationOptions options,
-            IReadOnlyList<KawaiiPosingSystemDto> dtos,
             KawaiiMigrationReport report,
             string undoName)
         {
@@ -78,12 +75,6 @@ namespace Gokoukotori.PoseTune.Editor
             root.disableWhenFullBodyTracking = options.disableWhenFullBodyTracking;
             root.enableHeightAdjust = options.footHeightMode != KawaiiFootHeightMode.Off;
             root.advancedSettings.allowFullBodyTracking = !options.disableWhenFullBodyTracking;
-            root.enableIconGeneration = dtos == null || dtos.Any(dto => !dto.IsIconDisabled);
-            if (dtos != null && dtos.Any(dto => dto.IsIconSmall))
-            {
-                root.previewSettings.thumbnailSize = 64;
-            }
-
             if (options.selectionSyncMode == PoseSelectionSyncMode.DirectGroupParameter)
             {
                 report.Warning(PoseTuneDiagnostics.KawaiiSyncedParameterDirectGroupApproximation.Code, "Kawaii syncdParameterValue は保持されますが、現在の同期方式は group Int 直接同期です。圧縮 Pose ID 互換ではありません。", root);
@@ -108,7 +99,6 @@ namespace Gokoukotori.PoseTune.Editor
                 Undo.RecordObject(existing, undoName);
                 ((Behaviour)existing).enabled = true;
                 existing.lyingMenuLayout = LyingMenuLayout.SeparateGroups;
-                existing.generateIcons = root.enableIconGeneration;
                 EditorUtility.SetDirty(existing);
                 KawaiiAuthoringObjectUtility.RecordPrefabModifications(existing);
                 return;
@@ -118,7 +108,6 @@ namespace Gokoukotori.PoseTune.Editor
             var poseMenu = menu.GetComponent<PoseMenu>() ?? Undo.AddComponent<PoseMenu>(menu);
             Undo.RecordObject(poseMenu, undoName);
             poseMenu.lyingMenuLayout = LyingMenuLayout.SeparateGroups;
-            poseMenu.generateIcons = root.enableIconGeneration;
             EditorUtility.SetDirty(poseMenu);
             KawaiiAuthoringObjectUtility.RecordPrefabModifications(poseMenu);
         }

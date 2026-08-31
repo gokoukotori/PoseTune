@@ -10,9 +10,10 @@ namespace Gokoukotori.PoseTune.Editor
             PoseGraph graph,
             PoseGroupDefinition group,
             PoseDefinition pose,
+            PoseSelectionPlan poseSelection,
             bool hasAutoEntry)
         {
-            AddPoseExitTransitions(variants.BaseState, variants.BaseHandoff, graph, group, pose, hasAutoEntry, false);
+            AddPoseExitTransitions(variants.BaseState, variants.BaseHandoff, graph, group, pose, poseSelection, hasAutoEntry, false);
             if (variants.NeedsDesktopLowerBodyLockVariant)
             {
                 AddVrModeInvalidExitTransition(variants.BaseState, variants.BaseHandoff);
@@ -24,18 +25,18 @@ namespace Gokoukotori.PoseTune.Editor
 
             if (variants.FullBodyState != null)
             {
-                AddPoseExitTransitions(variants.FullBodyState, variants.FullBodyHandoff, graph, group, pose, hasAutoEntry, true);
+                AddPoseExitTransitions(variants.FullBodyState, variants.FullBodyHandoff, graph, group, pose, poseSelection, hasAutoEntry, true);
             }
 
             if (variants.DesktopLowerBodyState != null)
             {
-                AddPoseExitTransitions(variants.DesktopLowerBodyState, variants.DesktopLowerBodyHandoff, graph, group, pose, hasAutoEntry, false);
+                AddPoseExitTransitions(variants.DesktopLowerBodyState, variants.DesktopLowerBodyHandoff, graph, group, pose, poseSelection, hasAutoEntry, false);
                 AddDesktopModeInvalidExitTransition(variants.DesktopLowerBodyState, variants.DesktopLowerBodyHandoff);
             }
 
             if (variants.VrState != null)
             {
-                AddPoseExitTransitions(variants.VrState, variants.VrHandoff, graph, group, pose, hasAutoEntry, false);
+                AddPoseExitTransitions(variants.VrState, variants.VrHandoff, graph, group, pose, poseSelection, hasAutoEntry, false);
                 if (variants.NeedsPoseSpaceVrVariant)
                 {
                     AddVrModeInvalidExitTransition(variants.VrState, variants.VrHandoff);
@@ -49,6 +50,7 @@ namespace Gokoukotori.PoseTune.Editor
             PoseGraph graph,
             PoseGroupDefinition group,
             PoseDefinition pose,
+            PoseSelectionPlan poseSelection,
             bool hasAutoEntry,
             bool fullBodyVariant)
         {
@@ -58,7 +60,7 @@ namespace Gokoukotori.PoseTune.Editor
                 toResetByGroup.hasExitTime = false;
                 toResetByGroup.duration = 0f;
                 AddManualModeEntryCondition(toResetByGroup, graph.RootComponent);
-                AddManualGroupDeselectedCondition(toResetByGroup, graph.RootComponent, group, pose);
+                AddManualGroupDeselectedCondition(toResetByGroup, poseSelection, pose);
             }
 
             var toResetByMode = state.AddTransition(cleanup);
@@ -84,7 +86,13 @@ namespace Gokoukotori.PoseTune.Editor
             if (hasAutoEntry)
             {
                 AddAutoContextExitTransitions(state, cleanup, graph.RootComponent, group);
-                AddSelectedPoseAutoExitTransition(state, cleanup, graph.RootComponent, group, pose);
+                AddSelectedPoseAutoExitTransition(
+                    state,
+                    cleanup,
+                    graph.RootComponent,
+                    group,
+                    pose,
+                    poseSelection);
             }
         }
     }

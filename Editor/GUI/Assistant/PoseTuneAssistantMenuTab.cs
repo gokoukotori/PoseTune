@@ -17,17 +17,16 @@ namespace Gokoukotori.PoseTune.Editor
                 menu = go.AddComponent<PoseMenu>();
             }
 
-            if (menu == null)
+            if (menu != null)
             {
-                return;
+                var editor = UnityEditor.Editor.CreateEditor(menu);
+                editor.OnInspectorGUI();
+                UnityEngine.Object.DestroyImmediate(editor);
             }
 
-            var editor = UnityEditor.Editor.CreateEditor(menu);
-            editor.OnInspectorGUI();
-            UnityEngine.Object.DestroyImmediate(editor);
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("生成予定メニュー", EditorStyles.boldLabel);
-            new MenuPlanPreviewRenderer().Draw(root);
+            EditorGUILayout.LabelField("使用予定パラメータ", EditorStyles.boldLabel);
+            new ParameterPlanPreviewRenderer().Draw(root);
         }
     }
 }

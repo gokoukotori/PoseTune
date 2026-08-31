@@ -60,14 +60,16 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
             }
         }
 
-        public static void ValidateSyncedGroupIntCount(PoseGraph graph, ValidationReport report)
+        public static void ValidateSyncedGroupIntCount(
+            PoseTuneValidationContext context,
+            ValidationReport report)
         {
-            var syncedGroupInts = PoseGraphBuildFilter.BuildableGroups(graph).Count(group =>
-                PoseTuneCompilerRules.RequiresPoseSelectionParameter(graph.RootComponent, group) && group.Synced);
+            var graph = context.Graph;
+            var syncedGroupInts = context.Parameters.PoseSelection.Channels.Count(channel => channel.Synced);
             if (syncedGroupInts > MaxSyncedGroupIntCount)
             {
                 report.Warning(PoseTuneDiagnostics.GroupSyncedParameterBudgetExceeded.Code,
-                    $"PoseTune に同期されるグループ Int パラメータが {syncedGroupInts} 個あります。メニューをまとめるか、一部のグループをローカル専用にすることを検討してください。",
+                    $"PoseTune に同期される物理選択 Int パラメータが {syncedGroupInts} 個あります。共有対象を増やすか、一部のグループをローカル専用にすることを検討してください。",
                     graph.RootComponent);
             }
         }

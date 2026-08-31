@@ -24,6 +24,7 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Hashing
             {
                 AppendGroup(builder, group);
             }
+            AppendPoseSelectionPlan(builder, PoseSelectionPlanner.Build(graph));
 
             using var sha = SHA256.Create();
             var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(builder.ToString()));
@@ -86,7 +87,6 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Hashing
             Append(builder, "menu.rootMenuName", menu != null ? menu.rootMenuName : "PoseTune");
             Append(builder, "menu.installMode", menu != null ? menu.installMode.ToString() : MenuInstallMode.AppendToRoot.ToString());
             Append(builder, "menu.autoSplitMenu", menu == null || menu.autoSplitMenu);
-            Append(builder, "menu.generateIcons", menu == null || menu.generateIcons);
             Append(builder, "menu.useSubMenusPerGroup", menu == null || menu.useSubMenusPerGroup);
             Append(builder, "menu.lyingMenuLayout", menu != null ? menu.lyingMenuLayout.ToString() : LyingMenuLayout.CombinedLyingMenu.ToString());
         }
@@ -135,7 +135,6 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Hashing
             {
                 AppendTracking(builder, group.FullBodyTrackingPolicy);
             }
-            Append(builder, "group.suppressIconGeneration", group.SuppressIconGeneration);
             AppendConditions(builder, "group.condition", group.Conditions);
             foreach (var pose in group.Poses)
             {
@@ -157,7 +156,6 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Hashing
             Append(builder, "pose.recenterRootXZToHead", pose.RecenterRootXZToHead);
             Append(builder, "pose.icon", AssetIdentity(pose.Icon));
             Append(builder, "pose.rootOffset", pose.RootOffset);
-            Append(builder, "pose.cameraOffset", pose.CameraOffset);
             Append(builder, "pose.menuValue", pose.MenuValue);
             Append(builder, "pose.sourceSyncedParameterValue", pose.SourceSyncedParameterValue);
             Append(builder, "pose.initial", pose.Initial);
@@ -165,13 +163,31 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Hashing
             Append(builder, "pose.menuOrder", pose.MenuOrder);
             Append(builder, "pose.priority", pose.Priority.ToString());
             Append(builder, "pose.blendMode", pose.BlendMode.ToString());
-            Append(builder, "pose.suppressIconGeneration", pose.SuppressIconGeneration);
             AppendPoseSpace(builder, pose.PoseSpace);
             AppendMotionTime(builder, pose.MotionTime);
             AppendConditions(builder, "pose.condition", pose.Conditions);
             foreach (var branch in pose.ConditionBranches)
             {
                 AppendConditions(builder, "pose.conditionBranch", branch);
+            }
+        }
+
+        private static void AppendPoseSelectionPlan(StringBuilder builder, PoseSelectionPlan plan)
+        {
+            foreach (var channel in plan?.Channels ?? Enumerable.Empty<PoseSelectionChannel>())
+            {
+                Append(builder, "selection.channel.name", channel.ParameterName);
+                Append(builder, "selection.channel.saved", channel.Saved);
+                Append(builder, "selection.channel.synced", channel.Synced);
+                Append(builder, "selection.channel.shared", channel.Shared);
+                Append(builder, "selection.channel.default", channel.DefaultValue);
+                foreach (var binding in channel.Poses)
+                {
+                    Append(builder, "selection.pose.group", binding.Group.Group.Id);
+                    Append(builder, "selection.pose.id", binding.Pose.Id);
+                    Append(builder, "selection.pose.value", binding.Value);
+                    Append(builder, "selection.pose.fallback", binding.Group.FallbackReason.ToString());
+                }
             }
         }
 

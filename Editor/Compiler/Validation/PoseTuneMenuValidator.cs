@@ -11,9 +11,15 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
         public static void Validate(PoseTuneValidationContext context, ValidationReport report)
         {
             var graph = context.Graph;
-            foreach (var group in graph.Groups)
+            foreach (var channel in context.Parameters.PoseSelection.Channels)
             {
-                ValidateMenuValues(graph.RootComponent, group, report);
+                ValidateMenuValues(channel, report);
+            }
+
+            foreach (var group in graph.Groups.Where(group =>
+                         context.Parameters.PoseSelection.Find(group) == null))
+            {
+                ValidateLegacyMenuValues(graph.RootComponent, group, report);
             }
 
             ValidateMenuControlLimit(context, report);
@@ -101,27 +107,58 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
             }
         }
 
-        private static void ValidateMenuValues(PoseTuneRoot root, PoseGroupDefinition group, ValidationReport report)
+        private static void ValidateMenuValues(PoseSelectionChannel channel, ValidationReport report)
         {
-            foreach (var pose in group.Poses)
+            foreach (var binding in channel.Poses)
             {
-                var selectionValue = pose.SelectionValue(root);
+                var selectionValue = binding.Value;
                 if (selectionValue <= 0)
                 {
-                    report.Error(PoseTuneDiagnostics.ClipMenuValueInvalid.Code, "PoseClip の選択値は 0 より大きい必要があります。", pose.Source);
+                    report.Error(PoseTuneDiagnostics.ClipMenuValueInvalid.Code, "PoseClip の選択値は 0 より大きい必要があります。", binding.Pose.Source);
                 }
 
                 if (selectionValue > 255)
                 {
-                    report.Error(PoseTuneDiagnostics.ClipMenuValueInvalid.Code, "PoseClip の選択値は 255 以下である必要があります。", pose.Source);
+                    report.Error(PoseTuneDiagnostics.ClipMenuValueInvalid.Code, "PoseClip の選択値は 255 以下である必要があります。", binding.Pose.Source);
                 }
             }
 
-            foreach (var duplicate in group.Poses.GroupBy(p => p.SelectionValue(root)).Where(g => g.Key > 0 && g.Count() > 1))
+            foreach (var duplicate in channel.Poses.GroupBy(binding => binding.Value)
+                         .Where(group => group.Key > 0 && group.Count() > 1))
+            {
+                foreach (var binding in duplicate)
+                {
+                    report.Error(PoseTuneDiagnostics.ClipMenuValueInvalid.Code, "同じ選択パラメータ内で PoseClip の値が重複しています: " + duplicate.Key, binding.Pose.Source);
+                }
+            }
+        }
+
+        private static void ValidateLegacyMenuValues(
+            PoseTuneRoot root,
+            PoseGroupDefinition group,
+            ValidationReport report)
+        {
+            foreach (var pose in group.Poses)
+            {
+                var selectionValue = pose.SelectionValue(root);
+                if (selectionValue <= 0 || selectionValue > 255)
+                {
+                    report.Error(
+                        PoseTuneDiagnostics.ClipMenuValueInvalid.Code,
+                        "PoseClip の選択値は 1 以上 255 以下である必要があります。",
+                        pose.Source);
+                }
+            }
+
+            foreach (var duplicate in group.Poses.GroupBy(pose => pose.SelectionValue(root))
+                         .Where(values => values.Key > 0 && values.Count() > 1))
             {
                 foreach (var pose in duplicate)
                 {
-                    report.Error(PoseTuneDiagnostics.ClipMenuValueInvalid.Code, "グループ内で PoseClip の選択値が重複しています: " + duplicate.Key, pose.Source);
+                    report.Error(
+                        PoseTuneDiagnostics.ClipMenuValueInvalid.Code,
+                        "グループ内で PoseClip の選択値が重複しています: " + duplicate.Key,
+                        pose.Source);
                 }
             }
         }

@@ -29,15 +29,34 @@ namespace Gokoukotori.PoseTune.Editor
 
         public ValidationReport Validate(PoseGraph graph, AnimatorController controller)
         {
-            return Validate(graph, ControllerView.Create(controller));
+            return Validate(graph, controller, new ParameterAllocator().Allocate(graph));
+        }
+
+        public ValidationReport Validate(
+            PoseGraph graph,
+            AnimatorController controller,
+            ParameterPlan parameters)
+        {
+            return Validate(graph, ControllerView.Create(controller), parameters);
         }
 
         public ValidationReport Validate(PoseGraph graph, VirtualAnimatorController controller)
         {
-            return Validate(graph, ControllerView.Create(controller));
+            return Validate(graph, controller, new ParameterAllocator().Allocate(graph));
         }
 
-        private static ValidationReport Validate(PoseGraph graph, ControllerView controller)
+        public ValidationReport Validate(
+            PoseGraph graph,
+            VirtualAnimatorController controller,
+            ParameterPlan parameters)
+        {
+            return Validate(graph, ControllerView.Create(controller), parameters);
+        }
+
+        private static ValidationReport Validate(
+            PoseGraph graph,
+            ControllerView controller,
+            ParameterPlan parameters)
         {
             var report = new ValidationReport();
             if (graph?.RootComponent == null || controller == null)
@@ -48,6 +67,8 @@ namespace Gokoukotori.PoseTune.Editor
             ValidateTrackingParameters(graph, controller, report);
             ValidateTrackingVoteDefinitions(graph, report);
             ValidateTrackingArbiters(graph, controller, report);
+            var poseSelection = parameters?.PoseSelection ?? PoseSelectionPlanner.Build(graph);
+            ValidatePoseSelectionParameters(poseSelection, controller, graph, report);
 
             foreach (var group in PoseGraphBuildFilter.BuildableGroups(graph).Where(group => group != null))
             {
@@ -59,10 +80,11 @@ namespace Gokoukotori.PoseTune.Editor
                         group,
                         bucket.LayerName,
                         bucket.Poses?.Where(pose => pose != null).ToList() ?? new List<PoseDefinition>(),
+                        poseSelection,
                         report);
                 }
 
-                ValidateAutoPreemption(graph, controller, group, report);
+                ValidateAutoPreemption(graph, controller, group, poseSelection, report);
             }
 
             return report;
@@ -108,6 +130,29 @@ namespace Gokoukotori.PoseTune.Editor
                     report);
             }
 
+        }
+
+        private static void ValidatePoseSelectionParameters(
+            PoseSelectionPlan poseSelection,
+            ControllerView controller,
+            PoseGraph graph,
+            ValidationReport report)
+        {
+            var parameters = controller.parameters ?? Array.Empty<AnimatorControllerParameter>();
+            foreach (var channel in poseSelection.Channels)
+            {
+                var parameter = parameters.FirstOrDefault(candidate =>
+                    candidate != null && candidate.name == channel.ParameterName);
+                if (parameter != null && parameter.type == AnimatorControllerParameterType.Int)
+                {
+                    continue;
+                }
+
+                report.Error(
+                    PoseTuneDiagnostics.AnimatorMissingResetExitTransition.Code,
+                    $"Pose selection parameter がないか型が不正です: {channel.ParameterName} (Int)",
+                    graph.RootComponent);
+            }
         }
 
         private static void ValidateParameter(
@@ -598,6 +643,7 @@ namespace Gokoukotori.PoseTune.Editor
             PoseGroupDefinition group,
             string layerName,
             List<PoseDefinition> poses,
+            PoseSelectionPlan poseSelection,
             ValidationReport report)
         {
             var layer = Layers(controller).FirstOrDefault(candidate => candidate != null && candidate.name == layerName);
@@ -615,7 +661,24 @@ namespace Gokoukotori.PoseTune.Editor
             {
                 ValidatePoseHandoff(graph, group, layer, pose, duplicateStateBaseNames, report);
                 ValidateFbtGuard(graph, layer, pose, duplicateStateBaseNames, report);
+                ValidatePoseSelectionTransitions(
+                    graph,
+                    group,
+                    layer,
+                    pose,
+                    duplicateStateBaseNames,
+                    poseSelection,
+                    report);
             }
+
+            ValidateSharedExclusiveResetDrivers(
+                graph,
+                group,
+                layer,
+                poses,
+                duplicateStateBaseNames,
+                poseSelection,
+                report);
 
             if (ParameterAllocator.RequiresTrackingVote(graph, group))
             {
@@ -657,10 +720,144 @@ namespace Gokoukotori.PoseTune.Editor
             }
         }
 
+        private static void ValidatePoseSelectionTransitions(
+            PoseGraph graph,
+            PoseGroupDefinition group,
+            LayerView layer,
+            PoseDefinition pose,
+            HashSet<string> duplicateStateBaseNames,
+            PoseSelectionPlan poseSelection,
+            ValidationReport report)
+        {
+            if (!PoseTuneCompilerRules.AllowsManualControl(graph.RootComponent, group))
+            {
+                return;
+            }
+
+            var binding = poseSelection.Find(pose);
+            if (binding == null)
+            {
+                report.Error(
+                    PoseTuneDiagnostics.AnimatorMissingResetExitTransition.Code,
+                    "Pose selection binding がありません: " + pose.DisplayName,
+                    pose.Source);
+                return;
+            }
+
+            var modeParameter = graph.RootComponent.Parameter(PoseTuneNames.Mode);
+            var anyTransitions = layer.stateMachine.anyStateTransitions ?? Array.Empty<TransitionView>();
+            foreach (var variant in ExpectedVariants(graph, group, pose, duplicateStateBaseNames))
+            {
+                var hasEntry = anyTransitions.Any(transition =>
+                    transition?.destinationState != null &&
+                    (transition.destinationState.name == variant.StateName ||
+                     transition.destinationState.name == "CommitExclusive_" + variant.StateName) &&
+                    HasCondition(transition, modeParameter, AnimatorConditionMode.Equals, 2f) &&
+                    HasCondition(
+                        transition,
+                        binding.ParameterName,
+                        AnimatorConditionMode.Equals,
+                        binding.Value));
+                if (!hasEntry)
+                {
+                    report.Error(
+                        PoseTuneDiagnostics.AnimatorMissingResetExitTransition.Code,
+                        $"Manual pose entry が共有selection条件を使用していません: {variant.StateName} ({binding.ParameterName}={binding.Value})",
+                        pose.Source);
+                }
+
+                var state = FindState(layer, variant.StateName);
+                var handoff = FindState(layer, variant.HandoffName);
+                var hasExit = state != null && handoff != null &&
+                              (state.transitions ?? Array.Empty<TransitionView>()).Any(transition =>
+                                  transition?.destinationState == handoff &&
+                                  HasCondition(transition, modeParameter, AnimatorConditionMode.Equals, 2f) &&
+                                  HasCondition(
+                                      transition,
+                                      binding.ParameterName,
+                                      AnimatorConditionMode.NotEqual,
+                                      binding.Value));
+                if (!hasExit)
+                {
+                    report.Error(
+                        PoseTuneDiagnostics.AnimatorMissingResetExitTransition.Code,
+                        $"Manual pose exit が共有selection条件を使用していません: {variant.StateName} ({binding.ParameterName}!={binding.Value})",
+                        pose.Source);
+                }
+            }
+        }
+
+        private static void ValidateSharedExclusiveResetDrivers(
+            PoseGraph graph,
+            PoseGroupDefinition group,
+            LayerView layer,
+            IEnumerable<PoseDefinition> poses,
+            HashSet<string> duplicateStateBaseNames,
+            PoseSelectionPlan poseSelection,
+            ValidationReport report)
+        {
+            if (graph.RootComponent.poseSelectionSyncMode != PoseSelectionSyncMode.SharedExclusivePoseId ||
+                !group.Exclusive ||
+                !PoseTuneCompilerRules.AllowsManualControl(graph.RootComponent, group))
+            {
+                return;
+            }
+
+            var resetNames = poseSelection.ExclusiveResetParameterNames(
+                graph.RootComponent,
+                PoseGraphBuildFilter.BuildableGroups(graph),
+                group);
+            var expected = new HashSet<string>(resetNames, StringComparer.Ordinal);
+            var currentParameter = poseSelection.Find(group)?.ParameterName ?? "";
+            foreach (var pose in poses)
+            {
+                foreach (var variant in ExpectedVariants(graph, group, pose, duplicateStateBaseNames))
+                {
+                    var commit = FindState(layer, "CommitExclusive_" + variant.StateName);
+                    if (expected.Count == 0)
+                    {
+                        if (commit != null)
+                        {
+                            report.Error(
+                                PoseTuneDiagnostics.AnimatorMissingResetExitTransition.Code,
+                                "同じ共有バンク内の切替に不要なexclusive commitがあります: " + commit.name,
+                                pose.Source);
+                        }
+
+                        continue;
+                    }
+
+                    var drivers = (commit?.behaviours ?? Array.Empty<StateMachineBehaviour>())
+                        .OfType<VRCAvatarParameterDriver>()
+                        .Where(driver => driver.debugString == "PoseTune Commit Exclusive Pose")
+                        .ToList();
+                    var actual = drivers
+                        .SelectMany(driver => driver.parameters)
+                        .Where(parameter =>
+                            parameter.type == VRC_AvatarParameterDriver.ChangeType.Set &&
+                            Mathf.Approximately(parameter.value, 0f))
+                        .Select(parameter => parameter.name)
+                        .ToHashSet(StringComparer.Ordinal);
+                    if (commit == null ||
+                        drivers.Count != 1 ||
+                        !drivers[0].localOnly ||
+                        actual.Contains(currentParameter) ||
+                        !actual.SetEquals(expected))
+                    {
+                        report.Error(
+                            PoseTuneDiagnostics.AnimatorMissingResetExitTransition.Code,
+                            $"Shared exclusive reset がowner-onlyの物理channel集合と一致しません: {variant.StateName}",
+                            pose.Source);
+                    }
+                }
+            }
+        }
+
         private static void ValidateAutoPreemption(
             PoseGraph graph,
             ControllerView controller,
             PoseGroupDefinition group,
+            PoseSelectionPlan poseSelection,
             ValidationReport report)
         {
             if (!graph.RootComponent.enableAutoContextSwitch ||
@@ -721,9 +918,9 @@ namespace Gokoukotori.PoseTune.Editor
                             HasCondition(transition, modeParameter, AnimatorConditionMode.Equals, 1f) &&
                             HasCondition(
                                 transition,
-                                group.ParameterName,
+                                poseSelection.Find(record.Pose).ParameterName,
                                 AnimatorConditionMode.NotEqual,
-                                record.Pose.SelectionValue(graph.RootComponent))))
+                                poseSelection.Find(record.Pose).Value)))
                     {
                         report.Error(
                             PoseTuneDiagnostics.AnimatorMissingResetExitTransition.Code,

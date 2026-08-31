@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.4.0] - 2026-08-31
+
+### Added
+
+- `PoseSelectionSyncMode.SharedExclusivePoseId`を追加し、同期される手動操作可能なexclusive groupをSaved属性ごとの共有`Int`（既定namespaceでは`PT/PoseId`／`PT/PoseIdTransient`、`0=Off`、`1..255=Pose`）へ集約可能に変更
+- 共有Pose IDについて、対象・同期cost・専用`Int`へのfallback理由を表示する`PT-P010`と、255 poses超過・複数初期Pose・既存Expression Parameter属性競合を検出する`PT-P011`～`PT-P013`を追加
+
+### Removed
+
+- **破壊的変更:** 自動thumbnail／icon生成、PNG保存、cache、生成UI、生成AutoFix、diagnostic `PT-M004`／`PT-M005`／`PT-KB001`を削除
+- **破壊的変更:** `PoseTuneRoot.enableIconGeneration`／`previewSettings`、`PoseMenu.generateIcons`、`PoseGroup.suppressIconGeneration`、`PoseClip.suppressIconGeneration`／`cameraOffset`、`PoseTunePreviewSettings`と生成専用Editor APIを削除
+
+### Changed
+
+- `PoseClip.customIcon`と`PoseGroup.icon`は常にmenu iconとして使用し、Group icon未指定時は初期Pose、次に先頭Poseの手動iconを使用
+- Kawaii BlendTree flatten fallbackのdiagnosticをthumbnail用`PT-KB001`から独立した`PT-KB-FALLBACK`へ変更
+- 旧版で生成済みのicon Assetと既存の`customIcon`参照は削除・変換せず、通常の手動iconとして維持
+- Assistantのメニュータブを生成予定menu previewから実際のvalidation／allocation経路に基づくExpression Parameters previewへ変更し、PoseMenu未配置時も名前・型・同期・local・Saved属性を表示
+- Animator／post-build validationを強化し、生成後Expression Parameterの重複、型、Saved／Synced属性と、共有Pose IDのentry／exit条件およびexclusive reset driverを検証
+- NDMF生成時の重複Auto preemption遷移を統合し、handoff clipを共有、Height生成の未参照中間Assetを破棄して、互換動作を維持したままAnimator生成時間とAsset数を削減
+
 ## [0.3.0] - 2026-08-27
 
 ### Removed

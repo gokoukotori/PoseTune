@@ -6,20 +6,10 @@ namespace Gokoukotori.PoseTune.Editor
 {
     public sealed class PoseTuneIconResolver
     {
-        private readonly PoseTuneIconCacheService iconCache = new();
-
         public void Apply(PoseGraph graph)
         {
-            if (graph == null || graph.RootComponent == null)
+            if (graph == null)
             {
-                return;
-            }
-
-            var canUseIcons = graph.RootComponent.enableIconGeneration &&
-                              (graph.Menu == null || graph.Menu.generateIcons);
-            if (!canUseIcons)
-            {
-                ClearIcons(graph);
                 return;
             }
 
@@ -36,7 +26,7 @@ namespace Gokoukotori.PoseTune.Editor
 
         public Texture2D ResolvePoseIcon(PoseGraph graph, PoseDefinition pose)
         {
-            if (!CanUseIcons(graph) || pose == null || pose.SuppressIconGeneration)
+            if (pose == null)
             {
                 return null;
             }
@@ -51,18 +41,12 @@ namespace Gokoukotori.PoseTune.Editor
                 return pose.Source.customIcon;
             }
 
-            var cached = iconCache.LoadCachedThumbnail(graph, pose);
-            if (cached != null)
-            {
-                return cached;
-            }
-
             return null;
         }
 
         public Texture2D ResolveGroupIcon(PoseGraph graph, PoseGroupDefinition group)
         {
-            if (!CanUseIcons(graph) || group == null || group.SuppressIconGeneration)
+            if (group == null)
             {
                 return null;
             }
@@ -91,24 +75,5 @@ namespace Gokoukotori.PoseTune.Editor
             return firstPose != null ? ResolvePoseIcon(graph, firstPose) : null;
         }
 
-        private static bool CanUseIcons(PoseGraph graph)
-        {
-            return graph?.RootComponent != null &&
-                   graph.RootComponent.enableIconGeneration &&
-                   (graph.Menu == null || graph.Menu.generateIcons);
-        }
-
-        private static void ClearIcons(PoseGraph graph)
-        {
-            foreach (var pose in graph.Poses)
-            {
-                pose.Icon = null;
-            }
-
-            foreach (var group in graph.Groups)
-            {
-                group.Icon = null;
-            }
-        }
     }
 }

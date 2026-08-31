@@ -2,7 +2,6 @@ using System.Linq;
 using Gokoukotori.PoseTune;
 using Gokoukotori.PoseTune.Editor;
 using UnityEditor;
-using UnityEditor.Animations;
 using UnityEngine;
 
 namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
@@ -30,11 +29,6 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
             if (pose.SourceMotion == null && pose.Clip == null)
             {
                 report.Error(PoseTuneDiagnostics.KawaiiSourceMotionAbsent.Code, "Kawaii profile の PoseClip に source motion がありません。", pose.Source);
-            }
-
-            if (pose.SourceMotion is BlendTree && pose.Clip == null)
-            {
-                report.Warning(PoseTuneDiagnostics.KawaiiBlendTreePreviewClipMissing.Code, "BlendTree source motion は保持されます。preview 用 clip がない場合は thumbnail 生成に制限があります。", pose.Source);
             }
 
             if (pose.RecenterRootXZToHead)

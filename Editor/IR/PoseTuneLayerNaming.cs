@@ -12,6 +12,8 @@ namespace Gokoukotori.PoseTune.Editor
         public const string LockFeet = "LockFeet";
         public const string LocomotionLock = "LocomotionLock";
         public const string SupineFlag = "SupineFlag";
+        public const string PoseId = "PoseId";
+        public const string PoseIdTransient = "PoseIdTransient";
         public const string GeneratedRootName = "PoseTune Generated";
 
         public static string ShortId(string id)

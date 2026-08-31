@@ -58,7 +58,7 @@ namespace Gokoukotori.PoseTune.Editor
             }
 
             EditorGUILayout.HelpBox(
-                $"Root Y: {suggestion.SuggestedRootYOffset:0.###}\nCamera: {suggestion.SuggestedCameraOffset}\n{suggestion.Reason}",
+                $"Root Y: {suggestion.SuggestedRootYOffset:0.###}\n{suggestion.Reason}",
                 suggestion.RequiresManualReview ? MessageType.Warning : MessageType.Info);
             using (new EditorGUI.DisabledScope(pose == null))
             {
@@ -68,7 +68,6 @@ namespace Gokoukotori.PoseTune.Editor
                     {
                         Undo.RecordObject(pose, "PoseTune 接地補正を適用");
                         pose.rootOffset = new Vector3(pose.rootOffset.x, suggestion.SuggestedRootYOffset, pose.rootOffset.z);
-                        pose.cameraOffset = suggestion.SuggestedCameraOffset;
                         EditorUtility.SetDirty(pose);
                     }
 

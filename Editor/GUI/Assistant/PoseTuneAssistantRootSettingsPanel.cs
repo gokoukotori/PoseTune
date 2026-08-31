@@ -13,6 +13,12 @@ namespace Gokoukotori.PoseTune.Editor
             root.enableAutoContextSwitch = EditorGUILayout.Toggle("自動コンテキスト切替", root.enableAutoContextSwitch);
             root.defaultMode = (PoseTuneDefaultMode)EditorGUILayout.EnumPopup("既定モード", root.defaultMode);
             root.poseSelectionSyncMode = (PoseSelectionSyncMode)EditorGUILayout.EnumPopup("ポーズ同期方式", root.poseSelectionSyncMode);
+            if (root.poseSelectionSyncMode == PoseSelectionSyncMode.SharedExclusivePoseId)
+            {
+                EditorGUILayout.HelpBox(
+                    "対象exclusiveグループをSaved属性ごとの共有Intへ圧縮します。Auto SelectedPosePerGroup、明示parameter名、非同期、non-exclusiveは専用Intへフォールバックします。",
+                    MessageType.Info);
+            }
             root.poseWriteDefaultsMode = (PoseWriteDefaultsMode)EditorGUILayout.EnumPopup("Write Defaults", root.poseWriteDefaultsMode);
             root.advancedSettings.keepGeneratedObjectsInBuild =
                 EditorGUILayout.Toggle("生成オブジェクトを Build に残す", root.advancedSettings.keepGeneratedObjectsInBuild);

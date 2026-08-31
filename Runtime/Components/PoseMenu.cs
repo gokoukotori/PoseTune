@@ -13,8 +13,6 @@ namespace Gokoukotori.PoseTune
         public string rootMenuName = "PoseTune";
         [InspectorName("メニューを自動分割")]
         public bool autoSplitMenu = true;
-        [InspectorName("アイコンを生成")]
-        public bool generateIcons = true;
         [InspectorName("グループごとにサブメニューを使用")]
         public bool useSubMenusPerGroup = true;
         [InspectorName("寝姿勢メニュー配置")]

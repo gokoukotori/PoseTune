@@ -70,7 +70,6 @@ namespace Gokoukotori.PoseTune.Editor
                 var root = KawaiiRootAuthoringWriter.PrepareRoot(
                     plan.AvatarRoot,
                     plan.Options,
-                    plan.Dtos,
                     report,
                     UndoName);
                 if (root == null)

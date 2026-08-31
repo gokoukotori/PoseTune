@@ -35,8 +35,7 @@ namespace Gokoukotori.PoseTune.Editor
                 TrackingPolicy = tracking.Policy,
                 HasFullBodyTrackingOverride = tracking.HasFullBodyTrackingOverride,
                 FullBodyTrackingPolicy = tracking.FullBodyTrackingPolicy,
-                SuppressIconGeneration = group.suppressIconGeneration,
-                Icon = group.suppressIconGeneration ? null : group.icon,
+                Icon = group.icon,
                 Source = group,
                 Conditions = new List<ParameterConditionData>(group.groupConditions)
             };
@@ -71,8 +70,7 @@ namespace Gokoukotori.PoseTune.Editor
                     HumanoidOrientationOffsetYDegrees = clip.humanoidOrientationOffsetYDegrees,
                     RecenterRootXZToHead = clip.recenterRootXZToHead,
                     RootOffset = clip.rootOffset,
-                    CameraOffset = clip.cameraOffset,
-                    Icon = clip.suppressIconGeneration ? null : clip.customIcon,
+                    Icon = clip.customIcon,
                     MenuValue = value,
                     SourceSyncedParameterValue = clip.sourceSyncedParameterValue,
                     Initial = clip.isInitial,
@@ -81,7 +79,6 @@ namespace Gokoukotori.PoseTune.Editor
                     Group = definition,
                     Priority = clip.priority,
                     BlendMode = clip.blendMode,
-                    SuppressIconGeneration = group.suppressIconGeneration || clip.suppressIconGeneration,
                     PoseSpace = ResolvePoseSpace(group, clip),
                     MotionTime = CopyMotionTime(clip.motionTime),
                     Conditions = conditionBranches.SelectMany(branch => branch).ToList(),

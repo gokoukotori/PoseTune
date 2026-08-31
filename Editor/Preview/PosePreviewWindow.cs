@@ -152,10 +152,6 @@ namespace Gokoukotori.PoseTune.Editor
                         PosePreviewController.ApplyPreview(selectedPose);
                     }
 
-                    if (GUILayout.Button("Generate Thumbnail") && selectedRoot != null)
-                    {
-                        new PoseTuneThumbnailGenerationService().Generate(selectedPose, selectedRoot);
-                    }
                 }
 
                 if (GUILayout.Button("Reset Preview"))

@@ -66,6 +66,16 @@ namespace Gokoukotori.PoseTune.Editor
         public static readonly PoseTuneDiagnosticDescriptor ParameterConditionInvalid = new(
             "PT-P009",
             "条件 parameter の値の型と比較方法を対応する組み合わせに修正してください。");
+        public static readonly PoseTuneDiagnosticDescriptor SharedPoseSelectionSummary = new("PT-P010");
+        public static readonly PoseTuneDiagnosticDescriptor SharedPoseSelectionCapacityExceeded = new(
+            "PT-P011",
+            "共有バンクの PoseClip を255個以下に減らすか、Saved設定を分けてください。");
+        public static readonly PoseTuneDiagnosticDescriptor SharedPoseSelectionInitialConflict = new(
+            "PT-P012",
+            "共有対象全体で初期ポーズを1つ以下にしてください。");
+        public static readonly PoseTuneDiagnosticDescriptor SharedPoseSelectionMetadataConflict = new(
+            "PT-P013",
+            "既存Expression ParameterのSavedまたはSynced設定を共有Pose IDと一致させてください。");
         public static readonly PoseTuneDiagnosticDescriptor UnsupportedTargetLayer = new("PT-A001");
         public static readonly PoseTuneDiagnosticDescriptor AnimatorMissingResetExitTransition = new(
             "PT-A002",
@@ -90,13 +100,10 @@ namespace Gokoukotori.PoseTune.Editor
         public static readonly PoseTuneDiagnosticDescriptor BuildMenuControlMissing = new("PT-B006");
         public static readonly PoseTuneDiagnosticDescriptor BuildPlayableLayerMissing = new("PT-B007");
         public static readonly PoseTuneDiagnosticDescriptor BuildGeneratedAnimatorAssetsSaveFailed = new("PT-B010");
+        public static readonly PoseTuneDiagnosticDescriptor BuildExpressionParameterMetadataMismatch = new("PT-B011");
         public static readonly PoseTuneDiagnosticDescriptor MenuControlLimitExceeded = new("PT-M001");
         public static readonly PoseTuneDiagnosticDescriptor MotionTimeAnimatorStateMenuUnavailable = new("PT-M002");
         public static readonly PoseTuneDiagnosticDescriptor ManualControlMenuMissing = new("PT-M003");
-        public static readonly PoseTuneDiagnosticDescriptor MissingThumbnail = new("PT-M004");
-        public static readonly PoseTuneDiagnosticDescriptor PersistentObjectIdUnavailable = new(
-            "PT-M005",
-            "SceneまたはPrefabを保存してからthumbnailを再生成してください。");
         public static readonly PoseTuneDiagnosticDescriptor DuplicateRootTrackingPolicies = new("PT-T001");
         public static readonly PoseTuneDiagnosticDescriptor TrackingResetDisabledForFbt = new("PT-T002");
         public static readonly PoseTuneDiagnosticDescriptor UnsupportedTrackingPolicyOwner = new(
@@ -133,8 +140,7 @@ namespace Gokoukotori.PoseTune.Editor
         public static readonly PoseTuneDiagnosticDescriptor KawaiiOverrideTrackingNotStrictlyMigrated = new("PT-KO002");
         public static readonly PoseTuneDiagnosticDescriptor KawaiiSourceMotionMissing = new("PT-KC001");
         public static readonly PoseTuneDiagnosticDescriptor KawaiiSourceMotionAbsent = new("PT-KC002");
-        public static readonly PoseTuneDiagnosticDescriptor KawaiiBlendTreePreviewClipMissing = new("PT-KB001");
-        public static readonly PoseTuneDiagnosticDescriptor KawaiiBlendTreeFlattenFallback = KawaiiBlendTreePreviewClipMissing;
+        public static readonly PoseTuneDiagnosticDescriptor KawaiiBlendTreeFlattenFallback = new("PT-KB-FALLBACK");
         public static readonly PoseTuneDiagnosticDescriptor KawaiiRootRecenterRequiresHumanoidVerification = new("PT-KR001");
         public static readonly PoseTuneDiagnosticDescriptor KawaiiRootYawOffsetSourceMotionMissing = new("PT-KR002");
         public static readonly PoseTuneDiagnosticDescriptor KawaiiRootRecenterApproximation = new("PT-KR003");
@@ -183,6 +189,10 @@ namespace Gokoukotori.PoseTune.Editor
             ExpressionParameterCountExceeded,
             ExpressionParameterCountNearLimit,
             ParameterConditionInvalid,
+            SharedPoseSelectionSummary,
+            SharedPoseSelectionCapacityExceeded,
+            SharedPoseSelectionInitialConflict,
+            SharedPoseSelectionMetadataConflict,
             UnsupportedTargetLayer,
             AnimatorMissingResetExitTransition,
             AnimatorTrackingResetStateMissing,
@@ -199,11 +209,10 @@ namespace Gokoukotori.PoseTune.Editor
             BuildMenuControlMissing,
             BuildPlayableLayerMissing,
             BuildGeneratedAnimatorAssetsSaveFailed,
+            BuildExpressionParameterMetadataMismatch,
             MenuControlLimitExceeded,
             MotionTimeAnimatorStateMenuUnavailable,
             ManualControlMenuMissing,
-            MissingThumbnail,
-            PersistentObjectIdUnavailable,
             DuplicateRootTrackingPolicies,
             TrackingResetDisabledForFbt,
             UnsupportedTrackingPolicyOwner,
@@ -236,7 +245,7 @@ namespace Gokoukotori.PoseTune.Editor
             KawaiiOverrideTrackingNotStrictlyMigrated,
             KawaiiSourceMotionMissing,
             KawaiiSourceMotionAbsent,
-            KawaiiBlendTreePreviewClipMissing,
+            KawaiiBlendTreeFlattenFallback,
             KawaiiRootRecenterRequiresHumanoidVerification,
             KawaiiRootYawOffsetSourceMotionMissing,
             KawaiiRootRecenterApproximation,

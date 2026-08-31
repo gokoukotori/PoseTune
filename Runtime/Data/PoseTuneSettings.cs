@@ -4,15 +4,6 @@ using UnityEngine;
 namespace Gokoukotori.PoseTune
 {
     [Serializable]
-    public sealed class PoseTunePreviewSettings
-    {
-        [InspectorName("サムネイルサイズ")]
-        public int thumbnailSize = 256;
-        [InspectorName("背景色")]
-        public Color backgroundColor = new Color(0.08f, 0.08f, 0.08f, 1f);
-    }
-
-    [Serializable]
     public sealed class PoseTuneAdvancedSettings
     {
         [InspectorName("FBT を許可")]

@@ -8,13 +8,12 @@ namespace Gokoukotori.PoseTune.Editor
     public sealed partial class AnimatorCompiler
     {
         private static AnimatorState CreateCleanupState(
-            AnimatorBuildResult result,
             AnimatorControllerLayer layer,
             PoseGraph graph,
             PoseGroupDefinition group,
             PoseDefinition pose,
             string stateName,
-            string clipName,
+            AnimationClip hold,
             Vector3 position,
             bool controlsActionPlayable,
             string activeParameter,
@@ -22,9 +21,7 @@ namespace Gokoukotori.PoseTune.Editor
             TrackingPolicyData outgoingPolicy)
         {
             var state = layer.stateMachine.AddState(stateName, position);
-            var hold = AnimatorLayerFactory.ResetHoldClip(clipName, CriticalStateHoldSeconds);
             state.motion = hold;
-            result.GeneratedAssets.Add(hold);
             if (group.EmitTrackingControl && ParameterAllocator.RequiresTrackingVote(graph, group))
             {
                 ParameterDriverCompiler.SetTrackingVote(state, group, 0);

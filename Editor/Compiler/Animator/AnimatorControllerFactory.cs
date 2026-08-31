@@ -11,7 +11,8 @@ namespace Gokoukotori.PoseTune.Editor
             var result = new AnimatorBuildResult
             {
                 TargetController = CreateController(ControllerName(graph, "Target")),
-                FxController = CreateController(ControllerName(graph, "FX"))
+                FxController = CreateController(ControllerName(graph, "FX")),
+                Parameters = parameters
             };
 
             AddParameters(result.TargetController, parameters, graph);

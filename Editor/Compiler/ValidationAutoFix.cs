@@ -10,8 +10,7 @@ namespace Gokoukotori.PoseTune.Editor
     {
         Safe,
         Reversible,
-        Destructive,
-        RequiresAssetWrite
+        Destructive
     }
 
     internal interface IPoseTuneAutoFix
@@ -33,7 +32,6 @@ namespace Gokoukotori.PoseTune.Editor
             new ClearGroupParameterAutoFix(PoseTuneDiagnostics.GroupParameterConflict.Code, "この group の明示 parameter 名をクリア"),
             new ClearGroupParameterAutoFix(PoseTuneDiagnostics.GroupGeneratedParameterConflict.Code, "この group の明示 parameter 名をクリア"),
             new AlignLoopSettingAutoFix(),
-            new GenerateThumbnailAutoFix(),
             new DisableFbtGuardAutoFix(),
             new AllowFbtAutoFix(),
             new FillKawaiiSourceMotionAutoFix()
@@ -133,26 +131,6 @@ namespace Gokoukotori.PoseTune.Editor
             Undo.RecordObject(pose, Label);
             pose.loop = AnimationUtility.GetAnimationClipSettings(pose.clip).loopTime;
             EditorUtility.SetDirty(pose);
-        }
-    }
-
-    internal sealed class GenerateThumbnailAutoFix : PoseTuneAutoFixBase
-    {
-        public GenerateThumbnailAutoFix() : base(PoseTuneDiagnostics.MissingThumbnail.Code, "missing thumbnail を生成", AutoFixSafety.RequiresAssetWrite)
-        {
-        }
-
-        public override bool CanFix(ValidationIssue issue, PoseGraph graph)
-        {
-            return issue.Context is PoseClip && graph?.RootComponent != null;
-        }
-
-        public override void Apply(ValidationIssue issue, PoseGraph graph)
-        {
-            if (issue.Context is PoseClip pose && graph?.RootComponent != null)
-            {
-                new PoseTuneThumbnailGenerationService().Generate(pose, graph.RootComponent);
-            }
         }
     }
 

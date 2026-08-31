@@ -28,7 +28,6 @@ namespace Gokoukotori.PoseTune.Editor
             group.autoPoseSelectionMode = AutoPoseSelectionMode.SelectedPosePerGroup;
             group.autoContextProfile = AutoContextProfile.KawaiiHeadHeightApproximation;
             group.emitTrackingControl = options.addTrackingPolicy;
-            group.suppressIconGeneration = dto != null && dto.IsIconDisabled;
             report.Created(groupObject, "Group");
 
             if (options.addTrackingPolicy)

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System;
+using System.Linq;
 using Gokoukotori.PoseTune;
 using UnityEditor;
 using UnityEditor.Animations;
@@ -118,22 +119,78 @@ namespace Gokoukotori.PoseTune.Editor
                 };
             }
 
-            var assets = new List<Object>(prepared.GeneratedAssets);
-            var tree = BuildHeightMotion(
-                prepared.Motion,
-                pose.DisplayName,
-                parameterName,
-                lowOffset,
-                midOffset,
-                highOffset,
-                applyMode,
-                height,
-                assets);
-            return new HeightBuildResult
+            var assets = new List<Object>();
+            try
             {
-                Motion = tree,
-                GeneratedAssets = assets
-            };
+                var tree = BuildHeightMotion(
+                    prepared.Motion,
+                    pose.DisplayName,
+                    parameterName,
+                    lowOffset,
+                    midOffset,
+                    highOffset,
+                    applyMode,
+                    height,
+                    assets);
+                ReleaseUnreferencedPreparedAssets(prepared.GeneratedAssets, tree, assets);
+                return new HeightBuildResult
+                {
+                    Motion = tree,
+                    GeneratedAssets = assets
+                };
+            }
+            catch
+            {
+                DestroyGeneratedAssets(assets);
+                DestroyGeneratedAssets(prepared.GeneratedAssets);
+                throw;
+            }
+        }
+
+        private static void ReleaseUnreferencedPreparedAssets(
+            IEnumerable<Object> preparedAssets,
+            Motion finalMotion,
+            ICollection<Object> finalAssets)
+        {
+            var retained = new HashSet<Object>(
+                MotionTreeCloneUtility.EnumerateMotions(finalMotion).Cast<Object>(),
+                ReferenceEqualityComparer<Object>.Instance);
+            foreach (var asset in DistinctGeneratedAssets(preparedAssets).Reverse())
+            {
+                if (retained.Contains(asset))
+                {
+                    if (!EditorUtility.IsPersistent(asset) &&
+                        !finalAssets.Any(candidate => ReferenceEquals(candidate, asset)))
+                    {
+                        finalAssets.Add(asset);
+                    }
+
+                    continue;
+                }
+
+                if (!EditorUtility.IsPersistent(asset))
+                {
+                    Object.DestroyImmediate(asset);
+                }
+            }
+        }
+
+        private static void DestroyGeneratedAssets(IEnumerable<Object> assets)
+        {
+            foreach (var asset in DistinctGeneratedAssets(assets).Reverse())
+            {
+                if (!EditorUtility.IsPersistent(asset))
+                {
+                    Object.DestroyImmediate(asset);
+                }
+            }
+        }
+
+        private static IEnumerable<Object> DistinctGeneratedAssets(IEnumerable<Object> assets)
+        {
+            return (assets ?? Enumerable.Empty<Object>())
+                .Where(asset => asset != null)
+                .Distinct(ReferenceEqualityComparer<Object>.Instance);
         }
 
         private static Motion BuildHeightMotion(

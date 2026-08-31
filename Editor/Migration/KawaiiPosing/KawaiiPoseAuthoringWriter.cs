@@ -59,7 +59,6 @@ namespace Gokoukotori.PoseTune.Editor
                     ? source.Rotate
                     : 0f;
             pose.recenterRootXZToHead = options.rootRecenterMode == KawaiiRootRecenterMode.FirstRootKeyApproximation;
-            pose.suppressIconGeneration = iconsDisabled;
             ApplyMotionTime(pose, source, options, report);
             ApplyPoseSpace(pose, options);
             BakeCompatibilityAtMigration(pose, source, options, report, assetStore);

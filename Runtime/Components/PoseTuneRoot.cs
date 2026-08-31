@@ -26,15 +26,11 @@ namespace Gokoukotori.PoseTune
         public PoseWriteDefaultsMode poseWriteDefaultsMode = PoseWriteDefaultsMode.PoseTuneDefault;
         [InspectorName("高さ調整を有効化")]
         public bool enableHeightAdjust = true;
-        [InspectorName("アイコン生成を有効化")]
-        public bool enableIconGeneration;
         [InspectorName("Quest / 低メモリモード")]
         public bool questLowMemoryMode;
         [InspectorName("FBT 時に無効化")]
         public bool disableWhenFullBodyTracking = true;
 
-        [InspectorName("プレビュー設定")]
-        public PoseTunePreviewSettings previewSettings = new();
         [InspectorName("詳細設定")]
         public PoseTuneAdvancedSettings advancedSettings = new();
         public string Parameter(string localName)

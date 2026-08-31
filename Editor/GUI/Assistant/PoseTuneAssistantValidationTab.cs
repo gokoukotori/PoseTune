@@ -8,7 +8,6 @@ namespace Gokoukotori.PoseTune.Editor
 {
     internal static class PoseTuneAssistantValidationTab
     {
-        private static readonly Dictionary<int, bool> ShowAssetWriteFixes = new();
         private static readonly Dictionary<string, bool> GroupFoldouts = new();
 
         public static void Draw(PoseTuneRoot root)
@@ -24,28 +23,21 @@ namespace Gokoukotori.PoseTune.Editor
             }
 
             var id = root.GetInstanceID();
-            ShowAssetWriteFixes.TryGetValue(id, out var showAssetWriteFixes);
-            using (new EditorGUILayout.HorizontalScope())
+            if (GUILayout.Button("安全な修正を一括適用"))
             {
-                if (GUILayout.Button("安全な修正を一括適用"))
+                foreach (var issue in groups.SelectMany(group => group.Issues).ToArray())
                 {
-                    foreach (var issue in groups.SelectMany(group => group.Issues).ToArray())
+                    foreach (var fix in registry.FindFixes(issue, graph)
+                                 .Where(fix => fix.IncludeInBatch &&
+                                               (fix.Safety == AutoFixSafety.Safe ||
+                                                fix.Safety == AutoFixSafety.Reversible)))
                     {
-                        foreach (var fix in registry.FindFixes(issue, graph)
-                                     .Where(fix => fix.IncludeInBatch &&
-                                                   (fix.Safety == AutoFixSafety.Safe ||
-                                                    fix.Safety == AutoFixSafety.Reversible)))
-                        {
-                            fix.Apply(issue, graph);
-                        }
+                        fix.Apply(issue, graph);
                     }
-
-                    GUI.changed = true;
-                    return;
                 }
 
-                showAssetWriteFixes = EditorGUILayout.ToggleLeft("Asset 書き込みを含む修正も表示", showAssetWriteFixes);
-                ShowAssetWriteFixes[id] = showAssetWriteFixes;
+                GUI.changed = true;
+                return;
             }
 
             foreach (var group in groups)
@@ -74,11 +66,6 @@ namespace Gokoukotori.PoseTune.Editor
 
                 foreach (var fix in CommonFixes(group, registry, graph))
                 {
-                    if (fix.Safety == AutoFixSafety.RequiresAssetWrite && !showAssetWriteFixes)
-                    {
-                        continue;
-                    }
-
                     var prefix = group.TargetCount > 1 ? "Fix all" : "Fix";
                     using (new EditorGUILayout.HorizontalScope())
                     {

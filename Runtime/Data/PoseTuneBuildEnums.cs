@@ -37,9 +37,11 @@ namespace Gokoukotori.PoseTune
     public enum PoseSelectionSyncMode
     {
         [InspectorName("グループパラメータを直接同期")]
-        DirectGroupParameter,
+        DirectGroupParameter = 0,
         [InspectorName("圧縮 Pose ID")]
-        CompressedPoseId
+        CompressedPoseId = 1,
+        [InspectorName("排他グループを共有 Int で同期")]
+        SharedExclusivePoseId = 2
     }
 
     public enum PoseWriteDefaultsMode

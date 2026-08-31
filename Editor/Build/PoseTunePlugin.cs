@@ -80,7 +80,10 @@ namespace Gokoukotori.PoseTune.Editor
 
                 var parameterPlan = new ParameterAllocator().AllocateStrict(graph);
                 var animatorResult = new AnimatorCompiler().Compile(graph, parameterPlan);
-                var animatorValidation = new PoseTuneAnimatorValidator().Validate(graph, animatorResult.TargetController);
+                var animatorValidation = new PoseTuneAnimatorValidator().Validate(
+                    graph,
+                    animatorResult.TargetController,
+                    parameterPlan);
                 MergeReport(graph.Validation, animatorValidation);
                 if (animatorValidation.Issues.Any())
                 {
@@ -93,7 +96,8 @@ namespace Gokoukotori.PoseTune.Editor
                     continue;
                 }
 
-                if (!PoseTuneNdmfAssetSaver.TrySaveGeneratedAnimatorAssets(context, animatorResult))
+                var saved = PoseTuneNdmfAssetSaver.TrySaveGeneratedAnimatorAssets(context, animatorResult);
+                if (!saved)
                 {
                     graph.Validation.Error(
                         PoseTuneDiagnostics.BuildGeneratedAnimatorAssetsSaveFailed.Code,
@@ -187,6 +191,5 @@ namespace Gokoukotori.PoseTune.Editor
         {
             PoseTuneNdmfErrorReporter.Report(report, context);
         }
-
     }
 }

@@ -12,7 +12,6 @@ namespace Gokoukotori.PoseTune.Editor
             var result = AnimatorControllerFactory.CreateBuildResult(graph, parameters);
             CreateActionPoseLayers(result, graph);
             FxAssistCompiler.Compile(result, graph);
-
             return result;
         }
 
@@ -20,12 +19,21 @@ namespace Gokoukotori.PoseTune.Editor
         {
             var controlsActionPlayable = PoseTuneCompilerRules.ControlsActionPlayable(graph.RootComponent);
             const bool tracksGroupActivity = true;
+            UnityEngine.AnimationClip handoffHold = null;
             foreach (var group in PoseGraphBuildFilter.BuildableGroups(graph))
             {
                 foreach (var bucket in PoseTuneLayerNaming.LayerBuckets(group))
                 {
+                    if (handoffHold == null)
+                    {
+                        handoffHold = AnimatorLayerFactory.ResetHoldClip(
+                            "PT_HandoffHold",
+                            CriticalStateHoldSeconds);
+                        result.GeneratedAssets.Add(handoffHold);
+                    }
+
                     CreateActionPoseLayer(result, graph, group, bucket.Poses, bucket.LayerName, bucket.BlendMode,
-                        tracksGroupActivity, PoseTuneNames.GroupActiveParameter(group, bucket.BlendMode));
+                        tracksGroupActivity, PoseTuneNames.GroupActiveParameter(group, bucket.BlendMode), handoffHold);
                 }
 
                 AddHigherPriorityAutoPreemptionTransitions(result.TargetController, graph, group);

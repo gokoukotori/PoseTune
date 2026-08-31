@@ -8,6 +8,7 @@ namespace Gokoukotori.PoseTune.Editor
     {
         public MenuPlan Compile(PoseGraph graph, ParameterPlan parameters)
         {
+            var poseSelection = parameters?.PoseSelection ?? PoseSelectionPlanner.Build(graph);
             var root = new MenuControlPlan
             {
                 Label = graph.Menu != null && !string.IsNullOrWhiteSpace(graph.Menu.rootMenuName) ? graph.Menu.rootMenuName : "PoseTune",
@@ -43,13 +44,13 @@ namespace Gokoukotori.PoseTune.Editor
                         continue;
                     }
 
-                    controls.Add(PoseTuneMenuControlBuilder.BuildGroupMenu(group, autoSplitMenu));
+                    controls.Add(PoseTuneMenuControlBuilder.BuildGroupMenu(group, autoSplitMenu, poseSelection));
                 }
 
                 var lyingGroups = buildableGroups.FindAll(PoseTuneMenuControlBuilder.IsLyingGroup);
                 if (!separateLyingGroups && lyingGroups.Count > 0)
                 {
-                    controls.Add(PoseTuneMenuControlBuilder.BuildLyingMenu(graph, lyingGroups));
+                    controls.Add(PoseTuneMenuControlBuilder.BuildLyingMenu(graph, lyingGroups, poseSelection));
                 }
                 else if (separateLyingGroups && PoseTuneMenuControlBuilder.NeedsSupineToggle(graph))
                 {
@@ -65,7 +66,7 @@ namespace Gokoukotori.PoseTune.Editor
                         continue;
                     }
 
-                    controls.AddRange(PoseTuneMenuControlBuilder.BuildFlatGroupControls(group));
+                    controls.AddRange(PoseTuneMenuControlBuilder.BuildFlatGroupControls(group, poseSelection));
                 }
 
                 if (PoseTuneMenuControlBuilder.NeedsSupineToggle(graph))

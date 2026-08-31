@@ -9,7 +9,6 @@ namespace Gokoukotori.PoseTune.Editor
     {
         public static void Draw(PoseTuneRoot root)
         {
-            root.enableIconGeneration = EditorGUILayout.Toggle("アイコン生成を有効化", root.enableIconGeneration);
             root.questLowMemoryMode = EditorGUILayout.Toggle("Quest / 低メモリモード", root.questLowMemoryMode);
 
             foreach (var pose in root.GetComponentsInChildren<PoseClip>(true).OrderBy(p => p.menuOrder))
@@ -22,13 +21,6 @@ namespace Gokoukotori.PoseTune.Editor
                         PosePreviewController.ApplyPreview(pose);
                     }
 
-                    using (new EditorGUI.DisabledScope(!root.enableIconGeneration || root.questLowMemoryMode))
-                    {
-                        if (GUILayout.Button("アイコン", GUILayout.Width(60)))
-                        {
-                            new PoseTuneThumbnailGenerationService().Generate(pose, root);
-                        }
-                    }
                 }
             }
 

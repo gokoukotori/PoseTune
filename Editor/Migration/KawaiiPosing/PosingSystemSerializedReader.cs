@@ -26,7 +26,6 @@ namespace Gokoukotori.PoseTune.Editor
             dto.GameObjectPath = TransformPath(component.transform);
             dto.SettingName = String(serialized, "settingName");
             dto.IsIconDisabled = Bool(serialized, "isIconDisabled");
-            dto.IsIconSmall = Bool(serialized, "isIconSmall");
             dto.MergeTrackingControl = Bool(serialized, "mergeTrackingControl", true);
             dto.AutoImportAvatarAnimations = Bool(serialized, "autoImportAvatarAnimations");
             dto.ThumbnailPackObject = ObjectRef<Object>(serialized, "thumbnailPackObject");

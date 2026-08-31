@@ -21,7 +21,6 @@ namespace Gokoukotori.PoseTune.Editor
         public string GameObjectPath = "";
         public string SettingName = "";
         public bool IsIconDisabled;
-        public bool IsIconSmall;
         public bool MergeTrackingControl;
         public bool AutoImportAvatarAnimations;
         public Object ThumbnailPackObject;

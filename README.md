@@ -11,7 +11,7 @@ PoseTune は、VRChat アバター向けの非破壊ポーズ authoring / compil
 - Pose menu、height radial、Motion Time radial、option menu の自動生成
 - VRChat Expression Menu の 8 controls 制限に合わせた自動ページ分割
 - 高さ調整、接地補正、avatar scale / EyeHeight 補正
-- Pose preview、thumbnail / icon 生成、Quest / 低メモリモード
+- Pose preview、手動指定のmenu icon、Quest / 低メモリモード
 - KawaiiPosing からの移行、Gorone System EX との併用 guard
 - build 前後の validation と safe auto-fix
 
@@ -53,10 +53,9 @@ PoseTune 全体のルートです。原則として 1 avatar につき 1 つ配�
 - `targetLayer`: `Action` または `Base`
 - `enableAutoContextSwitch`: 自動コンテキスト切替
 - `defaultMode`: `Off` / `Auto` / `Manual`
-- `poseSelectionSyncMode`: `DirectGroupParameter` / `CompressedPoseId`
+- `poseSelectionSyncMode`: `DirectGroupParameter` / `CompressedPoseId` / `SharedExclusivePoseId`
 - `poseWriteDefaultsMode`: 生成 Animator の Write Defaults 方針
 - `enableHeightAdjust`: 高さ調整
-- `enableIconGeneration`: thumbnail / icon 生成
 - `questLowMemoryMode`: Quest / 低メモリ向け設定
 - `disableWhenFullBodyTracking`: FBT 時に PoseTune を無効化
 
@@ -71,6 +70,7 @@ PoseTune 全体のルートです。原則として 1 avatar につき 1 つ配�
 - `activationMode`: `Manual` / `Auto` / `ManualAndAuto`
 - `autoPoseSelectionMode`: 自動時の pose 選択方式
 - `emitTrackingControl`: group 全体の tracking control
+- `icon`: group menuへ表示する手動指定icon
 - `groupConditions`: group 共通条件
 - `poseSpace`: Temporary Pose Space の制御
 
@@ -83,16 +83,23 @@ PoseTune 全体のルートです。原則として 1 avatar につき 1 つ配�
 - `clip` / `sourceMotion`: 入力 Motion
 - `compatibilityProfile`: KawaiiPosing などの互換プロファイル
 - `adjustmentClip` / `adjustmentApplyMode`: アバター個別補正
-- `customIcon`: menu icon
+- `customIcon`: Pose menuへ表示する手動指定icon
 - `rootOffset`, `rootYawOffsetDegrees`, `humanoidOrientationOffsetYDegrees`: 姿勢補正
-- `cameraOffset`: thumbnail framing 用補正
 - `isInitial`, `loop`, `explicitMenuValue`, `priority`, `blendMode`
 - `motionTime`: state time / custom float / height parameter 連動
 - `clipConditions`: pose 個別条件
 
 ### PoseMenu
 
-Expression Menu の install 位置、表示名、自動ページ分割、group submenu、icon 利用、Prone / Supine 配置を設定します。
+Expression Menu の install 位置、表示名、自動ページ分割、group submenu、Prone / Supine 配置を設定します。
+
+PoseTuneはiconを自動生成しません。`PoseClip.customIcon`または`PoseGroup.icon`へTextureを指定すると、Expression Menuへそのまま出力します。Group iconが未指定の場合は初期Pose、次に先頭Poseの手動iconを使用します。以前に生成されたPNGも、`customIcon`から参照されている限り通常の手動iconとして維持されます。
+
+### 排他グループの共有 Pose ID
+
+`PoseTuneRoot.poseSelectionSyncMode`を`SharedExclusivePoseId`にすると、同期される手動操作可能なexclusiveグループをSaved属性ごとの共有`Int`へまとめます。既定namespaceではSavedバンクが`PT/PoseId`、非Savedバンクが`PT/PoseIdTransient`です。各バンクは`0=Off`、`1..255=Pose`を使用し、同じSaved属性の同期コストをグループ数にかかわらず8 bitsにします。
+
+non-exclusive、`synced=false`、明示`parameterName`、Autoの`SelectedPosePerGroup`は既存動作を保つため専用`Int`へフォールバックします。「オフ」は同じSavedバンク全体を`0`にします。IDは`menuOrder`と構造IDからビルドごとに自動採番されるため、Hierarchyや順序を変更すると、保存済み値が別のPoseを指す可能性があります。1バンク255 posesを超える構成と、共有対象全体の複数初期PoseはValidation errorになります。
 
 ### PoseTrackingPolicy
 
@@ -118,24 +125,18 @@ Gorone System EX marker と Int 型の `VRCSupine` parameter を検出し、対�
 | メニュー | PoseMenu 設定と生成予定 menu preview |
 | トラッキング | FBT 設定と effective tracking policy |
 | 高さ | HeightAdjust 設定、接地補正候補計算、Pose への適用 |
-| プレビュー | Pose preview、thumbnail / icon 生成、preview reset |
+| プレビュー | Pose preview、preview reset |
 | 検証 | validation report、safe auto-fix、parameter clear |
 
-## 識別子と生成Asset
+## 識別子とKawaii生成Asset
 
-Editorで永続化するthumbnail、icon、Kawaii migration assetは、保存済みSceneまたはPrefab上のComponentの`GlobalObjectId`を使用します。path用の識別子は`GlobalObjectId.ToString()`をSHA-256でhash化した先頭16桁です。Hierarchy上でGameObjectを複製した場合や、同じGameObjectに同型Componentが複数ある場合もComponentごとに異なる識別子になります。
+Kawaii migration assetは、保存済みSceneまたはPrefab上のComponentの`GlobalObjectId`を使用します。path用の識別子は`GlobalObjectId.ToString()`をSHA-256でhash化した先頭16桁です。Hierarchy上でGameObjectを複製した場合や、同じGameObjectに同型Componentが複数ある場合もComponentごとに異なる識別子になります。
 
 NDMF build cloneでは`GlobalObjectId`を使わず、Component型、Avatar相対のsibling-index path、同じGameObject上の同型Component indexから決定的な構造IDを生成します。Root / Group / Pose、Animator名、内部parameter、graph hash、generated markerの照合はこの構造IDを共有します。
 
-未保存Sceneでは永続IDを確定できないため、thumbnail生成とKawaii migrationはAssetやauthoring構成を変更する前に停止します。通常のInspector編集とNDMF buildは構造IDで継続できます。Scene内の移動やPrefab構造の変更により`GlobalObjectId`や構造IDが変わる場合があります。
+未保存Sceneでは永続IDを確定できないため、Kawaii migrationはAssetやauthoring構成を変更する前に停止します。通常のInspector編集とNDMF buildは構造IDで継続できます。Scene内の移動やPrefab構造の変更により`GlobalObjectId`や構造IDが変わる場合があります。
 
-生成iconは次の場所に保存されます。
-
-```text
-Assets/PoseTuneGenerated/<AvatarName>/<RootGlobalObjectIdHash>/Icons
-```
-
-既存の生成AssetをPoseTuneが自動削除または変換することはありません。
+旧版が作成したicon AssetをPoseTuneが自動削除または変換することはありません。
 
 ## Build時の動作
 
@@ -160,9 +161,9 @@ manifestにはAvatar、Root、Pose、移行元Componentの`GlobalObjectId`、作
 
 ## Validation
 
-Assistantの**検証**タブとNDMF buildで、Root配置、Humanoid Animator、空group、Motion欠落、curve、parameter衝突・budget、menu上限、tracking policy、FBT、Gorone System EX、Kawaii互換、thumbnail、generated outputを検証します。
+Assistantの**検証**タブとNDMF buildで、Root配置、Humanoid Animator、空group、Motion欠落、curve、parameter衝突・budget、menu上限、tracking policy、FBT、Gorone System EX、Kawaii互換、generated outputを検証します。
 
-一部のissueにはsafe auto-fixがあります。Asset書き込みを伴うfixは明示表示をONにしてから個別に適用してください。
+一部のissueにはsafe auto-fixがあります。
 
 ## 開発者向け構成
 
@@ -175,7 +176,7 @@ Editor/
   Compiler/        Graph、parameter、menu、animator、validation
   GUI/             Inspector、Assistant、preview UI
   Migration/       KawaiiPosing migration
-  Preview/         Pose preview、thumbnail generation
+  Preview/         Pose preview
 Tests/Editor/      EditMode regression tests
 ```
 
@@ -184,7 +185,7 @@ Tests/Editor/      EditMode regression tests
 - buildされない: `PoseTuneRoot`が`VRCAvatarDescriptor`配下にあり、Avatar内に1つだけ存在することを確認します。
 - menuにPoseが出ない: `includeInBuild`、`activationMode`、Motion設定を確認します。
 - parameter conflict: 明示parameter名、Motion Time parameter、既存Expression Parametersを確認します。
-- iconが出ない: Scene / Prefabを保存し、`enableIconGeneration`、`generateIcons`、suppress設定、低メモリモードを確認します。
+- 手動iconが出ない: `PoseClip.customIcon`または`PoseGroup.icon`のTexture参照と、PoseMenuのinstall設定を確認します。
 - FBTで意図しない動作になる: `disableWhenFullBodyTracking`、Root / Group policy、FBT override、TrackingType条件を確認します。
 
 ## ライセンス

@@ -21,7 +21,6 @@ namespace Gokoukotori.PoseTune.Editor
             new("rootYawOffsetDegrees", "Root Yaw オフセット"),
             new("humanoidOrientationOffsetYDegrees", "Humanoid Orientation Offset Y"),
             new("recenterRootXZToHead", "Root XZ を first key 基準で再中心化"),
-            new("cameraOffset", "カメラオフセット", "サムネイル生成時のカメラ位置補正です。VRChat 実行時の視点位置は変更しません。"),
             new("isInitial", "初期ポーズ"),
             new("loop", "ループ"),
             new("explicitMenuValue", "明示メニュー値"),
@@ -31,7 +30,6 @@ namespace Gokoukotori.PoseTune.Editor
             new("blendMode", "ブレンドモード", "Animator layer の Override / Additive 分割に使います。"),
             new("motionTime", "モーション時間"),
             new("poseSpace", "ポーズ空間"),
-            new("suppressIconGeneration", "アイコン生成を抑止"),
             new("clipConditions", "クリップ条件")
         };
 

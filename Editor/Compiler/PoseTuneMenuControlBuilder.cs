@@ -117,7 +117,10 @@ namespace Gokoukotori.PoseTune.Editor
             return group.Kind == PoseGroupKind.Prone || group.Kind == PoseGroupKind.Supine;
         }
 
-        public static MenuControlPlan BuildLyingMenu(PoseGraph graph, List<PoseGroupDefinition> groups)
+        public static MenuControlPlan BuildLyingMenu(
+            PoseGraph graph,
+            List<PoseGroupDefinition> groups,
+            PoseSelectionPlan poseSelection)
         {
             var menu = new MenuControlPlan
             {
@@ -132,7 +135,10 @@ namespace Gokoukotori.PoseTune.Editor
                     continue;
                 }
 
-                controls.Add(BuildGroupMenu(group, graph.Menu == null || graph.Menu.autoSplitMenu));
+                controls.Add(BuildGroupMenu(
+                    group,
+                    graph.Menu == null || graph.Menu.autoSplitMenu,
+                    poseSelection));
             }
 
             if (NeedsSupineToggle(graph))
@@ -169,15 +175,18 @@ namespace Gokoukotori.PoseTune.Editor
             return mode;
         }
 
-        public static List<MenuControlPlan> BuildFlatGroupControls(PoseGroupDefinition group)
+        public static List<MenuControlPlan> BuildFlatGroupControls(
+            PoseGroupDefinition group,
+            PoseSelectionPlan poseSelection)
         {
+            var groupBinding = poseSelection?.Find(group);
             var controls = new List<MenuControlPlan>
             {
                 new MenuControlPlan
                 {
                     Label = group.DisplayName + " オフ",
                     Type = PoseTuneMenuControlType.Toggle,
-                    Parameter = group.ParameterName,
+                    Parameter = groupBinding?.ParameterName ?? group.ParameterName,
                     Value = 0,
                     Icon = group.Icon
                 }
@@ -188,8 +197,8 @@ namespace Gokoukotori.PoseTune.Editor
                 {
                     Label = pose.DisplayName,
                     Type = PoseTuneMenuControlType.Toggle,
-                    Parameter = group.ParameterName,
-                    Value = SelectionValue(group, pose),
+                    Parameter = poseSelection?.Find(pose)?.ParameterName ?? group.ParameterName,
+                    Value = poseSelection?.Find(pose)?.Value ?? SelectionValue(group, pose),
                     Icon = pose.Icon
                 });
             }
@@ -197,8 +206,12 @@ namespace Gokoukotori.PoseTune.Editor
             return controls;
         }
 
-        public static MenuControlPlan BuildGroupMenu(PoseGroupDefinition group, bool split)
+        public static MenuControlPlan BuildGroupMenu(
+            PoseGroupDefinition group,
+            bool split,
+            PoseSelectionPlan poseSelection)
         {
+            var groupBinding = poseSelection?.Find(group);
             var menu = new MenuControlPlan
             {
                 Label = group.DisplayName,
@@ -212,7 +225,7 @@ namespace Gokoukotori.PoseTune.Editor
                 {
                     Label = "オフ",
                     Type = PoseTuneMenuControlType.Toggle,
-                    Parameter = group.ParameterName,
+                    Parameter = groupBinding?.ParameterName ?? group.ParameterName,
                     Value = 0
                 }
             };
@@ -222,8 +235,8 @@ namespace Gokoukotori.PoseTune.Editor
                 {
                     Label = pose.DisplayName,
                     Type = PoseTuneMenuControlType.Toggle,
-                    Parameter = group.ParameterName,
-                    Value = SelectionValue(group, pose),
+                    Parameter = poseSelection?.Find(pose)?.ParameterName ?? group.ParameterName,
+                    Value = poseSelection?.Find(pose)?.Value ?? SelectionValue(group, pose),
                     Icon = pose.Icon
                 });
             }

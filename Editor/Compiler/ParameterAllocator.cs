@@ -10,6 +10,8 @@ namespace Gokoukotori.PoseTune.Editor
         {
             var builder = new ParameterPlanBuilder();
             var buildableGroups = PoseGraphBuildFilter.BuildableGroups(graph).ToList();
+            var poseSelection = PoseSelectionPlanner.Build(graph);
+            builder.Build().PoseSelection = poseSelection;
             builder.AddInt(graph.RootComponent.Parameter(PoseTuneNames.Mode))
                 .Saved()
                 .DefaultValue((float)graph.RootComponent.defaultMode);
@@ -62,16 +64,16 @@ namespace Gokoukotori.PoseTune.Editor
                     .LocalOnly();
             }
 
+            foreach (var channel in poseSelection.Channels)
+            {
+                builder.AddInt(channel.ParameterName)
+                    .Saved(channel.Saved)
+                    .LocalOnly(!channel.Synced)
+                    .DefaultValue(channel.DefaultValue);
+            }
+
             foreach (var group in buildableGroups)
             {
-                if (PoseTuneCompilerRules.RequiresPoseSelectionParameter(graph.RootComponent, group))
-                {
-                    builder.AddInt(group.ParameterName)
-                        .Saved(group.Saved)
-                        .LocalOnly(!group.Synced)
-                        .DefaultValue(group.Poses.FirstOrDefault(p => p.Initial)?.SelectionValue(graph.RootComponent) ?? 0);
-                }
-
                 if (group.Poses.Count > 0)
                 {
                     foreach (var parameterName in PoseTuneLayerNaming.GroupActiveParameters(group))
@@ -82,7 +84,7 @@ namespace Gokoukotori.PoseTune.Editor
                     }
                 }
 
-                if (NeedsManualCommitGuard(graph, buildableGroups, group))
+                if (NeedsManualCommitGuard(graph, buildableGroups, group, poseSelection))
                 {
                     foreach (var pose in group.Poses)
                     {
@@ -179,15 +181,16 @@ namespace Gokoukotori.PoseTune.Editor
         private static bool NeedsManualCommitGuard(
             PoseGraph graph,
             System.Collections.Generic.IEnumerable<PoseGroupDefinition> buildableGroups,
-            PoseGroupDefinition group)
+            PoseGroupDefinition group,
+            PoseSelectionPlan poseSelection)
         {
             return group != null &&
                    group.Exclusive &&
                    PoseTuneCompilerRules.AllowsManualControl(graph.RootComponent, group) &&
-                   buildableGroups.Any(other =>
-                       other != group &&
-                       other.Exclusive &&
-                       PoseTuneCompilerRules.AllowsManualControl(graph.RootComponent, other));
+                   poseSelection.ExclusiveResetParameterNames(
+                       graph.RootComponent,
+                       buildableGroups,
+                       group).Count > 0;
         }
 
         internal static bool NeedsGeneratedHeightParameter(PoseGraph graph)
