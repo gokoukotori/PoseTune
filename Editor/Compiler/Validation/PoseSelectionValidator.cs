@@ -26,12 +26,17 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
                 graph.RootComponent);
 
             ReportFallbacks(plan, graph, report);
-            foreach (var channel in plan.Channels.Where(channel => channel.Shared && channel.Poses.Count > 255))
+            foreach (var channel in plan.Channels.Where(channel =>
+                         channel.Shared && channel.Poses.Count > PoseSelectionPlanner.SharedBankCapacity))
             {
+                var group = channel.Groups.FirstOrDefault(candidate =>
+                                candidate.Poses.Count > PoseSelectionPlanner.SharedBankCapacity) ??
+                            channel.Groups.FirstOrDefault();
+                var groupLabel = group != null ? group.DisplayName : channel.ParameterName;
                 report.Error(
                     PoseTuneDiagnostics.SharedPoseSelectionCapacityExceeded.Code,
-                    $"共有 Pose ID {channel.ParameterName} に {channel.Poses.Count} poses があり、Intで表現できる255 posesを超えています。",
-                    graph.RootComponent);
+                    $"共有対象の PoseGroup {groupLabel} に {channel.Poses.Count} poses があり、単一Intで表現できる{PoseSelectionPlanner.SharedBankCapacity} posesを超えています。",
+                    (UnityEngine.Object)group?.Source ?? graph.RootComponent);
             }
 
             var initialPoses = plan.PoseBindings

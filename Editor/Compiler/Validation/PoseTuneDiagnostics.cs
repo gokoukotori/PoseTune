@@ -69,7 +69,7 @@ namespace Gokoukotori.PoseTune.Editor
         public static readonly PoseTuneDiagnosticDescriptor SharedPoseSelectionSummary = new("PT-P010");
         public static readonly PoseTuneDiagnosticDescriptor SharedPoseSelectionCapacityExceeded = new(
             "PT-P011",
-            "共有バンクの PoseClip を255個以下に減らすか、Saved設定を分けてください。");
+            "単一の PoseGroup に含まれる共有対象 PoseClip を255個以下に分けてください。");
         public static readonly PoseTuneDiagnosticDescriptor SharedPoseSelectionInitialConflict = new(
             "PT-P012",
             "共有対象全体で初期ポーズを1つ以下にしてください。");

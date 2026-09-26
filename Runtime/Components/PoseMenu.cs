@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Gokoukotori.PoseTune
 {
-    [AddComponentMenu("PoseTune/Pose Menu")]
+    [AddComponentMenu("Gokoukotori/PoseTune/Pose Menu")]
     public sealed class PoseMenu : MonoBehaviour, INDMFEditorOnly
     {
         [InspectorName("インストールモード")]

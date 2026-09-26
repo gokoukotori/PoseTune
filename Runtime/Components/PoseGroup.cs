@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace Gokoukotori.PoseTune
 {
-    [AddComponentMenu("PoseTune/Pose Group")]
+    [AddComponentMenu("Gokoukotori/PoseTune/Pose Group")]
     public sealed class PoseGroup : MonoBehaviour, INDMFEditorOnly
     {
         [InspectorName("種類")]

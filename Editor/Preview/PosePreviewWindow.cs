@@ -62,7 +62,7 @@ namespace Gokoukotori.PoseTune.Editor
         private bool resetPreviewOnClose = true;
         private Vector2 scroll;
 
-        [MenuItem("Tools/PoseTune/Pose Preview Window")]
+        [MenuItem("Tools/Gokoukotori/PoseTune/Pose Preview Window")]
         public static void Open()
         {
             GetWindow<PosePreviewWindow>("Pose Preview");

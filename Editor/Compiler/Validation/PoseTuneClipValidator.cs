@@ -12,7 +12,44 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
         private const float PositionTolerance = 0.00001f;
         private const float RotationToleranceDegrees = 0.01f;
 
-        public static void Validate(PoseDefinition pose, ValidationReport report)
+        // Scoped to one validation pass: clips can change between NDMF phases or editor edits.
+        internal sealed class AnalysisCache
+        {
+            private readonly Dictionary<AnimationClip, ClipAnalysis> clips = new();
+
+            internal ClipAnalysis Get(AnimationClip clip)
+            {
+                if (!clips.TryGetValue(clip, out var analysis))
+                {
+                    analysis = new ClipAnalysis(clip);
+                    clips.Add(clip, analysis);
+                }
+
+                return analysis;
+            }
+        }
+
+        internal sealed class ClipAnalysis
+        {
+            internal readonly bool HasTimeVariation;
+            internal readonly bool HasNonIdentityValue;
+            internal readonly bool HasUnsupportedCurves;
+            internal readonly bool LoopTime;
+
+            internal ClipAnalysis(AnimationClip clip)
+            {
+                var bindings = AnimationUtility.GetCurveBindings(clip);
+                var rootCurves = CollectRootCurveSets(clip, bindings);
+                HasTimeVariation = rootCurves.Any(set => set.HasTimeVariation());
+                HasNonIdentityValue = !HasTimeVariation && rootCurves.Any(set => set.HasNonIdentityValue());
+                HasUnsupportedCurves = bindings.Any(binding => !PoseTuneCurveBindingPolicy.IsAllowedFloatCurve(binding)) ||
+                    AnimationUtility.GetObjectReferenceCurveBindings(clip)
+                        .Any(binding => !PoseTuneCurveBindingPolicy.IsAllowedObjectReferenceCurve(binding));
+                LoopTime = AnimationUtility.GetAnimationClipSettings(clip).loopTime;
+            }
+        }
+
+        public static void Validate(PoseDefinition pose, ValidationReport report, AnalysisCache cache = null)
         {
             if (pose.Clip.empty)
             {
@@ -25,21 +62,20 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
                 report.Warning(PoseTuneDiagnostics.ClipZeroLength.Code, "Motion Time を使用していますが AnimationClip の長さが 0 です。", pose.Source);
             }
 
-            var floatBindings = AnimationUtility.GetCurveBindings(pose.Clip);
-            var rootCurveSets = CollectRootCurveSets(pose.Clip, floatBindings);
-            if (rootCurveSets.Any(set => set.HasTimeVariation()))
+            var analysis = cache != null ? cache.Get(pose.Clip) : new ClipAnalysis(pose.Clip);
+            if (analysis.HasTimeVariation)
             {
                 report.Warning(PoseTuneDiagnostics.ClipRootTransformCurves.Code,
                     "AnimationClip に時間変化する root position / rotation curve が含まれています。", pose.Source);
             }
             else if (pose.CompatibilityProfile != PoseSourceCompatibilityProfile.KawaiiPosing &&
-                     rootCurveSets.Any(set => set.HasNonIdentityValue()))
+                     analysis.HasNonIdentityValue)
             {
                 report.Warning(PoseTuneDiagnostics.ClipRootTransformCurves.Code,
                     "AnimationClip に静的な root position / rotation offset が含まれています。", pose.Source);
             }
 
-            if (PoseTuneCurveBindingPolicy.HasUnsupportedCurves(pose.Clip))
+            if (analysis.HasUnsupportedCurves)
             {
                 report.Warning(
                     PoseTuneDiagnostics.ClipUnsupportedCurves.Code,
@@ -47,20 +83,19 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
                     pose.Source);
             }
 
-            var settings = AnimationUtility.GetAnimationClipSettings(pose.Clip);
-            if (settings.loopTime != pose.Loop)
+            if (analysis.LoopTime != pose.Loop)
             {
                 report.Warning(PoseTuneDiagnostics.ClipLoopMismatch.Code, "PoseClip のループ設定が AnimationClip のループ設定と異なります。", pose.Source);
             }
         }
 
-        public static void ValidateMotion(PoseDefinition pose, ValidationReport report)
+        public static void ValidateMotion(PoseDefinition pose, ValidationReport report, AnalysisCache cache = null)
         {
             if (pose?.SourceMotion is BlendTree tree)
             {
                 foreach (var clip in MotionTreeCloneUtility.EnumerateMotions(tree).OfType<AnimationClip>())
                 {
-                    Validate(ClipPose(pose, clip), report);
+                    Validate(ClipPose(pose, clip), report, cache);
                 }
 
                 return;
@@ -68,7 +103,7 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
 
             if (pose?.Clip != null)
             {
-                Validate(pose, report);
+                Validate(pose, report, cache);
             }
         }
 

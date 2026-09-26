@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Gokoukotori.PoseTune
 {
-    [AddComponentMenu("PoseTune/Pose Tracking Policy")]
+    [AddComponentMenu("Gokoukotori/PoseTune/Pose Tracking Policy")]
     [DisallowMultipleComponent]
     public sealed class PoseTrackingPolicy : MonoBehaviour, INDMFEditorOnly
     {

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Gokoukotori.PoseTune;
 
@@ -15,6 +16,17 @@ namespace Gokoukotori.PoseTune.Editor
         public const string PoseId = "PoseId";
         public const string PoseIdTransient = "PoseIdTransient";
         public const string GeneratedRootName = "PoseTune Generated";
+
+        public static string PoseIdParameter(PoseTuneRoot root, bool saved, int bankNumber)
+        {
+            var localName = saved ? PoseId : PoseIdTransient;
+            if (bankNumber > 1)
+            {
+                localName += bankNumber.ToString(CultureInfo.InvariantCulture);
+            }
+
+            return root.Parameter(localName);
+        }
 
         public static string ShortId(string id)
         {

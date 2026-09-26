@@ -7,6 +7,8 @@ namespace Gokoukotori.PoseTune.Editor
 {
     internal static class PoseSelectionPlanner
     {
+        internal const int SharedBankCapacity = 255;
+
         public static PoseSelectionPlan Build(PoseGraph graph)
         {
             var plan = new PoseSelectionPlan();
@@ -44,8 +46,8 @@ namespace Gokoukotori.PoseTune.Editor
                 }
             }
 
-            AddSharedBank(plan, root, shared.Where(group => group.Saved), saved: true);
-            AddSharedBank(plan, root, shared.Where(group => !group.Saved), saved: false);
+            AddSharedBanks(plan, root, shared.Where(group => group.Saved), saved: true);
+            AddSharedBanks(plan, root, shared.Where(group => !group.Saved), saved: false);
             foreach (var item in dedicated)
             {
                 AddDedicated(plan, root, item.Group, item.Reason);
@@ -54,7 +56,7 @@ namespace Gokoukotori.PoseTune.Editor
             return plan;
         }
 
-        private static void AddSharedBank(
+        private static void AddSharedBanks(
             PoseSelectionPlan plan,
             PoseTuneRoot root,
             IEnumerable<PoseGroupDefinition> source,
@@ -69,18 +71,27 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
-            var channel = new PoseSelectionChannel
-            {
-                ParameterName = root.Parameter(saved ? PoseTuneNames.PoseId : PoseTuneNames.PoseIdTransient),
-                Saved = saved,
-                Synced = true,
-                Shared = true
-            };
-            plan.Channels.Add(channel);
-
+            var channels = new List<PoseSelectionChannel>();
+            PoseSelectionChannel channel = null;
             var nextValue = 1;
             foreach (var group in groups)
             {
+                if (channel == null ||
+                    (channel.Poses.Count > 0 &&
+                     channel.Poses.Count + group.Poses.Count > SharedBankCapacity))
+                {
+                    channel = new PoseSelectionChannel
+                    {
+                        ParameterName = PoseTuneNames.PoseIdParameter(root, saved, channels.Count + 1),
+                        Saved = saved,
+                        Synced = true,
+                        Shared = true
+                    };
+                    channels.Add(channel);
+                    plan.Channels.Add(channel);
+                    nextValue = 1;
+                }
+
                 var groupBinding = plan.AddGroup(channel, group, PoseSelectionFallbackReason.None);
                 foreach (var pose in group.Poses
                              .OrderBy(pose => pose.MenuOrder)
@@ -90,7 +101,11 @@ namespace Gokoukotori.PoseTune.Editor
                 }
             }
 
-            channel.DefaultValue = channel.Poses.FirstOrDefault(binding => binding.Pose.Initial)?.Value ?? 0;
+            foreach (var sharedChannel in channels)
+            {
+                sharedChannel.DefaultValue =
+                    sharedChannel.Poses.FirstOrDefault(binding => binding.Pose.Initial)?.Value ?? 0;
+            }
         }
 
         private static void AddDedicated(

@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Gokoukotori.PoseTune
 {
-    [AddComponentMenu("PoseTune/Pose Tune Root")]
+    [AddComponentMenu("Gokoukotori/PoseTune/Pose Tune Root")]
     public sealed class PoseTuneRoot : MonoBehaviour, INDMFEditorOnly
     {
         [InspectorName("表示名")]

@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Gokoukotori.PoseTune
 {
-    [AddComponentMenu("PoseTune/Pose Height Adjust")]
+    [AddComponentMenu("Gokoukotori/PoseTune/Pose Height Adjust")]
     public sealed class PoseHeightAdjust : MonoBehaviour, INDMFEditorOnly
     {
         [InspectorName("ビルドに含める")]

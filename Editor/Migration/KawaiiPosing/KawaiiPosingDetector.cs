@@ -46,13 +46,19 @@ namespace Gokoukotori.PoseTune.Editor
             }
 
             var type = behaviour.GetType();
-            if (IsTypeOrBase(type, KawaiiPosingTypeName) || IsTypeOrBase(type, PosingSystemTypeName))
+            if (IsKawaiiOrPosingSystemType(type))
             {
                 return true;
             }
 
             using var serialized = new SerializedObject(behaviour);
             return LooksLikePosingSystemShape(serialized);
+        }
+
+        internal static bool IsKawaiiOrPosingSystemType(System.Type type)
+        {
+            return type != null &&
+                   (IsTypeOrBase(type, KawaiiPosingTypeName) || IsTypeOrBase(type, PosingSystemTypeName));
         }
 
         private static bool LooksLikePosingSystemShape(SerializedObject serialized)

@@ -868,6 +868,8 @@ namespace Gokoukotori.PoseTune.Editor
 
             var records = new List<ExpectedAutoPoseRecord>();
             var buckets = PoseTuneLayerNaming.LayerBuckets(group);
+            var duplicatesByBucket = buckets.ToDictionary(bucket => bucket,
+                bucket => PoseStateNaming.DuplicateBaseNames(bucket.Poses));
             foreach (var pose in OrderPosesForAuto(group.Poses))
             {
                 var bucket = buckets.First(candidate => candidate.Poses.Contains(pose));
@@ -878,7 +880,7 @@ namespace Gokoukotori.PoseTune.Editor
                     continue;
                 }
 
-                var duplicates = PoseStateNaming.DuplicateBaseNames(bucket.Poses);
+                var duplicates = duplicatesByBucket[bucket];
                 records.Add(new ExpectedAutoPoseRecord
                 {
                     Pose = pose,
@@ -890,17 +892,26 @@ namespace Gokoukotori.PoseTune.Editor
             var modeParameter = graph.RootComponent.Parameter(PoseTuneNames.Mode);
             var voteParameter = PoseTuneNames.TrackingVoteParameter(group);
             var activeParameters = new HashSet<string>(PoseTuneLayerNaming.GroupActiveParameters(group));
+            // Keep one entry per original transition, including duplicates: diagnostics are per entry.
+            var autoEntries = records.Select(record =>
+                (record.Layer.stateMachine.anyStateTransitions ?? Array.Empty<TransitionView>())
+                .Where(transition => transition != null && transition.destinationState != null &&
+                    record.Variants.Any(variant => variant.StateName == transition.destinationState.name) &&
+                    HasCondition(transition, modeParameter, AnimatorConditionMode.Equals, 1f))
+                .Select(transition => (transition.conditions ?? Array.Empty<AnimatorCondition>())
+                    .Where(condition =>
+                        !(condition.parameter == voteParameter &&
+                          condition.mode == AnimatorConditionMode.Equals &&
+                          Mathf.Approximately(condition.threshold, 0f)) &&
+                        !(activeParameters.Contains(condition.parameter) &&
+                          condition.mode == AnimatorConditionMode.Less &&
+                          Mathf.Approximately(condition.threshold, 0.5f)))
+                    .ToArray())
+                .ToList()).ToList();
             for (var index = 0; index < records.Count; index++)
             {
                 var record = records[index];
-                var ownAutoEntries = (record.Layer.stateMachine.anyStateTransitions ??
-                                      Array.Empty<TransitionView>())
-                    .Where(transition =>
-                        transition != null &&
-                        transition.destinationState != null &&
-                        record.Variants.Any(variant => variant.StateName == transition.destinationState.name) &&
-                        HasCondition(transition, modeParameter, AnimatorConditionMode.Equals, 1f))
-                    .ToList();
+                var ownAutoEntries = autoEntries[index];
                 foreach (var variant in record.Variants)
                 {
                     var state = FindState(record.Layer, variant.StateName);
@@ -934,15 +945,9 @@ namespace Gokoukotori.PoseTune.Editor
                     continue;
                 }
 
-                var higherEntries = records
+                var higherEntries = autoEntries
                     .Take(index)
-                    .SelectMany(higher =>
-                        (higher.Layer.stateMachine.anyStateTransitions ?? Array.Empty<TransitionView>())
-                        .Where(transition =>
-                            transition != null &&
-                            transition.destinationState != null &&
-                            higher.Variants.Any(variant => variant.StateName == transition.destinationState.name) &&
-                            HasCondition(transition, modeParameter, AnimatorConditionMode.Equals, 1f)))
+                    .SelectMany(entries => entries)
                     .ToList();
                 foreach (var variant in record.Variants)
                 {
@@ -953,17 +958,8 @@ namespace Gokoukotori.PoseTune.Editor
                         continue;
                     }
 
-                    foreach (var higherEntry in higherEntries)
+                    foreach (var requiredConditions in higherEntries)
                     {
-                        var requiredConditions = (higherEntry.conditions ?? Array.Empty<AnimatorCondition>())
-                            .Where(condition =>
-                                !(condition.parameter == voteParameter &&
-                                  condition.mode == AnimatorConditionMode.Equals &&
-                                  Mathf.Approximately(condition.threshold, 0f)) &&
-                                !(activeParameters.Contains(condition.parameter) &&
-                                  condition.mode == AnimatorConditionMode.Less &&
-                                  Mathf.Approximately(condition.threshold, 0.5f)))
-                            .ToList();
                         if ((state.transitions ?? Array.Empty<TransitionView>()).Any(transition =>
                                 transition != null &&
                                 transition.destinationState == handoff &&
@@ -1286,8 +1282,7 @@ namespace Gokoukotori.PoseTune.Editor
 
         private static StateView FindState(LayerView layer, string stateName)
         {
-            return (layer?.stateMachine?.states ?? Array.Empty<StateView>())
-                .FirstOrDefault(state => state != null && state.name == stateName);
+            return layer?.stateMachine?.FindState(stateName);
         }
 
         private static bool HasFbtGuard(TransitionView transition)
@@ -1423,6 +1418,18 @@ namespace Gokoukotori.PoseTune.Editor
         {
             public StateView[] states = Array.Empty<StateView>();
             public TransitionView[] anyStateTransitions = Array.Empty<TransitionView>();
+            private Dictionary<string, StateView> statesByName;
+
+            public StateView FindState(string stateName)
+            {
+                // The view is immutable for this validation; preserve first-match semantics.
+                statesByName ??= states.Where(state => state != null && state.name != null)
+                    .GroupBy(state => state.name, StringComparer.Ordinal)
+                    .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+                if (stateName == null)
+                    return states.FirstOrDefault(state => state != null && state.name == null);
+                return statesByName.TryGetValue(stateName, out var state) ? state : null;
+            }
 
             public static StateMachineView Create(AnimatorStateMachine stateMachine)
             {

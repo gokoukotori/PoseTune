@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Gokoukotori.PoseTune
 {
-    [AddComponentMenu("PoseTune/Pose Tune Assistant")]
+    [AddComponentMenu("Gokoukotori/PoseTune/Pose Tune Assistant")]
     public sealed class PoseTuneAssistant : MonoBehaviour, INDMFEditorOnly
     {
         [InspectorName("最後に選択したタブ")]

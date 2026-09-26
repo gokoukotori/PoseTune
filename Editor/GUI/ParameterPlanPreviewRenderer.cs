@@ -73,8 +73,49 @@ namespace Gokoukotori.PoseTune.Editor
         }
     }
 
-    internal sealed class ParameterPlanPreviewRenderer
+    internal sealed class ParameterPlanPreviewSnapshot
     {
+        public ParameterPlanPreviewSnapshot(
+            ParameterPlanPreviewModel model,
+            IReadOnlyList<string> errors)
+        {
+            Model = model;
+            Errors = errors ?? Array.Empty<string>();
+        }
+
+        public ParameterPlanPreviewModel Model { get; }
+        public IReadOnlyList<string> Errors { get; }
+    }
+
+    internal sealed class ParameterPlanPreviewRenderer : IDisposable
+    {
+        private readonly Func<PoseTuneRoot, ParameterPlanPreviewSnapshot> _createSnapshot;
+        private readonly PoseTuneAssistantScopedInvalidation _invalidation;
+        private PoseTuneRoot _cachedRoot;
+        private ParameterPlanPreviewSnapshot _snapshot;
+        private bool _cacheValid;
+
+        public ParameterPlanPreviewRenderer()
+            : this(CreateSnapshot)
+        {
+        }
+
+        internal ParameterPlanPreviewRenderer(Func<PoseTuneRoot, ParameterPlanPreviewSnapshot> createSnapshot)
+        {
+            _createSnapshot = createSnapshot ?? throw new ArgumentNullException(nameof(createSnapshot));
+            _invalidation = new PoseTuneAssistantScopedInvalidation(Invalidate);
+        }
+
+        public void Invalidate()
+        {
+            _cacheValid = false;
+        }
+
+        public void Dispose()
+        {
+            _invalidation.Dispose();
+        }
+
         public void Draw(PoseTuneRoot root)
         {
             if (root == null)
@@ -82,30 +123,53 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
+            var snapshot = GetSnapshot(root);
+            foreach (var error in snapshot.Errors)
+            {
+                EditorGUILayout.HelpBox(error, MessageType.Error);
+            }
+
+            if (snapshot.Model != null)
+            {
+                Draw(snapshot.Model);
+            }
+        }
+
+        internal ParameterPlanPreviewSnapshot GetSnapshot(PoseTuneRoot root)
+        {
+            _invalidation.Track(root);
+            if (!_cacheValid || _cachedRoot != root)
+            {
+                _cachedRoot = root;
+                _snapshot = _createSnapshot(root);
+                _cacheValid = true;
+            }
+
+            return _snapshot;
+        }
+
+        private static ParameterPlanPreviewSnapshot CreateSnapshot(PoseTuneRoot root)
+        {
             var graph = new PoseGraphCollector().Collect(root);
             var report = new PoseValidator().Validate(graph);
             if (report.HasErrors)
             {
-                foreach (var issue in report.Errors)
-                {
-                    EditorGUILayout.HelpBox($"{issue.Code}: {issue.Message}", MessageType.Error);
-                }
-
-                return;
+                return new ParameterPlanPreviewSnapshot(
+                    null,
+                    report.Errors.Select(issue => $"{issue.Code}: {issue.Message}").ToList());
             }
 
-            ParameterPlan parameters;
             try
             {
-                parameters = new ParameterAllocator().AllocateStrict(graph);
+                var parameters = new ParameterAllocator().AllocateStrict(graph);
+                return new ParameterPlanPreviewSnapshot(
+                    ParameterPlanPreviewModel.Create(parameters),
+                    Array.Empty<string>());
             }
             catch (Exception ex)
             {
-                EditorGUILayout.HelpBox(ex.Message, MessageType.Error);
-                return;
+                return new ParameterPlanPreviewSnapshot(null, new[] { ex.Message });
             }
-
-            Draw(ParameterPlanPreviewModel.Create(parameters));
         }
 
         private static void Draw(ParameterPlanPreviewModel model)

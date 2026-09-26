@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased]
+
+## [0.4.1] - 2026-09-26
+
+### Changed
+
+- コンポーネントの追加メニューを`Gokoukotori > PoseTune`配下、Toolsメニューを`Tools > Gokoukotori > PoseTune`配下へ移動
+- `SharedExclusivePoseId`の共有対象が255 posesを超える場合、PoseGroup単位で`PoseId2`／`PoseIdTransient2`以降の同期`Int`へ自動分割するように変更。単一PoseGroupの255 poses上限は維持
+
 ## [0.4.0] - 2026-08-31
 
 ### Added

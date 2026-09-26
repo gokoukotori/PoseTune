@@ -7,10 +7,27 @@ namespace Gokoukotori.PoseTune.Editor
     [CustomEditor(typeof(PoseTuneAssistant))]
     public sealed class PoseTuneAssistantEditor : UnityEditor.Editor
     {
+        private PoseTuneAssistantMenuTab _menuTab;
+        private PoseTuneAssistantValidationTab _validationTab;
+
         private static readonly string[] Tabs =
         {
             "ポーズ", "メニュー", "トラッキング", "高さ", "プレビュー", "検証"
         };
+
+        private void OnEnable()
+        {
+            _menuTab = new PoseTuneAssistantMenuTab();
+            _validationTab = new PoseTuneAssistantValidationTab();
+        }
+
+        private void OnDisable()
+        {
+            _menuTab?.Dispose();
+            _menuTab = null;
+            _validationTab?.Dispose();
+            _validationTab = null;
+        }
 
         public override void OnInspectorGUI()
         {
@@ -41,7 +58,7 @@ namespace Gokoukotori.PoseTune.Editor
                     PoseTuneAssistantPoseTab.Draw(root);
                     break;
                 case 1:
-                    PoseTuneAssistantMenuTab.Draw(root);
+                    (_menuTab ??= new PoseTuneAssistantMenuTab()).Draw(root);
                     break;
                 case 2:
                     PoseTuneAssistantTrackingTab.Draw(root);
@@ -53,10 +70,11 @@ namespace Gokoukotori.PoseTune.Editor
                     PoseTuneAssistantPreviewTab.Draw(root);
                     break;
                 case 5:
-                    PoseTuneAssistantValidationTab.Draw(root);
+                    (_validationTab ??= new PoseTuneAssistantValidationTab()).Draw(root);
                     break;
             }
 
+            EditorGUI.BeginChangeCheck();
             EditorGUILayout.Space();
             assistant.showAdvanced = EditorGUILayout.Foldout(assistant.showAdvanced, "詳細設定");
             if (assistant.showAdvanced)
@@ -66,10 +84,21 @@ namespace Gokoukotori.PoseTune.Editor
                     PoseTuneAssistantRootSettingsPanel.Draw(root);
                 }
             }
+            var advancedSettingsChanged = EditorGUI.EndChangeCheck();
 
             serializedObject.ApplyModifiedProperties();
             if (GUI.changed)
             {
+                if (assistant.lastSelectedTab != 1 || advancedSettingsChanged)
+                {
+                    _menuTab?.InvalidateParameterPreview();
+                }
+
+                if (assistant.lastSelectedTab != 5 || advancedSettingsChanged)
+                {
+                    _validationTab?.Invalidate();
+                }
+
                 EditorUtility.SetDirty(assistant);
                 EditorUtility.SetDirty(root);
             }

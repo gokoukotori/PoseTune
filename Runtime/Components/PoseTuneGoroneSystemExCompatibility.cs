@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Gokoukotori.PoseTune
 {
-    [AddComponentMenu("PoseTune/Gorone System EX 互換")]
+    [AddComponentMenu("Gokoukotori/PoseTune/Gorone System EX 互換")]
     public sealed class PoseTuneGoroneSystemExCompatibility : MonoBehaviour, INDMFEditorOnly
     {
         [InspectorName("ガードモード")]

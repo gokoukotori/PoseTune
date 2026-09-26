@@ -97,9 +97,9 @@ PoseTuneはiconを自動生成しません。`PoseClip.customIcon`または`Pose
 
 ### 排他グループの共有 Pose ID
 
-`PoseTuneRoot.poseSelectionSyncMode`を`SharedExclusivePoseId`にすると、同期される手動操作可能なexclusiveグループをSaved属性ごとの共有`Int`へまとめます。既定namespaceではSavedバンクが`PT/PoseId`、非Savedバンクが`PT/PoseIdTransient`です。各バンクは`0=Off`、`1..255=Pose`を使用し、同じSaved属性の同期コストをグループ数にかかわらず8 bitsにします。
+`PoseTuneRoot.poseSelectionSyncMode`を`SharedExclusivePoseId`にすると、同期される手動操作可能なexclusiveグループをSaved属性ごとの共有`Int`へまとめます。既定namespaceでは最初のSavedバンクが`PT/PoseId`、非Savedバンクが`PT/PoseIdTransient`です。各バンクは`0=Off`、`1..255=Pose`を使用します。同じSaved属性の共有対象が255 posesを超える場合は、PoseGroupを分割せず`PT/PoseId2`、`PT/PoseId3`または`PT/PoseIdTransient2`、`PT/PoseIdTransient3`のような追加バンクへ順番に割り当てます。各追加バンクの同期コストは8 bitsです。
 
-non-exclusive、`synced=false`、明示`parameterName`、Autoの`SelectedPosePerGroup`は既存動作を保つため専用`Int`へフォールバックします。「オフ」は同じSavedバンク全体を`0`にします。IDは`menuOrder`と構造IDからビルドごとに自動採番されるため、Hierarchyや順序を変更すると、保存済み値が別のPoseを指す可能性があります。1バンク255 posesを超える構成と、共有対象全体の複数初期PoseはValidation errorになります。
+non-exclusive、`synced=false`、明示`parameterName`、Autoの`SelectedPosePerGroup`は既存動作を保つため専用`Int`へフォールバックします。「オフ」は所属する物理バンク全体を`0`にし、異なるバンクのPoseを選択すると他の排他バンクを`0`へ戻します。IDとバンクは`menuOrder`と構造IDからビルドごとに自動割り当てされるため、Hierarchyや順序を変更すると、保存済み値が別のPoseを指す可能性があります。単一PoseGroupに256 poses以上ある構成と、共有対象全体の複数初期PoseはValidation errorになります。
 
 ### PoseTrackingPolicy
 

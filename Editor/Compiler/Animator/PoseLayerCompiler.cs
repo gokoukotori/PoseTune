@@ -150,6 +150,26 @@ namespace Gokoukotori.PoseTune.Editor
             var modeParameter = graph.RootComponent.Parameter(PoseTuneNames.Mode);
             var voteParameter = PoseTuneNames.TrackingVoteParameter(group);
             var activeParameters = new HashSet<string>(PoseTuneLayerNaming.GroupActiveParameters(group));
+            // Unity returns copied arrays for transitions and conditions. Read them once per layer.
+            var entriesByLayer = records.Select(record => record.Layer).Distinct().ToDictionary(
+                layer => layer,
+                layer => layer.stateMachine.anyStateTransitions
+                    .Where(transition => transition != null && transition.destinationState != null)
+                    .Select(transition => new
+                    {
+                        State = transition.destinationState,
+                        Conditions = transition.conditions
+                    })
+                    .Where(entry => entry.Conditions.Any(condition =>
+                        condition.parameter == modeParameter &&
+                        condition.mode == AnimatorConditionMode.Equals &&
+                        Mathf.Approximately(condition.threshold, 1f)))
+                    .Select(entry => new AutoPreemptionEntry
+                    {
+                        State = entry.State,
+                        Conditions = entry.Conditions.Where(condition =>
+                            !ExcludedPreemptionCondition(condition, voteParameter, activeParameters)).ToArray()
+                    }).ToList());
             for (var lowerIndex = 1; lowerIndex < records.Count; lowerIndex++)
             {
                 var higherRecords = records.Take(lowerIndex).ToList();
@@ -160,22 +180,10 @@ namespace Gokoukotori.PoseTune.Editor
                     .Take(lowerIndex)
                     .Select(record => record.Layer)
                     .Distinct()
-                    .SelectMany(layer => layer.stateMachine.anyStateTransitions ??
-                        System.Array.Empty<AnimatorStateTransition>())
-                    .Distinct()
-                    .Where(transition =>
-                        transition != null &&
-                        transition.destinationState != null &&
-                        higherStates.Contains(transition.destinationState) &&
-                        (transition.conditions ?? System.Array.Empty<AnimatorCondition>()).Any(condition =>
-                            condition.parameter == modeParameter &&
-                            condition.mode == AnimatorConditionMode.Equals &&
-                            Mathf.Approximately(condition.threshold, 1f)))
-                    .ToList();
-                var uniqueConditionSets = UniquePreemptionConditionSets(
-                    higherAutoEntries,
-                    voteParameter,
-                    activeParameters);
+                    .SelectMany(layer => entriesByLayer[layer])
+                    .Where(entry => higherStates.Contains(entry.State))
+                    .Select(entry => entry.Conditions);
+                var uniqueConditionSets = UniquePreemptionConditionSets(higherAutoEntries);
 
                 foreach (var pair in records[lowerIndex].Variants)
                 {
@@ -184,29 +192,18 @@ namespace Gokoukotori.PoseTune.Editor
                         var preempt = pair.State.AddTransition(pair.Handoff);
                         preempt.hasExitTime = false;
                         preempt.duration = 0f;
-                        foreach (var condition in conditions)
-                        {
-                            preempt.AddCondition(condition.mode, condition.threshold, condition.parameter);
-                        }
+                        preempt.conditions = conditions;
                     }
                 }
             }
         }
 
         private static List<AnimatorCondition[]> UniquePreemptionConditionSets(
-            IEnumerable<AnimatorStateTransition> entries,
-            string voteParameter,
-            HashSet<string> activeParameters)
+            IEnumerable<AnimatorCondition[]> entries)
         {
             var result = new List<AnimatorCondition[]>();
-            foreach (var entry in entries ?? Enumerable.Empty<AnimatorStateTransition>())
+            foreach (var conditions in entries)
             {
-                var conditions = (entry?.conditions ?? System.Array.Empty<AnimatorCondition>())
-                    .Where(condition => !ExcludedPreemptionCondition(
-                        condition,
-                        voteParameter,
-                        activeParameters))
-                    .ToArray();
                 if (result.Any(existing => SameConditionMultiset(existing, conditions)))
                 {
                     continue;
@@ -274,22 +271,34 @@ namespace Gokoukotori.PoseTune.Editor
             PoseGroupDefinition group)
         {
             var buckets = PoseTuneLayerNaming.LayerBuckets(group);
+            var layers = controller.layers;
+            var layersByBucket = buckets.ToDictionary(bucket => bucket,
+                bucket => layers.Last(candidate => candidate.name == bucket.LayerName));
+            var duplicatesByBucket = buckets.ToDictionary(bucket => bucket,
+                bucket => PoseStateNaming.DuplicateBaseNames(bucket.Poses));
+            var statesByBucket = buckets.ToDictionary(bucket => bucket,
+                bucket => layersByBucket[bucket].stateMachine.states
+                    .Select(child => child.state)
+                    .Where(state => state != null)
+                    .GroupBy(state => state.name)
+                    .ToDictionary(states => states.Key, states => states.First()));
             var result = new List<PoseLayerRecord>();
             foreach (var pose in PosesForTransitionGeneration(group.Poses))
             {
                 var bucket = buckets.First(candidate => candidate.Poses.Contains(pose));
-                var layer = controller.layers.Last(candidate => candidate.name == bucket.LayerName);
-                var duplicates = PoseStateNaming.DuplicateBaseNames(bucket.Poses);
+                var layer = layersByBucket[bucket];
+                var duplicates = duplicatesByBucket[bucket];
+                var states = statesByBucket[bucket];
                 var variants = new List<PoseVariantHandoff>();
                 AddVariantHandoff(
-                    layer,
+                    states,
                     variants,
                     PoseStateNaming.Name(pose, duplicates),
                     PoseStateNaming.CleanupName(pose, duplicates));
                 if (PoseStateVariantRules.NeedsDesktopLowerBodyLockVariant(graph.RootComponent, group, pose))
                 {
                     AddVariantHandoff(
-                        layer,
+                        states,
                         variants,
                         PoseStateNaming.Name(pose, duplicates, "_Desktop"),
                         PoseStateNaming.CleanupName(pose, duplicates, "_Desktop"));
@@ -298,7 +307,7 @@ namespace Gokoukotori.PoseTune.Editor
                 if (PoseStateVariantRules.NeedsPoseSpaceVrVariant(pose))
                 {
                     AddVariantHandoff(
-                        layer,
+                        states,
                         variants,
                         PoseStateNaming.Name(pose, duplicates, "_VR"),
                         PoseStateNaming.CleanupName(pose, duplicates, "_VR"));
@@ -308,7 +317,7 @@ namespace Gokoukotori.PoseTune.Editor
                     graph.RootComponent.advancedSettings?.allowFullBodyTracking == true)
                 {
                     AddVariantHandoff(
-                        layer,
+                        states,
                         variants,
                         PoseStateNaming.Name(pose, duplicates, "_FBT"),
                         PoseStateNaming.CleanupName(pose, duplicates, "_FBT"));
@@ -325,21 +334,23 @@ namespace Gokoukotori.PoseTune.Editor
         }
 
         private static void AddVariantHandoff(
-            AnimatorControllerLayer layer,
+            IReadOnlyDictionary<string, AnimatorState> states,
             ICollection<PoseVariantHandoff> variants,
             string stateName,
             string handoffName)
         {
-            var state = layer.stateMachine.states
-                .Select(child => child.state)
-                .FirstOrDefault(candidate => candidate != null && candidate.name == stateName);
-            var handoff = layer.stateMachine.states
-                .Select(child => child.state)
-                .FirstOrDefault(candidate => candidate != null && candidate.name == handoffName);
+            states.TryGetValue(stateName, out var state);
+            states.TryGetValue(handoffName, out var handoff);
             if (state != null && handoff != null)
             {
                 variants.Add(new PoseVariantHandoff(state, handoff));
             }
+        }
+
+        private sealed class AutoPreemptionEntry
+        {
+            public AnimatorState State;
+            public AnimatorCondition[] Conditions;
         }
 
         private sealed class PoseLayerRecord

@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace Gokoukotori.PoseTune
 {
-    [AddComponentMenu("PoseTune/Pose Clip")]
+    [AddComponentMenu("Gokoukotori/PoseTune/Pose Clip")]
     public sealed class PoseClip : MonoBehaviour, INDMFEditorOnly
     {
         [InspectorName("ビルドに含める")]

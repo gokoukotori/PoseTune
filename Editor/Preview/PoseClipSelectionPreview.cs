@@ -6,7 +6,7 @@ namespace Gokoukotori.PoseTune.Editor
 {
     public static class PoseClipSelectionPreview
     {
-        private const string SelectedPosePreviewMenuPath = "Tools/PoseTune/Settings/Selected Pose Preview";
+        private const string SelectedPosePreviewMenuPath = "Tools/Gokoukotori/PoseTune/Settings/Selected Pose Preview";
         private const int SelectedPosePreviewMenuPriority = 1100;
 
         [InitializeOnLoadMethod]

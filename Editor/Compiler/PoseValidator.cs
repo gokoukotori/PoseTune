@@ -23,6 +23,7 @@ namespace Gokoukotori.PoseTune.Editor
             PoseTuneMenuValidator.Validate(context, report);
             PoseTuneGroupValidator.ValidateSyncedGroupIntCount(context, report);
 
+            var clipAnalysis = new PoseTuneClipValidator.AnalysisCache();
             foreach (var pose in graph.Poses)
             {
                 PoseTuneKawaiiCompatibilityValidator.ValidatePose(graph, pose, report);
@@ -32,7 +33,7 @@ namespace Gokoukotori.PoseTune.Editor
                     continue;
                 }
 
-                PoseTuneClipValidator.ValidateMotion(pose, report);
+                PoseTuneClipValidator.ValidateMotion(pose, report, clipAnalysis);
 
                 PoseTuneMotionTimeValidator.Validate(graph, pose, report);
                 PoseTuneTrackingValidator.ValidatePose(graph, pose, report);

@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace Gokoukotori.PoseTune
 {
-    [AddComponentMenu("PoseTune/Pose Condition")]
+    [AddComponentMenu("Gokoukotori/PoseTune/Pose Condition")]
     public sealed class PoseCondition : MonoBehaviour, INDMFEditorOnly
     {
         [InspectorName("条件の合成")]

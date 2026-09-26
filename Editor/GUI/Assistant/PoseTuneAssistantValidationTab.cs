@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Gokoukotori.PoseTune;
@@ -6,17 +7,56 @@ using UnityEngine;
 
 namespace Gokoukotori.PoseTune.Editor
 {
-    internal static class PoseTuneAssistantValidationTab
+    internal sealed class PoseTuneAssistantValidationSnapshot
+    {
+        public PoseTuneAssistantValidationSnapshot(
+            PoseGraph graph,
+            ValidationReport report,
+            IReadOnlyList<ValidationIssueGroup> groups)
+        {
+            Graph = graph;
+            Report = report;
+            Groups = groups;
+        }
+
+        public PoseGraph Graph { get; }
+        public ValidationReport Report { get; }
+        public IReadOnlyList<ValidationIssueGroup> Groups { get; }
+    }
+
+    internal sealed class PoseTuneAssistantValidationTab : IDisposable
     {
         private static readonly Dictionary<string, bool> GroupFoldouts = new();
+        private readonly PoseTuneAutoFixRegistry _registry = new PoseTuneAutoFixRegistry();
+        private readonly Func<PoseTuneRoot, PoseTuneAssistantValidationSnapshot> _createSnapshot;
+        private readonly PoseTuneAssistantScopedInvalidation _invalidation;
+        private PoseTuneRoot _cachedRoot;
+        private PoseTuneAssistantValidationSnapshot _snapshot;
+        private bool _cacheValid;
 
-        public static void Draw(PoseTuneRoot root)
+        public PoseTuneAssistantValidationTab()
+            : this(CreateSnapshot)
         {
-            var graph = new PoseGraphCollector().Collect(root);
-            new PoseTuneIconResolver().Apply(graph);
-            var report = new PoseValidator().Validate(graph);
-            var registry = new PoseTuneAutoFixRegistry();
-            var groups = ValidationIssueGrouping.Group(report.Issues);
+        }
+
+        internal PoseTuneAssistantValidationTab(
+            Func<PoseTuneRoot, PoseTuneAssistantValidationSnapshot> createSnapshot)
+        {
+            _createSnapshot = createSnapshot ?? throw new ArgumentNullException(nameof(createSnapshot));
+            _invalidation = new PoseTuneAssistantScopedInvalidation(Invalidate);
+        }
+
+        public void Draw(PoseTuneRoot root)
+        {
+            if (GUILayout.Button("再検証"))
+            {
+                Invalidate();
+            }
+
+            var snapshot = GetSnapshot(root);
+            var graph = snapshot.Graph;
+            var report = snapshot.Report;
+            var groups = snapshot.Groups;
             if (!report.Errors.Any() && !report.Warnings.Any())
             {
                 EditorGUILayout.HelpBox("検証に成功しました。", MessageType.Info);
@@ -27,7 +67,7 @@ namespace Gokoukotori.PoseTune.Editor
             {
                 foreach (var issue in groups.SelectMany(group => group.Issues).ToArray())
                 {
-                    foreach (var fix in registry.FindFixes(issue, graph)
+                    foreach (var fix in _registry.FindFixes(issue, graph)
                                  .Where(fix => fix.IncludeInBatch &&
                                                (fix.Safety == AutoFixSafety.Safe ||
                                                 fix.Safety == AutoFixSafety.Reversible)))
@@ -36,6 +76,7 @@ namespace Gokoukotori.PoseTune.Editor
                     }
                 }
 
+                Invalidate();
                 GUI.changed = true;
                 return;
             }
@@ -58,13 +99,13 @@ namespace Gokoukotori.PoseTune.Editor
                             using (new EditorGUILayout.HorizontalScope())
                             {
                                 GUILayout.Space(20);
-                                EditorGUILayout.ObjectField(context, typeof(Object), true);
+                                EditorGUILayout.ObjectField(context, typeof(UnityEngine.Object), true);
                             }
                         }
                     }
                 }
 
-                foreach (var fix in CommonFixes(group, registry, graph))
+                foreach (var fix in CommonFixes(group, _registry, graph))
                 {
                     var prefix = group.TargetCount > 1 ? "Fix all" : "Fix";
                     using (new EditorGUILayout.HorizontalScope())
@@ -77,6 +118,7 @@ namespace Gokoukotori.PoseTune.Editor
                                 fix.Apply(issue, graph);
                             }
 
+                            Invalidate();
                             GUI.changed = true;
                             return;
                         }
@@ -94,7 +136,44 @@ namespace Gokoukotori.PoseTune.Editor
                         EditorUtility.SetDirty(group);
                     }
                 }
+
+                Invalidate();
+                GUI.changed = true;
             }
+        }
+
+        public void Invalidate()
+        {
+            _cacheValid = false;
+        }
+
+        public void Dispose()
+        {
+            _invalidation.Dispose();
+        }
+
+        internal PoseTuneAssistantValidationSnapshot GetSnapshot(PoseTuneRoot root)
+        {
+            _invalidation.Track(root);
+            if (!_cacheValid || _cachedRoot != root)
+            {
+                _cachedRoot = root;
+                _snapshot = _createSnapshot(root);
+                _cacheValid = true;
+            }
+
+            return _snapshot;
+        }
+
+        private static PoseTuneAssistantValidationSnapshot CreateSnapshot(PoseTuneRoot root)
+        {
+            var graph = new PoseGraphCollector().Collect(root);
+            new PoseTuneIconResolver().Apply(graph);
+            var report = new PoseValidator().Validate(graph);
+            return new PoseTuneAssistantValidationSnapshot(
+                graph,
+                report,
+                ValidationIssueGrouping.Group(report.Issues));
         }
 
         private static IEnumerable<IPoseTuneAutoFix> CommonFixes(

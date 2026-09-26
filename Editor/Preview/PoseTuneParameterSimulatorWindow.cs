@@ -27,7 +27,7 @@ namespace Gokoukotori.PoseTune.Editor
             "FBT"
         };
 
-        [MenuItem("Tools/PoseTune/Parameter Simulator")]
+        [MenuItem("Tools/Gokoukotori/PoseTune/Parameter Simulator")]
         public static void Open()
         {
             GetWindow<PoseTuneParameterSimulatorWindow>("PoseTune Simulator");
