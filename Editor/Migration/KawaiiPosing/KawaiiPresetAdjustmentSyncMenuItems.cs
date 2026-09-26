@@ -6,7 +6,7 @@ namespace Gokoukotori.PoseTune.Editor
 {
     internal static class KawaiiPresetAdjustmentSyncMenuItems
     {
-        private const string MenuPath = "GameObject/PoseTune/KawaiiPosing 調整クリップを同期";
+        private const string MenuPath = "GameObject/Gokoukotori/PoseTune/KawaiiPosing 調整クリップを同期";
 
         [MenuItem(MenuPath, false, 41)]
         private static void OpenWindow()

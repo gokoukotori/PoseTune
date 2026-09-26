@@ -10,7 +10,7 @@ namespace Gokoukotori.PoseTune.Editor
     {
         private const string PoseGroupsRootName = "ポーズグループ";
 
-        [MenuItem("GameObject/PoseTune/テンプレート", false, 30)]
+        [MenuItem("GameObject/Gokoukotori/PoseTune/テンプレート", false, 30)]
         private static void AddTemplateMenuItem()
         {
             var selected = Selection.activeGameObject;
@@ -24,7 +24,7 @@ namespace Gokoukotori.PoseTune.Editor
             Selection.activeGameObject = CreateTemplate(avatar.gameObject);
         }
 
-        [MenuItem("GameObject/PoseTune/テンプレート", true)]
+        [MenuItem("GameObject/Gokoukotori/PoseTune/テンプレート", true)]
         private static bool ValidateAddTemplateMenuItem()
         {
             return ResolveAvatar(Selection.activeGameObject) != null;

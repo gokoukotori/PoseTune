@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-09-26
+
+### Changed
+
+- Hierarchyの右クリックメニュー（テンプレート追加、KawaiiPosingからの移行、調整クリップ同期）を`Gokoukotori > PoseTune`配下へ統一
+
 ## [0.4.1] - 2026-09-26
 
 ### Changed

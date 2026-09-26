@@ -7,7 +7,7 @@ namespace Gokoukotori.PoseTune.Editor
 {
     internal static class KawaiiPosingMigrationMenuItems
     {
-        [MenuItem("GameObject/PoseTune/KawaiiPosing から移行", false, 40)]
+        [MenuItem("GameObject/Gokoukotori/PoseTune/KawaiiPosing から移行", false, 40)]
         private static void MigrateFromKawaiiPosing()
         {
             var avatar = ResolveAvatar(Selection.activeGameObject);
@@ -20,7 +20,7 @@ namespace Gokoukotori.PoseTune.Editor
             KawaiiPosingMigrationWindow.Open(avatar.gameObject);
         }
 
-        [MenuItem("GameObject/PoseTune/KawaiiPosing から移行", true)]
+        [MenuItem("GameObject/Gokoukotori/PoseTune/KawaiiPosing から移行", true)]
         private static bool ValidateMigrateFromKawaiiPosing()
         {
             var avatar = ResolveAvatar(Selection.activeGameObject);
