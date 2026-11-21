@@ -130,7 +130,7 @@ namespace Gokoukotori.PoseTune.Editor
             var sharedObjects = sourceSet
                 .Select(source => source.gameObject)
                 .Distinct()
-                .Where(gameObject => IsSharedSourceObject(gameObject, sourceSet))
+                .Where(gameObject => KawaiiPosingMigrationExecutor.IsSharedSourceObject(gameObject, sourceSet))
                 .ToArray();
             if (sharedObjects.Length == 0)
             {
@@ -148,32 +148,19 @@ namespace Gokoukotori.PoseTune.Editor
             return options.confirmSharedSourceObjectMutation;
         }
 
-        private static bool IsSharedSourceObject(GameObject gameObject, System.Collections.Generic.ISet<MonoBehaviour> sources)
-        {
-            if (gameObject == null || gameObject.transform.childCount > 0)
-            {
-                return true;
-            }
-
-            return gameObject.GetComponents<Component>().Any(component =>
-                component is not Transform &&
-                (component is not MonoBehaviour behaviour || !sources.Contains(behaviour)));
-        }
-
         private static string DescribeSharedSourceObject(
             GameObject gameObject,
             System.Collections.Generic.ISet<MonoBehaviour> sources)
         {
             var unrelatedComponents = gameObject.GetComponents<Component>()
-                .Where(component => component is not Transform &&
-                                    (component is not MonoBehaviour behaviour || !sources.Contains(behaviour)))
+                .Where(component => KawaiiPosingMigrationExecutor.IsUnrelatedSourceComponent(component, sources))
                 .Select(component => component.GetType().FullName)
                 .ToArray();
             var childPaths = gameObject.GetComponentsInChildren<Transform>(true)
                 .Where(transform => transform != gameObject.transform)
-                .Select(transform => HierarchyPath(transform))
+                .Select(transform => PoseTuneHierarchyUtility.HierarchyPath(transform))
                 .ToArray();
-            var lines = new System.Collections.Generic.List<string> { "- " + HierarchyPath(gameObject.transform) };
+            var lines = new System.Collections.Generic.List<string> { "- " + PoseTuneHierarchyUtility.HierarchyPath(gameObject.transform) };
             if (unrelatedComponents.Length > 0)
             {
                 lines.Add("  Components: " + string.Join(", ", unrelatedComponents));
@@ -187,22 +174,10 @@ namespace Gokoukotori.PoseTune.Editor
             return string.Join("\n", lines);
         }
 
-        private static string HierarchyPath(Transform transform)
-        {
-            var names = new System.Collections.Generic.Stack<string>();
-            for (var current = transform; current != null; current = current.parent)
-            {
-                names.Push(current.name);
-            }
-
-            return string.Join("/", names);
-        }
-
         private static T SelectableEnumPopup<T>(string label, T value) where T : struct, Enum
         {
             var values = Enum.GetValues(typeof(T))
                 .Cast<T>()
-                .Where(item => KawaiiMigrationOptionSupport.IsSelectable(item))
                 .ToArray();
             if (values.Length == 0)
             {
@@ -235,12 +210,7 @@ namespace Gokoukotori.PoseTune.Editor
             EditorGUILayout.LabelField($"スキップ: {lastReport.SkippedPoseCount}");
             foreach (var issue in lastReport.Issues)
             {
-                var type = issue.Severity == KawaiiMigrationSeverity.Error
-                    ? MessageType.Error
-                    : issue.Severity == KawaiiMigrationSeverity.Warning
-                        ? MessageType.Warning
-                        : MessageType.Info;
-                EditorGUILayout.HelpBox($"{issue.Code}: {LocalizedIssueMessage(issue)}", type);
+                EditorGUILayout.HelpBox($"{issue.Code}: {LocalizedIssueMessage(issue)}", issue.Severity.ToMessageType());
             }
         }
 

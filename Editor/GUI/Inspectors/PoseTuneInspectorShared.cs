@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
@@ -21,17 +22,35 @@ namespace Gokoukotori.PoseTune.Editor
         {
             return new GUIContent(label, tooltip);
         }
+
+        public static void Draw(SerializedObject serializedObject, string propertyPath, string label, string tooltip = "")
+        {
+            var property = serializedObject.FindProperty(propertyPath);
+            if (property != null)
+            {
+                EditorGUILayout.PropertyField(property, Content(label, tooltip), true);
+            }
+        }
+
+        // Edits fields of an object other than the inspected one. Going through SerializedObject
+        // records Undo and prefab overrides, which direct field writes plus SetDirty do not.
+        public static void DrawFields(SerializedObject serializedObject, IEnumerable<PoseTuneFieldLabel> fields)
+        {
+            serializedObject.Update();
+            foreach (var field in fields)
+            {
+                Draw(serializedObject, field.Path, field.Label.text, field.Label.tooltip);
+            }
+
+            serializedObject.ApplyModifiedProperties();
+        }
     }
 
     public abstract class PoseTuneLocalizedEditor : UnityEditor.Editor
     {
         protected void Draw(string propertyPath, string label, string tooltip = "")
         {
-            var property = serializedObject.FindProperty(propertyPath);
-            if (property != null)
-            {
-                EditorGUILayout.PropertyField(property, PoseTuneInspectorGui.Content(label, tooltip), true);
-            }
+            PoseTuneInspectorGui.Draw(serializedObject, propertyPath, label, tooltip);
         }
 
         protected void DrawFields(params PoseTuneFieldLabel[] fields)

@@ -80,7 +80,7 @@ namespace Gokoukotori.PoseTune.Editor
                 var expectedNetworkSynced = !parameter.LocalOnly &&
                                             parameter.SyncType != PoseTuneParameterSyncType.NotSynced;
                 if (matches.Count != 1 ||
-                    matches[0].valueType != ToVrcValueType(parameter.ValueType) ||
+                    matches[0].valueType != PoseTuneParameterTypeMapper.ToVrcValueType(parameter.ValueType) ||
                     matches[0].saved != parameter.Saved ||
                     matches[0].networkSynced != expectedNetworkSynced)
                 {
@@ -141,10 +141,7 @@ namespace Gokoukotori.PoseTune.Editor
             var animatorReport = virtualController != null
                 ? animatorValidator.Validate(graph, virtualController, parameters)
                 : animatorValidator.Validate(graph, targetController, parameters);
-            foreach (var issue in animatorReport.Issues)
-            {
-                report.Add(issue);
-            }
+            report.AddRange(animatorReport.Issues);
         }
 
         private static System.Collections.Generic.IEnumerable<VRCExpressionParameters.Parameter> ExpressionParameters(
@@ -154,19 +151,6 @@ namespace Gokoukotori.PoseTune.Editor
             return parameters?.parameters?
                        .Where(parameter => parameter != null && parameter.name == name) ??
                    Enumerable.Empty<VRCExpressionParameters.Parameter>();
-        }
-
-        private static VRCExpressionParameters.ValueType ToVrcValueType(PoseTuneParameterValueType type)
-        {
-            switch (type)
-            {
-                case PoseTuneParameterValueType.Bool:
-                    return VRCExpressionParameters.ValueType.Bool;
-                case PoseTuneParameterValueType.Int:
-                    return VRCExpressionParameters.ValueType.Int;
-                default:
-                    return VRCExpressionParameters.ValueType.Float;
-            }
         }
 
         private static AnimatorController ControllerForLayer(

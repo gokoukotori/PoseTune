@@ -43,7 +43,7 @@ namespace Gokoukotori.PoseTune.Editor
                 line = NextLine(line);
                 DrawOperatorPopup(line, valueType, op);
 
-                var valueProperty = ValueProperty(property, valueType, op, out var valueLabel);
+                var valueProperty = ValueProperty(property, valueType, out var valueLabel);
                 if (valueProperty != null)
                 {
                     line = NextLine(line);
@@ -65,8 +65,7 @@ namespace Gokoukotori.PoseTune.Editor
             }
 
             var valueType = property.FindPropertyRelative("valueType");
-            var op = property.FindPropertyRelative("op");
-            var childLineCount = ValueProperty(property, valueType, op, out _) != null ? 4 : 3;
+            var childLineCount = ValueProperty(property, valueType, out _) != null ? 4 : 3;
             return height + childLineCount *
                 (EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing);
         }
@@ -98,10 +97,6 @@ namespace Gokoukotori.PoseTune.Editor
             }
 
             var selectedIndex = currentIndex < 0 ? 0 : currentIndex;
-            if (currentIndex < 0)
-            {
-                selectedIndex = 0;
-            }
 
             EditorGUI.showMixedValue = operatorProperty.hasMultipleDifferentValues;
             EditorGUI.BeginChangeCheck();
@@ -133,11 +128,9 @@ namespace Gokoukotori.PoseTune.Editor
         private static SerializedProperty ValueProperty(
             SerializedProperty property,
             SerializedProperty valueTypeProperty,
-            SerializedProperty operatorProperty,
             out GUIContent label)
         {
             var valueType = (ParameterValueType)valueTypeProperty.intValue;
-            var op = (ConditionOperator)operatorProperty.intValue;
             switch (valueType)
             {
                 case ParameterValueType.Int:

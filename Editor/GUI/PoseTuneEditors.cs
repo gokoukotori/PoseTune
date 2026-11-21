@@ -5,11 +5,20 @@ using UnityEngine;
 namespace Gokoukotori.PoseTune.Editor
 {
     [CustomEditor(typeof(PoseTuneAssistant))]
-    public sealed class PoseTuneAssistantEditor : UnityEditor.Editor
+    public sealed class PoseTuneAssistantEditor : PoseTuneLocalizedEditor
     {
+        private const int PoseTabIndex = 0;
+        private const int MenuTabIndex = 1;
+        private const int TrackingTabIndex = 2;
+        private const int HeightTabIndex = 3;
+        private const int PreviewTabIndex = 4;
+        private const int ValidationTabIndex = 5;
+
         private PoseTuneAssistantMenuTab _menuTab;
         private PoseTuneAssistantValidationTab _validationTab;
+        private SerializedObject _rootObject;
 
+        // Order must match the *TabIndex constants above.
         private static readonly string[] Tabs =
         {
             "ポーズ", "メニュー", "トラッキング", "高さ", "プレビュー", "検証"
@@ -27,6 +36,21 @@ namespace Gokoukotori.PoseTune.Editor
             _menuTab = null;
             _validationTab?.Dispose();
             _validationTab = null;
+            _rootObject?.Dispose();
+            _rootObject = null;
+        }
+
+        // The tabs edit the parent PoseTuneRoot, not the inspected assistant, so they get their own
+        // SerializedObject for it (for Undo and prefab overrides).
+        private SerializedObject RootObject(PoseTuneRoot root)
+        {
+            if (_rootObject == null || _rootObject.targetObject != root)
+            {
+                _rootObject?.Dispose();
+                _rootObject = new SerializedObject(root);
+            }
+
+            return _rootObject;
         }
 
         public override void OnInspectorGUI()
@@ -38,38 +62,31 @@ namespace Gokoukotori.PoseTune.Editor
             if (root == null)
             {
                 EditorGUILayout.HelpBox("PoseTuneRoot が見つかりません。テンプレートから作成し直してください。", MessageType.Error);
-                using (new EditorGUI.DisabledScope(true))
-                {
-                    EditorGUILayout.PropertyField(serializedObject.FindProperty("m_Script"), new GUIContent("スクリプト"));
-                }
-
-                EditorGUILayout.PropertyField(serializedObject.FindProperty("lastSelectedTab"), new GUIContent("最後に選択したタブ"));
-                EditorGUILayout.PropertyField(serializedObject.FindProperty("showAdvanced"), new GUIContent("詳細設定を表示"));
-                serializedObject.ApplyModifiedProperties();
                 return;
             }
 
             assistant.lastSelectedTab = GUILayout.Toolbar(Mathf.Clamp(assistant.lastSelectedTab, 0, Tabs.Length - 1), Tabs);
             EditorGUILayout.Space();
 
+            var rootObject = RootObject(root);
             switch (assistant.lastSelectedTab)
             {
-                case 0:
+                case PoseTabIndex:
                     PoseTuneAssistantPoseTab.Draw(root);
                     break;
-                case 1:
+                case MenuTabIndex:
                     (_menuTab ??= new PoseTuneAssistantMenuTab()).Draw(root);
                     break;
-                case 2:
-                    PoseTuneAssistantTrackingTab.Draw(root);
+                case TrackingTabIndex:
+                    PoseTuneAssistantTrackingTab.Draw(root, rootObject);
                     break;
-                case 3:
-                    PoseTuneAssistantHeightTab.Draw(root);
+                case HeightTabIndex:
+                    PoseTuneAssistantHeightTab.Draw(root, rootObject);
                     break;
-                case 4:
+                case PreviewTabIndex:
                     PoseTuneAssistantPreviewTab.Draw(root);
                     break;
-                case 5:
+                case ValidationTabIndex:
                     (_validationTab ??= new PoseTuneAssistantValidationTab()).Draw(root);
                     break;
             }
@@ -81,7 +98,7 @@ namespace Gokoukotori.PoseTune.Editor
             {
                 using (new EditorGUI.IndentLevelScope())
                 {
-                    PoseTuneAssistantRootSettingsPanel.Draw(root);
+                    PoseTuneAssistantRootSettingsPanel.Draw(rootObject);
                 }
             }
             var advancedSettingsChanged = EditorGUI.EndChangeCheck();
@@ -89,12 +106,12 @@ namespace Gokoukotori.PoseTune.Editor
             serializedObject.ApplyModifiedProperties();
             if (GUI.changed)
             {
-                if (assistant.lastSelectedTab != 1 || advancedSettingsChanged)
+                if (assistant.lastSelectedTab != MenuTabIndex || advancedSettingsChanged)
                 {
                     _menuTab?.InvalidateParameterPreview();
                 }
 
-                if (assistant.lastSelectedTab != 5 || advancedSettingsChanged)
+                if (assistant.lastSelectedTab != ValidationTabIndex || advancedSettingsChanged)
                 {
                     _validationTab?.Invalidate();
                 }

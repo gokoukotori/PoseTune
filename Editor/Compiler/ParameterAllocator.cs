@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Gokoukotori.PoseTune;
 
@@ -17,22 +18,14 @@ namespace Gokoukotori.PoseTune.Editor
                 .DefaultValue((float)graph.RootComponent.defaultMode);
             if (graph.HasPoseOptions)
             {
-                builder.AddBool(graph.RootComponent.Parameter(PoseTuneNames.LockHead))
-                    .Saved()
-                    .LocalOnly()
-                    .DefaultValue(graph.Options != null && graph.Options.lockHead ? 1f : 0f);
-                builder.AddBool(graph.RootComponent.Parameter(PoseTuneNames.LockHands))
-                    .Saved()
-                    .LocalOnly()
-                    .DefaultValue(graph.Options != null && graph.Options.lockHands ? 1f : 0f);
-                builder.AddBool(graph.RootComponent.Parameter(PoseTuneNames.LockFeet))
-                    .Saved()
-                    .LocalOnly()
-                    .DefaultValue(graph.Options != null && graph.Options.lockFeet ? 1f : 0f);
-                builder.AddBool(graph.RootComponent.Parameter(PoseTuneNames.LocomotionLock))
-                    .Saved()
-                    .LocalOnly()
-                    .DefaultValue(graph.Options != null && graph.Options.locomotionLock ? 1f : 0f);
+                AddLockOption(builder, graph.RootComponent.Parameter(PoseTuneNames.LockHead),
+                    graph.Options != null && graph.Options.lockHead);
+                AddLockOption(builder, graph.RootComponent.Parameter(PoseTuneNames.LockHands),
+                    graph.Options != null && graph.Options.lockHands);
+                AddLockOption(builder, graph.RootComponent.Parameter(PoseTuneNames.LockFeet),
+                    graph.Options != null && graph.Options.lockFeet);
+                AddLockOption(builder, graph.RootComponent.Parameter(PoseTuneNames.LocomotionLock),
+                    graph.Options != null && graph.Options.locomotionLock);
             }
 
             if (NeedsTrackingArbiter(graph))
@@ -52,7 +45,14 @@ namespace Gokoukotori.PoseTune.Editor
                 }
             }
 
-            if (NeedsSupineFlag(graph))
+            if (PoseRefreshLayerCompiler.IsNeeded(graph))
+            {
+                builder.AddNotSyncedBool(PoseTuneNames.PoseRefreshParameter)
+                    .LocalOnly()
+                    .AnimatorOnly();
+            }
+
+            if (PoseTuneCompilerRules.NeedsSupineFlag(graph))
             {
                 builder.AddBool(graph.RootComponent.Parameter(PoseTuneNames.SupineFlag))
                     .Saved();
@@ -95,24 +95,33 @@ namespace Gokoukotori.PoseTune.Editor
                 }
             }
 
-            foreach (var pose in graph.Poses)
+            // Parameters PoseTune generates and syncs come first, so a pose motion that reads the same name
+            // reuses them regardless of pose order instead of turning them into unsynced parameters.
+            if (PoseTuneCompilerRules.AppliesHeightOffset(graph))
             {
-                AddMotionTimeParameter(builder, graph, pose);
-                foreach (var parameter in BlendTreeParameterCollector.Collect(pose.SourceMotion))
-                {
-                    builder.AddNotSyncedFloatIfMissing(parameter)
-                        .LocalOnly()
-                        .AnimatorOnly();
-                }
+                ConfigureHeight(
+                    builder.AddFloat(PoseTuneNames.HeightParameter(graph.RootComponent, graph.HeightAdjust)),
+                    graph);
             }
 
-            if (graph.RootComponent.enableHeightAdjust && PoseTuneAuthoringInclusion.Includes(graph.HeightAdjust) &&
-                graph.HeightAdjust.applyMode != HeightApplyMode.Disabled)
+            foreach (var pose in graph.Poses)
             {
-                builder.AddFloat(PoseTuneNames.HeightParameter(graph.RootComponent, graph.HeightAdjust))
-                    .Saved(graph.HeightAdjust.saved)
-                    .LocalOnly(!graph.HeightAdjust.synced || graph.RootComponent.questLowMemoryMode)
-                    .DefaultValue(0.5f);
+                AddGeneratedMotionTimeParameter(builder, graph, pose);
+            }
+
+            // Names only a pose's own motion reads belong to the avatar; keep them out of MA auto-rename.
+            foreach (var pose in graph.Poses)
+            {
+                if (pose.MotionTime?.mode == MotionTimeMode.UseAnimatorStateTimeParameter &&
+                    !string.IsNullOrWhiteSpace(pose.MotionTime.parameterName))
+                {
+                    AddAvatarSharedFloat(builder, pose.MotionTime.parameterName);
+                }
+
+                foreach (var parameter in BlendTreeParameterCollector.Collect(pose.SourceMotion))
+                {
+                    AddAvatarSharedFloat(builder, parameter);
+                }
             }
 
             return builder.Build();
@@ -131,7 +140,33 @@ namespace Gokoukotori.PoseTune.Editor
             return plan;
         }
 
-        private static void AddMotionTimeParameter(ParameterPlanBuilder builder, PoseGraph graph, PoseDefinition pose)
+        private static void AddLockOption(ParameterPlanBuilder builder, string name, bool enabled)
+        {
+            builder.AddBool(name)
+                .Saved()
+                .LocalOnly()
+                .DefaultValue(enabled ? 1f : 0f);
+        }
+
+        private static void ConfigureHeight(ParameterPlanEntryBuilder entry, PoseGraph graph)
+        {
+            entry.Saved(graph.HeightAdjust.saved)
+                .LocalOnly(!graph.HeightAdjust.synced)
+                .DefaultValue(0.5f);
+        }
+
+        private static void AddAvatarSharedFloat(ParameterPlanBuilder builder, string name)
+        {
+            builder.AddNotSyncedFloatIfMissing(name)
+                .LocalOnly()
+                .AnimatorOnly()
+                .SharedWithAvatar();
+        }
+
+        private static void AddGeneratedMotionTimeParameter(
+            ParameterPlanBuilder builder,
+            PoseGraph graph,
+            PoseDefinition pose)
         {
             if (pose.MotionTime == null)
             {
@@ -140,15 +175,6 @@ namespace Gokoukotori.PoseTune.Editor
 
             switch (pose.MotionTime.mode)
             {
-                case MotionTimeMode.UseAnimatorStateTimeParameter:
-                    if (!string.IsNullOrWhiteSpace(pose.MotionTime.parameterName))
-                    {
-                        builder.AddNotSyncedFloatIfMissing(pose.MotionTime.parameterName)
-                            .LocalOnly()
-                            .AnimatorOnly();
-                    }
-
-                    break;
                 case MotionTimeMode.UseCustomFloatParameter:
                     if (!string.IsNullOrWhiteSpace(pose.MotionTime.parameterName))
                     {
@@ -161,26 +187,16 @@ namespace Gokoukotori.PoseTune.Editor
                     if (graph.RootComponent.enableHeightAdjust && PoseTuneAuthoringInclusion.Includes(graph.HeightAdjust))
                     {
                         var name = PoseTuneNames.HeightParameter(graph.RootComponent, graph.HeightAdjust);
-                        builder.AddFloatIfMissing(name)
-                            .Saved(graph.HeightAdjust.saved)
-                            .LocalOnly(!graph.HeightAdjust.synced || graph.RootComponent.questLowMemoryMode)
-                            .DefaultValue(0.5f);
+                        ConfigureHeight(builder.AddFloatIfMissing(name), graph);
                     }
 
                     break;
             }
         }
 
-        private static bool NeedsSupineFlag(PoseGraph graph)
-        {
-            return graph.RootComponent.enableAutoContextSwitch &&
-                   PoseGraphBuildFilter.BuildableGroups(graph)
-                       .Any(g => g.Kind == PoseGroupKind.Prone || g.Kind == PoseGroupKind.Supine);
-        }
-
         private static bool NeedsManualCommitGuard(
             PoseGraph graph,
-            System.Collections.Generic.IEnumerable<PoseGroupDefinition> buildableGroups,
+            IEnumerable<PoseGroupDefinition> buildableGroups,
             PoseGroupDefinition group,
             PoseSelectionPlan poseSelection)
         {

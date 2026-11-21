@@ -140,7 +140,7 @@ namespace Gokoukotori.PoseTune.Editor
 
         private static bool IsManualReviewPose(PoseClip pose)
         {
-            return pose.GetComponentInParent<PoseGroup>()?.kind is PoseGroupKind.Prone or PoseGroupKind.Supine;
+            return pose.GetComponentInParent<PoseGroup>()?.kind is { } kind && PoseTuneCompilerRules.IsLyingKind(kind);
         }
 
         private static void SetHideFlags(Transform transform, HideFlags hideFlags)

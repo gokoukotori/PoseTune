@@ -7,16 +7,6 @@ namespace Gokoukotori.PoseTune.Editor
 {
     internal static class KawaiiBlendTreeCompatibilityConverter
     {
-        public static BlendTree CloneForBuild(BlendTree source, string name)
-        {
-            return source != null ? PoseMotionPreparationService.CloneBlendTree(source, name) : null;
-        }
-
-        public static bool IsBlendTree(Motion motion)
-        {
-            return motion is BlendTree;
-        }
-
         public static IReadOnlyList<KawaiiAnimationDto> ExpandAnimation(
             KawaiiAnimationDto source,
             KawaiiMigrationOptions options)
@@ -82,7 +72,7 @@ namespace Gokoukotori.PoseTune.Editor
             };
         }
 
-        private static IEnumerable<AnimationClip> LeafClips(Motion motion)
+        internal static IEnumerable<AnimationClip> LeafClips(Motion motion)
         {
             if (motion is AnimationClip clip)
             {

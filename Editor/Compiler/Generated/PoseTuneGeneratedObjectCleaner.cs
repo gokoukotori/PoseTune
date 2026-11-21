@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Gokoukotori.PoseTune;
@@ -15,16 +16,7 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
-            var avatarRoot = graph.AvatarRoot;
-            var generatedTransforms = avatarRoot.GetComponentsInChildren<PoseTuneGeneratedMarker>(true)
-                .Where(marker => marker != null)
-                .Where(marker => marker.gameObject != avatarRoot)
-                .Where(marker => marker.rootKey == graph.RootId)
-                .Select(marker => marker.transform)
-                .OrderByDescending(GetDepth)
-                .ToArray();
-
-            DestroyTransforms(generatedTransforms, avatarRoot);
+            DestroyGeneratedObjects(graph.AvatarRoot, marker => marker.rootKey == graph.RootId);
         }
 
         public static void ClearAllGeneratedObjects(GameObject avatarRoot)
@@ -34,8 +26,14 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
+            DestroyGeneratedObjects(avatarRoot, marker => true);
+        }
+
+        private static void DestroyGeneratedObjects(GameObject avatarRoot, Func<PoseTuneGeneratedMarker, bool> include)
+        {
             var generatedTransforms = avatarRoot.GetComponentsInChildren<PoseTuneGeneratedMarker>(true)
                 .Where(marker => marker != null && marker.gameObject != avatarRoot)
+                .Where(include)
                 .Select(marker => marker.transform)
                 .OrderByDescending(GetDepth)
                 .ToArray();

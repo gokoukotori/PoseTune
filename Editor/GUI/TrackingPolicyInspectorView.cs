@@ -23,14 +23,9 @@ namespace Gokoukotori.PoseTune.Editor
             }
 
             DrawSelectionButtons(root, ref selectedObject);
-            var summary = ResolveEffectivePolicy(root, selectedObject);
+            var summary = PoseTuneTrackingPolicyResolver.ResolveEffectivePolicy(root, selectedObject);
             DrawSummary(summary);
             DrawDirectEditor(root, selectedObject);
-        }
-
-        public static ResolvedGroupTrackingPolicy ResolveEffectivePolicy(PoseTuneRoot root, Object selectedObject)
-        {
-            return PoseTuneTrackingPolicyResolver.ResolveEffectivePolicy(root, selectedObject);
         }
 
         private static void DrawSelectionButtons(PoseTuneRoot root, ref Object selectedObject)
@@ -62,10 +57,7 @@ namespace Gokoukotori.PoseTune.Editor
             EditorGUILayout.LabelField("Effective policy", EditorStyles.boldLabel);
             EditorGUILayout.LabelField("Source", summary.Source.ToString());
             EditorGUILayout.LabelField("Context", summary.Context != null ? summary.Context.name : "<none>");
-            EditorGUILayout.LabelField("Head / Hands / Hip / Feet",
-                $"{summary.Policy.head} / {summary.Policy.leftHand},{summary.Policy.rightHand} / {summary.Policy.hip} / {summary.Policy.leftFoot},{summary.Policy.rightFoot}");
-            EditorGUILayout.LabelField("Fingers / Eyes / Mouth",
-                $"{summary.Policy.leftFingers},{summary.Policy.rightFingers} / {summary.Policy.eyes} / {summary.Policy.mouth}");
+            DrawPolicyLines("", summary.Policy);
             using (new EditorGUI.DisabledScope(true))
             {
                 EditorGUILayout.Toggle("終了時にリセット", summary.GenerateResetOnExit);
@@ -74,11 +66,16 @@ namespace Gokoukotori.PoseTune.Editor
 
             if (summary.HasFullBodyTrackingOverride)
             {
-                EditorGUILayout.LabelField("FBT: Head / Hands / Hip / Feet",
-                    $"{summary.FullBodyTrackingPolicy.head} / {summary.FullBodyTrackingPolicy.leftHand},{summary.FullBodyTrackingPolicy.rightHand} / {summary.FullBodyTrackingPolicy.hip} / {summary.FullBodyTrackingPolicy.leftFoot},{summary.FullBodyTrackingPolicy.rightFoot}");
-                EditorGUILayout.LabelField("FBT: Fingers / Eyes / Mouth",
-                    $"{summary.FullBodyTrackingPolicy.leftFingers},{summary.FullBodyTrackingPolicy.rightFingers} / {summary.FullBodyTrackingPolicy.eyes} / {summary.FullBodyTrackingPolicy.mouth}");
+                DrawPolicyLines("FBT: ", summary.FullBodyTrackingPolicy);
             }
+        }
+
+        private static void DrawPolicyLines(string prefix, TrackingPolicyData policy)
+        {
+            EditorGUILayout.LabelField(prefix + "Head / Hands / Hip / Feet",
+                $"{policy.head} / {policy.leftHand},{policy.rightHand} / {policy.hip} / {policy.leftFoot},{policy.rightFoot}");
+            EditorGUILayout.LabelField(prefix + "Fingers / Eyes / Mouth",
+                $"{policy.leftFingers},{policy.rightFingers} / {policy.eyes} / {policy.mouth}");
         }
 
         private static void DrawDirectEditor(PoseTuneRoot root, Object selectedObject)

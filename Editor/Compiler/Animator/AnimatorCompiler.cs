@@ -2,23 +2,21 @@ using Gokoukotori.PoseTune;
 
 namespace Gokoukotori.PoseTune.Editor
 {
-    public sealed partial class AnimatorCompiler
+    public sealed class AnimatorCompiler
     {
-        private const float CriticalStateHoldSeconds = 0.02f;
+        internal const float CriticalStateHoldSeconds = 0.02f;
 
         public AnimatorBuildResult Compile(PoseGraph graph, ParameterPlan parameters)
         {
             graph.TrackingVotes = new TrackingVoteRegistry();
             var result = AnimatorControllerFactory.CreateBuildResult(graph, parameters);
             CreateActionPoseLayers(result, graph);
-            FxAssistCompiler.Compile(result, graph);
             return result;
         }
 
         private static void CreateActionPoseLayers(AnimatorBuildResult result, PoseGraph graph)
         {
             var controlsActionPlayable = PoseTuneCompilerRules.ControlsActionPlayable(graph.RootComponent);
-            const bool tracksGroupActivity = true;
             UnityEngine.AnimationClip handoffHold = null;
             foreach (var group in PoseGraphBuildFilter.BuildableGroups(graph))
             {
@@ -32,21 +30,33 @@ namespace Gokoukotori.PoseTune.Editor
                         result.GeneratedAssets.Add(handoffHold);
                     }
 
-                    CreateActionPoseLayer(result, graph, group, bucket.Poses, bucket.LayerName, bucket.BlendMode,
-                        tracksGroupActivity, PoseTuneNames.GroupActiveParameter(group, bucket.BlendMode), handoffHold);
+                    PoseLayerCompiler.CreateActionPoseLayer(result, graph, group, bucket.Poses, bucket.LayerName, bucket.BlendMode,
+                        PoseTuneNames.GroupActiveParameter(group, bucket.BlendMode), handoffHold);
                 }
 
-                AddHigherPriorityAutoPreemptionTransitions(result.TargetController, graph, group);
+                AutoPreemptionCompiler.AddHigherPriorityAutoPreemptionTransitions(result.TargetController, graph, group);
+            }
+
+            UnityEngine.AnimationClip refreshLoop = null;
+            if (PoseRefreshLayerCompiler.IsNeeded(graph))
+            {
+                refreshLoop = PoseRefreshLayerCompiler.CreateRefreshLoopClip("PT_PoseRefresh_Loop");
+                result.GeneratedAssets.Add(refreshLoop);
             }
 
             if (controlsActionPlayable)
             {
-                ActionWeightLayerCompiler.Compile(result, graph);
+                ActionWeightLayerCompiler.Compile(result, graph, refreshLoop);
             }
 
             if (ParameterAllocator.NeedsTrackingArbiter(graph))
             {
-                TrackingArbiterCompiler.Compile(result, graph);
+                TrackingArbiterCompiler.Compile(result, graph, refreshLoop);
+            }
+
+            if (refreshLoop != null)
+            {
+                PoseRefreshLayerCompiler.Compile(result);
             }
 
             PoseOptionsLayerCompiler.Compile(result, graph);

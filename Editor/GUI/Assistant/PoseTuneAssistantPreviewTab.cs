@@ -9,8 +9,6 @@ namespace Gokoukotori.PoseTune.Editor
     {
         public static void Draw(PoseTuneRoot root)
         {
-            root.questLowMemoryMode = EditorGUILayout.Toggle("Quest / 低メモリモード", root.questLowMemoryMode);
-
             foreach (var pose in root.GetComponentsInChildren<PoseClip>(true).OrderBy(p => p.menuOrder))
             {
                 using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))

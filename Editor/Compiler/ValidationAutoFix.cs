@@ -37,8 +37,6 @@ namespace Gokoukotori.PoseTune.Editor
             new FillKawaiiSourceMotionAutoFix()
         };
 
-        public IReadOnlyList<IPoseTuneAutoFix> Fixes => fixes;
-
         public IEnumerable<IPoseTuneAutoFix> FindFixes(ValidationIssue issue, PoseGraph graph)
         {
             return fixes.Where(fix => fix.Code == issue.Code && fix.CanFix(issue, graph));
@@ -60,6 +58,13 @@ namespace Gokoukotori.PoseTune.Editor
         public virtual bool IncludeInBatch => true;
         public abstract bool CanFix(ValidationIssue issue, PoseGraph graph);
         public abstract void Apply(ValidationIssue issue, PoseGraph graph);
+
+        protected void Modify(Object target, System.Action change)
+        {
+            Undo.RecordObject(target, Label);
+            change();
+            EditorUtility.SetDirty(target);
+        }
     }
 
     internal sealed class DisableGroupAutoFix : PoseTuneAutoFixBase
@@ -80,9 +85,7 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
-            Undo.RecordObject(group, Label);
-            group.includeInBuild = false;
-            EditorUtility.SetDirty(group);
+            Modify(group, () => group.includeInBuild = false);
         }
     }
 
@@ -104,9 +107,7 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
-            Undo.RecordObject(group, Label);
-            group.parameterName = "";
-            EditorUtility.SetDirty(group);
+            Modify(group, () => group.parameterName = "");
         }
     }
 
@@ -128,39 +129,8 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
-            Undo.RecordObject(pose, Label);
-            pose.loop = AnimationUtility.GetAnimationClipSettings(pose.clip).loopTime;
-            EditorUtility.SetDirty(pose);
+            Modify(pose, () => pose.loop = AnimationUtility.GetAnimationClipSettings(pose.clip).loopTime);
         }
-    }
-
-    internal sealed class DisableDuplicateRootPoliciesAutoFix : PoseTuneAutoFixBase
-    {
-        public DisableDuplicateRootPoliciesAutoFix() : base(PoseTuneDiagnostics.DuplicateRootTrackingPolicies.Code, "2件目以降の root-level policy を無効化", AutoFixSafety.Reversible)
-        {
-        }
-
-        public override bool CanFix(ValidationIssue issue, PoseGraph graph)
-        {
-            return graph?.RootComponent != null &&
-                   PoseTuneTrackingPolicyResolver.RootPolicies(graph.RootComponent, false).Count > 1;
-        }
-
-        public override void Apply(ValidationIssue issue, PoseGraph graph)
-        {
-            if (graph?.RootComponent == null)
-            {
-                return;
-            }
-
-            foreach (var policy in PoseTuneTrackingPolicyResolver.RootPolicies(graph.RootComponent, false).Skip(1))
-            {
-                Undo.RecordObject(policy, Label);
-                policy.enabled = false;
-                EditorUtility.SetDirty(policy);
-            }
-        }
-
     }
 
     internal sealed class DisableFbtGuardAutoFix : PoseTuneAutoFixBase
@@ -183,9 +153,7 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
-            Undo.RecordObject(graph.RootComponent, Label);
-            graph.RootComponent.disableWhenFullBodyTracking = false;
-            EditorUtility.SetDirty(graph.RootComponent);
+            Modify(graph.RootComponent, () => graph.RootComponent.disableWhenFullBodyTracking = false);
         }
     }
 
@@ -209,9 +177,7 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
-            Undo.RecordObject(graph.RootComponent, Label);
-            graph.RootComponent.advancedSettings.allowFullBodyTracking = true;
-            EditorUtility.SetDirty(graph.RootComponent);
+            Modify(graph.RootComponent, () => graph.RootComponent.advancedSettings.allowFullBodyTracking = true);
         }
     }
 
@@ -236,9 +202,7 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
-            Undo.RecordObject(pose, Label);
-            pose.sourceMotion = pose.clip;
-            EditorUtility.SetDirty(pose);
+            Modify(pose, () => pose.sourceMotion = pose.clip);
         }
     }
 }

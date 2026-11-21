@@ -2,7 +2,6 @@ using System;
 using Gokoukotori.PoseTune;
 using Gokoukotori.PoseTune.Editor.Compiler.Hashing;
 using nadena.dev.modular_avatar.core;
-using UnityEditor.Animations;
 using UnityEngine;
 using VRC.SDK3.Avatars.Components;
 using VRC.SDK3.Avatars.ScriptableObjects;
@@ -22,10 +21,6 @@ namespace Gokoukotori.PoseTune.Editor
                 : VRCAvatarDescriptor.AnimLayerType.Action,
                 matchAvatarWriteDefaults,
                 TargetLayerPriority(graph));
-            if (HasAnimatorContent(animators.FxController))
-            {
-                EmitAnimator(generatedRoot, animators.FxController, VRCAvatarDescriptor.AnimLayerType.FX, matchAvatarWriteDefaults);
-            }
             return generatedRoot;
         }
 
@@ -49,15 +44,20 @@ namespace Gokoukotori.PoseTune.Editor
             markerComponent.rootKey = graph.RootId;
             markerComponent.generatedVersion = PoseTunePackageInfo.Version;
             markerComponent.graphHash = PoseTuneGraphHasher.Compute(graph);
-            markerComponent.generatedAt = DateTime.UtcNow.ToString("O");
             return go;
         }
 
-        private static void EmitParameters(GameObject parent, ParameterPlan plan)
+        internal static void EmitParameters(GameObject parent, ParameterPlan plan)
         {
             var component = parent.AddComponent<ModularAvatarParameters>();
             foreach (var parameter in plan.Parameters)
             {
+                if (parameter.SharedWithAvatar)
+                {
+                    // Declaring it would make MA auto-rename it (internal) or add it to Expression Parameters.
+                    continue;
+                }
+
                 component.parameters.Add(new ParameterConfig
                 {
                     nameOrPrefix = parameter.Name,
@@ -116,12 +116,6 @@ namespace Gokoukotori.PoseTune.Editor
                    compatibility.overridePoseTuneLayerPriority
                 ? compatibility.poseTuneLayerPriority
                 : 0;
-        }
-
-        private static bool HasAnimatorContent(RuntimeAnimatorController controller)
-        {
-            return controller is AnimatorController animatorController &&
-                   animatorController.layers.Length > 0;
         }
 
         private static void EmitMenu(GameObject parent, PoseGraph graph, MenuPlan plan)

@@ -2,255 +2,237 @@ using System.Collections.Generic;
 using System.Linq;
 using Gokoukotori.PoseTune;
 using UnityEditor.Animations;
+using UnityEngine;
 
 namespace Gokoukotori.PoseTune.Editor
 {
-    public sealed partial class AnimatorCompiler
+    internal static class PoseEntryTransitionBuilder
     {
-        private static bool AddPoseEntryTransitions(
-            AnimatorControllerLayer layer,
-            PoseGraph graph,
-            PoseGroupDefinition group,
+        internal static bool AddPoseEntryTransitions(
+            PoseLayerBuildContext context,
             PoseDefinition pose,
             PoseStateVariants variants,
-            HashSet<string> duplicateStateBaseNames,
-            List<string> exclusiveResetTargets,
-            List<string> poseActiveParameters,
-            bool controlsActionPlayable,
-            string activeParameter,
             string poseActiveParameter,
-            PoseSelectionPlan poseSelection,
             int x,
             int y)
         {
-            var selectionBinding = poseSelection.Find(pose);
-            var resetLocalOnly = graph.RootComponent.poseSelectionSyncMode ==
-                                 PoseSelectionSyncMode.SharedExclusivePoseId;
-            var state = variants.BaseState;
-            var desktopLowerBodyState = variants.DesktopLowerBodyState;
-            var vrState = variants.VrState;
-            var fbtState = variants.FullBodyState;
-            var needsPoseSpaceVrVariant = variants.NeedsPoseSpaceVrVariant;
-            var needsDesktopLowerBodyLockVariant = variants.NeedsDesktopLowerBodyLockVariant;
-
-            var conditionBranches = pose.ConditionBranches.Count > 0
-                ? pose.ConditionBranches
-                : new List<List<ParameterConditionData>> { pose.Conditions };
+            var root = context.Root;
+            var group = context.Group;
+            var selectionBinding = context.PoseSelection.Find(pose);
+            var conditionBranches = ConditionTransitionCompiler.EffectiveConditionBranches(pose);
             var hasAutoEntry = conditionBranches.Any(branch =>
-                AllowsAutoEntry(graph.RootComponent, group, pose, branch));
-            AnimatorState commit = null;
-            AnimatorState desktopCommit = null;
-            AnimatorState vrCommit = null;
-            AnimatorState fbtCommit = null;
+                AutoContextTransitionCompiler.AllowsAutoEntry(root, group, pose, branch));
             foreach (var branch in conditionBranches)
             {
-                if (AllowsManualEntry(graph.RootComponent, group))
+                // Within a branch every manual entry precedes every auto entry; any-state order is priority.
+                if (AutoContextTransitionCompiler.AllowsManualEntry(root, group))
                 {
-                    var manualTarget = state;
-                    if (group.Exclusive && exclusiveResetTargets.Count > 0)
+                    foreach (var variant in variants.All)
                     {
-                        commit ??= CreateExclusiveCommitState(layer, group, pose, state,
-                            duplicateStateBaseNames,
-                            exclusiveResetTargets, poseActiveParameters, controlsActionPlayable,
-                            activeParameter, true, x + 280, y,
-                            trackingVoteId: variants.BaseTrackingVoteId,
-                            resetLocalOnly: resetLocalOnly);
-                        manualTarget = commit;
-                    }
-
-                    var enter = layer.stateMachine.AddAnyStateTransition(manualTarget);
-                    enter.hasExitTime = false;
-                    enter.duration = 0f;
-                    enter.canTransitionToSelf = false;
-                    AddManualModeEntryCondition(enter, graph.RootComponent);
-                    AddTrackingVoteClearedCondition(enter, graph, group);
-                    enter.AddCondition(
-                        AnimatorConditionMode.Equals,
-                        selectionBinding.Value,
-                        selectionBinding.ParameterName);
-                    AddManualCommitReentryGuard(enter, manualTarget, state, poseActiveParameter);
-                    AddFbtEntryCondition(enter, graph.RootComponent, pose, false);
-                    if (needsDesktopLowerBodyLockVariant)
-                    {
-                        AddVrModeCondition(enter);
-                    }
-                    else
-                    {
-                        AddPoseSpaceScopeCondition(enter, pose);
-                    }
-                    AddConditions(enter, branch);
-
-                    if (desktopLowerBodyState != null)
-                    {
-                        var desktopTarget = desktopLowerBodyState;
-                        if (group.Exclusive && exclusiveResetTargets.Count > 0)
-                        {
-                            desktopCommit ??= CreateExclusiveCommitState(layer, group, pose, desktopLowerBodyState,
-                            duplicateStateBaseNames,
-                            exclusiveResetTargets, poseActiveParameters, controlsActionPlayable,
-                            activeParameter, true, x + 420, y,
-                            "_Desktop",
-                            variants.DesktopLowerBodyTrackingVoteId,
-                            resetLocalOnly);
-                            desktopTarget = desktopCommit;
-                        }
-
-                        var desktopEnter = layer.stateMachine.AddAnyStateTransition(desktopTarget);
-                        desktopEnter.hasExitTime = false;
-                        desktopEnter.duration = 0f;
-                        desktopEnter.canTransitionToSelf = false;
-                        AddManualModeEntryCondition(desktopEnter, graph.RootComponent);
-                        AddTrackingVoteClearedCondition(desktopEnter, graph, group);
-                        desktopEnter.AddCondition(
-                            AnimatorConditionMode.Equals,
-                            selectionBinding.Value,
-                            selectionBinding.ParameterName);
-                        AddManualCommitReentryGuard(desktopEnter, desktopTarget, desktopLowerBodyState, poseActiveParameter);
-                        AddFbtEntryCondition(desktopEnter, graph.RootComponent, pose, false);
-                        AddDesktopModeCondition(desktopEnter);
-                        AddConditions(desktopEnter, branch);
-                    }
-
-                    if (vrState != null)
-                    {
-                        var vrTarget = vrState;
-                        if (group.Exclusive && exclusiveResetTargets.Count > 0)
-                        {
-                            vrCommit ??= CreateExclusiveCommitState(layer, group, pose, vrState,
-                                duplicateStateBaseNames,
-                                exclusiveResetTargets, poseActiveParameters, controlsActionPlayable,
-                                activeParameter, false, x + 420, y,
-                                "_VR",
-                                variants.VrTrackingVoteId,
-                                resetLocalOnly);
-                            vrTarget = vrCommit;
-                        }
-
-                        var vrEnter = layer.stateMachine.AddAnyStateTransition(vrTarget);
-                        vrEnter.hasExitTime = false;
-                        vrEnter.duration = 0f;
-                        vrEnter.canTransitionToSelf = false;
-                        AddManualModeEntryCondition(vrEnter, graph.RootComponent);
-                        AddTrackingVoteClearedCondition(vrEnter, graph, group);
-                        vrEnter.AddCondition(
-                            AnimatorConditionMode.Equals,
-                            selectionBinding.Value,
-                            selectionBinding.ParameterName);
-                        AddManualCommitReentryGuard(vrEnter, vrTarget, vrState, poseActiveParameter);
-                        AddFbtEntryCondition(vrEnter, graph.RootComponent, pose, false);
-                        AddPoseSpaceScopeCondition(vrEnter, pose, true);
-                        AddConditions(vrEnter, branch);
-                    }
-
-                    if (fbtState != null)
-                    {
-                        var fbtTarget = fbtState;
-                        if (group.Exclusive && exclusiveResetTargets.Count > 0)
-                        {
-                            fbtCommit ??= CreateExclusiveCommitState(layer, group, pose, fbtState,
-                            duplicateStateBaseNames,
-                            exclusiveResetTargets, poseActiveParameters, controlsActionPlayable,
-                            activeParameter, !needsPoseSpaceVrVariant, x + 560, y,
-                            "_FBT",
-                            variants.FullBodyTrackingVoteId,
-                            resetLocalOnly);
-                            fbtTarget = fbtCommit;
-                        }
-
-                        var fbtEnter = layer.stateMachine.AddAnyStateTransition(fbtTarget);
-                        fbtEnter.hasExitTime = false;
-                        fbtEnter.duration = 0f;
-                        fbtEnter.canTransitionToSelf = false;
-                        AddManualModeEntryCondition(fbtEnter, graph.RootComponent);
-                        AddTrackingVoteClearedCondition(fbtEnter, graph, group);
-                        fbtEnter.AddCondition(
-                            AnimatorConditionMode.Equals,
-                            selectionBinding.Value,
-                            selectionBinding.ParameterName);
-                        AddManualCommitReentryGuard(fbtEnter, fbtTarget, fbtState, poseActiveParameter);
-                        AddFbtEntryCondition(fbtEnter, graph.RootComponent, pose, true);
-                        AddPoseSpaceScopeCondition(fbtEnter, pose, needsPoseSpaceVrVariant);
-                        AddConditions(fbtEnter, branch);
+                        AddManualEntry(
+                            context,
+                            pose,
+                            variants,
+                            variant,
+                            branch,
+                            selectionBinding,
+                            poseActiveParameter,
+                            x,
+                            y);
                     }
                 }
 
-                if (AllowsAutoEntry(graph.RootComponent, group, pose, branch))
+                if (AutoContextTransitionCompiler.AllowsAutoEntry(root, group, pose, branch))
                 {
-                    var enter = layer.stateMachine.AddAnyStateTransition(state);
-                    enter.hasExitTime = false;
-                    enter.duration = 0f;
-                    enter.canTransitionToSelf = false;
-                    enter.AddCondition(AnimatorConditionMode.Equals, 1, graph.RootComponent.Parameter(PoseTuneNames.Mode));
-                    AddTrackingVoteClearedCondition(enter, graph, group);
-                    AddSelectedPoseAutoEntryCondition(enter, graph.RootComponent, group, pose, poseSelection);
-                    AddFbtEntryCondition(enter, graph.RootComponent, pose, false);
-                    if (needsDesktopLowerBodyLockVariant)
+                    foreach (var variant in variants.All)
                     {
-                        AddVrModeCondition(enter);
-                    }
-                    else
-                    {
-                        AddPoseSpaceScopeCondition(enter, pose);
-                    }
-                    AddConditions(enter, AutoContextConditions(graph.RootComponent, group));
-                    AddConditions(enter, branch);
-
-                    if (desktopLowerBodyState != null)
-                    {
-                        var desktopEnter = layer.stateMachine.AddAnyStateTransition(desktopLowerBodyState);
-                        desktopEnter.hasExitTime = false;
-                        desktopEnter.duration = 0f;
-                        desktopEnter.canTransitionToSelf = false;
-                        desktopEnter.AddCondition(AnimatorConditionMode.Equals, 1,
-                            graph.RootComponent.Parameter(PoseTuneNames.Mode));
-                        AddTrackingVoteClearedCondition(desktopEnter, graph, group);
-                        AddSelectedPoseAutoEntryCondition(
-                            desktopEnter,
-                            graph.RootComponent,
-                            group,
-                            pose,
-                            poseSelection);
-                        AddFbtEntryCondition(desktopEnter, graph.RootComponent, pose, false);
-                        AddDesktopModeCondition(desktopEnter);
-                        AddConditions(desktopEnter, AutoContextConditions(graph.RootComponent, group));
-                        AddConditions(desktopEnter, branch);
-                    }
-
-                    if (vrState != null)
-                    {
-                        var vrEnter = layer.stateMachine.AddAnyStateTransition(vrState);
-                        vrEnter.hasExitTime = false;
-                        vrEnter.duration = 0f;
-                        vrEnter.canTransitionToSelf = false;
-                        vrEnter.AddCondition(AnimatorConditionMode.Equals, 1,
-                            graph.RootComponent.Parameter(PoseTuneNames.Mode));
-                        AddTrackingVoteClearedCondition(vrEnter, graph, group);
-                        AddSelectedPoseAutoEntryCondition(vrEnter, graph.RootComponent, group, pose, poseSelection);
-                        AddFbtEntryCondition(vrEnter, graph.RootComponent, pose, false);
-                        AddPoseSpaceScopeCondition(vrEnter, pose, true);
-                        AddConditions(vrEnter, AutoContextConditions(graph.RootComponent, group));
-                        AddConditions(vrEnter, branch);
-                    }
-
-                    if (fbtState != null)
-                    {
-                        var fbtEnter = layer.stateMachine.AddAnyStateTransition(fbtState);
-                        fbtEnter.hasExitTime = false;
-                        fbtEnter.duration = 0f;
-                        fbtEnter.canTransitionToSelf = false;
-                        fbtEnter.AddCondition(AnimatorConditionMode.Equals, 1,
-                            graph.RootComponent.Parameter(PoseTuneNames.Mode));
-                        AddTrackingVoteClearedCondition(fbtEnter, graph, group);
-                        AddSelectedPoseAutoEntryCondition(fbtEnter, graph.RootComponent, group, pose, poseSelection);
-                        AddFbtEntryCondition(fbtEnter, graph.RootComponent, pose, true);
-                        AddPoseSpaceScopeCondition(fbtEnter, pose, needsPoseSpaceVrVariant);
-                        AddConditions(fbtEnter, AutoContextConditions(graph.RootComponent, group));
-                        AddConditions(fbtEnter, branch);
+                        AddAutoEntry(context, pose, variants, variant, branch);
                     }
                 }
             }
 
             return hasAutoEntry;
+        }
+
+        private static void AddManualEntry(
+            PoseLayerBuildContext context,
+            PoseDefinition pose,
+            PoseStateVariants variants,
+            PoseStateVariant variant,
+            List<ParameterConditionData> branch,
+            PoseSelectionBinding selectionBinding,
+            string poseActiveParameter,
+            int x,
+            int y)
+        {
+            var target = variant.State;
+            if (context.Group.Exclusive && context.ExclusiveResetTargets.Count > 0)
+            {
+                variant.Commit ??= CreateExclusiveCommitState(context, pose, variant, x, y);
+                target = variant.Commit;
+            }
+
+            var enter = AnimatorTransitionFactory.ImmediateFromAny(context.Layer.stateMachine, target);
+            ModeTransitionCompiler.AddManualModeEntryCondition(enter, context.Root);
+            AddTrackingVoteClearedCondition(enter, context.Graph, context.Group);
+            enter.AddCondition(
+                AnimatorConditionMode.Equals,
+                selectionBinding.Value,
+                selectionBinding.ParameterName);
+            AddManualCommitReentryGuard(enter, target, variant.State, poseActiveParameter);
+            AddFbtEntryCondition(enter, context.Root, pose, variant.IsFullBody);
+            AddVariantScopeCondition(enter, pose, variants, variant);
+            ConditionTransitionCompiler.AddConditions(enter, branch);
+        }
+
+        private static void AddAutoEntry(
+            PoseLayerBuildContext context,
+            PoseDefinition pose,
+            PoseStateVariants variants,
+            PoseStateVariant variant,
+            List<ParameterConditionData> branch)
+        {
+            var enter = AnimatorTransitionFactory.ImmediateFromAny(context.Layer.stateMachine, variant.State);
+            ModeTransitionCompiler.AddAutoModeCondition(enter, context.Root);
+            AddTrackingVoteClearedCondition(enter, context.Graph, context.Group);
+            AutoContextTransitionCompiler.AddSelectedPoseAutoEntryCondition(
+                enter,
+                context.Root,
+                context.Group,
+                pose,
+                context.PoseSelection);
+            AddFbtEntryCondition(enter, context.Root, pose, variant.IsFullBody);
+            AddVariantScopeCondition(enter, pose, variants, variant);
+            ConditionTransitionCompiler.AddConditions(
+                enter,
+                AutoContextTransitionCompiler.AutoContextConditions(context.Root, context.Group));
+            ConditionTransitionCompiler.AddConditions(enter, branch);
+        }
+
+        /// <summary>Restricts an entry to the mode or pose space scope its variant plays in.</summary>
+        private static void AddVariantScopeCondition(
+            AnimatorStateTransition transition,
+            PoseDefinition pose,
+            PoseStateVariants variants,
+            PoseStateVariant variant)
+        {
+            switch (variant.Kind)
+            {
+                case PoseStateVariantKind.Base:
+                    if (variants.NeedsDesktopVariant)
+                    {
+                        ModeTransitionCompiler.AddVrModeCondition(transition);
+                    }
+                    else
+                    {
+                        PoseSpaceTransitionCompiler.AddPoseSpaceScopeCondition(transition, pose);
+                    }
+
+                    break;
+                case PoseStateVariantKind.Desktop:
+                    ModeTransitionCompiler.AddDesktopModeCondition(transition);
+                    break;
+                case PoseStateVariantKind.Vr:
+                    PoseSpaceTransitionCompiler.AddPoseSpaceScopeCondition(transition, pose, true);
+                    break;
+                default:
+                    PoseSpaceTransitionCompiler.AddPoseSpaceScopeCondition(
+                        transition,
+                        pose,
+                        variants.NeedsPoseSpaceVrVariant);
+                    break;
+            }
+        }
+
+        private static void AddFbtEntryCondition(
+            AnimatorStateTransition transition,
+            PoseTuneRoot root,
+            PoseDefinition pose,
+            bool fullBodyVariant)
+        {
+            TrackingGuardCompiler.AddEntryConditions(
+                transition,
+                TrackingGuardCompiler.PoseEntryProfile(root, pose, fullBodyVariant));
+        }
+
+        private static void AddManualCommitReentryGuard(
+            AnimatorStateTransition transition,
+            AnimatorState manualTarget,
+            AnimatorState poseState,
+            string poseActiveParameter)
+        {
+            if (manualTarget == poseState || string.IsNullOrWhiteSpace(poseActiveParameter))
+            {
+                return;
+            }
+
+            transition.AddCondition(AnimatorConditionMode.IfNot, 0f, poseActiveParameter);
+        }
+
+        private static void AddTrackingVoteClearedCondition(
+            AnimatorStateTransition transition,
+            PoseGraph graph,
+            PoseGroupDefinition group)
+        {
+            if (ParameterAllocator.RequiresTrackingVote(graph, group))
+            {
+                transition.AddCondition(
+                    AnimatorConditionMode.Equals,
+                    0f,
+                    PoseTuneNames.TrackingVoteParameter(group));
+            }
+
+            foreach (var activeParameter in PoseTuneLayerNaming.GroupActiveParameters(group))
+            {
+                ActiveParameterConditions.AddInactiveCondition(transition, activeParameter);
+            }
+        }
+
+        private static AnimatorState CreateExclusiveCommitState(
+            PoseLayerBuildContext context,
+            PoseDefinition pose,
+            PoseStateVariant variant,
+            int x,
+            int y)
+        {
+            var destination = variant.State;
+            var commit = context.Layer.stateMachine.AddState(
+                PoseStateNaming.CommitExclusivePrefix + PoseStateNaming.Name(pose, context.DuplicateStateBaseNames) +
+                variant.Suffix,
+                new Vector3(x + variant.CommitX, y));
+            CopyPoseStateSurface(destination, commit);
+            ParameterDriverCompiler.ResetExclusiveParameters(
+                commit,
+                context.ExclusiveResetTargets,
+                context.ResetLocalOnly);
+            ParameterDriverCompiler.ResetPoseActiveParameters(commit, context.PoseActiveParameters);
+            if (variant.AppliesPoseSpace)
+            {
+                PoseSpaceCompiler.AddEnterPoseSpaceBehavior(commit, pose.PoseSpace);
+            }
+            ParameterDriverCompiler.SetGroupActive(commit, context.ActiveParameter, 1f);
+            if (variant.VoteId > 0)
+            {
+                ParameterDriverCompiler.SetTrackingVote(commit, context.Group, variant.VoteId);
+            }
+            AnimatorTransitionFactory.AfterExitTime(commit, destination, 0f, CommitStateHoldSeconds(pose));
+            return commit;
+        }
+
+        private static float CommitStateHoldSeconds(PoseDefinition pose)
+        {
+            var poseSpaceDelay = pose?.PoseSpace != null && pose.PoseSpace.enabled && pose.PoseSpace.fixedDelay
+                ? pose.PoseSpace.delayTime
+                : 0f;
+            return Mathf.Max(AnimatorCompiler.CriticalStateHoldSeconds, poseSpaceDelay);
+        }
+
+        private static void CopyPoseStateSurface(AnimatorState source, AnimatorState destination)
+        {
+            destination.motion = source.motion;
+            destination.writeDefaultValues = source.writeDefaultValues;
+            destination.timeParameterActive = source.timeParameterActive;
+            destination.timeParameter = source.timeParameter;
         }
     }
 }

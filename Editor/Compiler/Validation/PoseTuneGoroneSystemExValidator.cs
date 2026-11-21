@@ -33,20 +33,11 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
                         compatibility);
                 }
 
-                if (compatibility.requireGoroneSystemEx)
-                {
-                    report.Error(
-                        PoseTuneDiagnostics.GoroneSystemExMissing.Code,
-                        "Gorone System EX Compatibility が有効ですが、Gorone System EX が検出できません。",
-                        compatibility);
-                }
-                else
-                {
-                    report.Warning(
-                        PoseTuneDiagnostics.GoroneSystemExMissing.Code,
-                        "Gorone System EX Compatibility が有効ですが、Gorone System EX が検出できません。",
-                        compatibility);
-                }
+                report.Add(new ValidationIssue(
+                    compatibility.requireGoroneSystemEx ? ValidationSeverity.Error : ValidationSeverity.Warning,
+                    PoseTuneDiagnostics.GoroneSystemExMissing.Code,
+                    "Gorone System EX Compatibility が有効ですが、Gorone System EX が検出できません。",
+                    compatibility));
             }
 
             if (detection.HasGoroneSystemEx && detection.VrcSupineParameters.Count == 0)

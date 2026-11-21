@@ -90,10 +90,10 @@ namespace Gokoukotori.PoseTune.Editor
             {
                 currentPlan.Warning(
                     KawaiiPresetAdjustmentSyncExecutor.StalePlanCode,
-                    "入力またはPoseTuneの状態が変わりました。最新のドライラン結果を確認してください。",
+                    KawaiiPresetAdjustmentSyncExecutor.StalePlanMessage,
                     root);
                 lastPlan = currentPlan;
-                resultMessage = "状態変更を検出したため同期しませんでした。";
+                resultMessage = KawaiiPresetAdjustmentSyncExecutor.StaleResultMessage;
                 resultMessageType = MessageType.Warning;
                 return;
             }
@@ -108,7 +108,7 @@ namespace Gokoukotori.PoseTune.Editor
 
             if (!currentPlan.HasChanges)
             {
-                resultMessage = "同期が必要な調整クリップはありません。";
+                resultMessage = KawaiiPresetAdjustmentSyncExecutor.NoChangesMessage;
                 resultMessageType = MessageType.Info;
                 return;
             }
@@ -156,13 +156,7 @@ namespace Gokoukotori.PoseTune.Editor
 
             foreach (var issue in lastPlan.Issues)
             {
-                var messageType = issue.Severity switch
-                {
-                    KawaiiMigrationSeverity.Error => MessageType.Error,
-                    KawaiiMigrationSeverity.Warning => MessageType.Warning,
-                    _ => MessageType.Info
-                };
-                EditorGUILayout.HelpBox(issue.Code + ": " + issue.Message, messageType);
+                EditorGUILayout.HelpBox(issue.Code + ": " + issue.Message, issue.Severity.ToMessageType());
             }
 
             foreach (var entry in lastPlan.Entries)

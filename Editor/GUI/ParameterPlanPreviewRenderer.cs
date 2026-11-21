@@ -89,11 +89,7 @@ namespace Gokoukotori.PoseTune.Editor
 
     internal sealed class ParameterPlanPreviewRenderer : IDisposable
     {
-        private readonly Func<PoseTuneRoot, ParameterPlanPreviewSnapshot> _createSnapshot;
-        private readonly PoseTuneAssistantScopedInvalidation _invalidation;
-        private PoseTuneRoot _cachedRoot;
-        private ParameterPlanPreviewSnapshot _snapshot;
-        private bool _cacheValid;
+        private readonly PoseTuneRootSnapshotCache<ParameterPlanPreviewSnapshot> _cache;
 
         public ParameterPlanPreviewRenderer()
             : this(CreateSnapshot)
@@ -102,18 +98,17 @@ namespace Gokoukotori.PoseTune.Editor
 
         internal ParameterPlanPreviewRenderer(Func<PoseTuneRoot, ParameterPlanPreviewSnapshot> createSnapshot)
         {
-            _createSnapshot = createSnapshot ?? throw new ArgumentNullException(nameof(createSnapshot));
-            _invalidation = new PoseTuneAssistantScopedInvalidation(Invalidate);
+            _cache = new PoseTuneRootSnapshotCache<ParameterPlanPreviewSnapshot>(createSnapshot);
         }
 
         public void Invalidate()
         {
-            _cacheValid = false;
+            _cache.Invalidate();
         }
 
         public void Dispose()
         {
-            _invalidation.Dispose();
+            _cache.Dispose();
         }
 
         public void Draw(PoseTuneRoot root)
@@ -137,15 +132,7 @@ namespace Gokoukotori.PoseTune.Editor
 
         internal ParameterPlanPreviewSnapshot GetSnapshot(PoseTuneRoot root)
         {
-            _invalidation.Track(root);
-            if (!_cacheValid || _cachedRoot != root)
-            {
-                _cachedRoot = root;
-                _snapshot = _createSnapshot(root);
-                _cacheValid = true;
-            }
-
-            return _snapshot;
+            return _cache.Get(root);
         }
 
         private static ParameterPlanPreviewSnapshot CreateSnapshot(PoseTuneRoot root)

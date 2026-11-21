@@ -24,41 +24,12 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Conditions
             };
         }
 
-        public static ParameterConditionData Invert(ParameterConditionData condition)
-        {
-            if (condition == null)
-            {
-                return null;
-            }
-
-            var inverted = Copy(condition);
-            switch (condition.op)
-            {
-                case ConditionOperator.Equals:
-                    inverted.op = ConditionOperator.NotEquals;
-                    break;
-                case ConditionOperator.NotEquals:
-                    inverted.op = ConditionOperator.Equals;
-                    break;
-                case ConditionOperator.Greater:
-                case ConditionOperator.GreaterOrEqual:
-                    inverted.op = ConditionOperator.LessOrEqual;
-                    break;
-                case ConditionOperator.Less:
-                case ConditionOperator.LessOrEqual:
-                    inverted.op = ConditionOperator.GreaterOrEqual;
-                    break;
-                case ConditionOperator.If:
-                    inverted.op = ConditionOperator.IfNot;
-                    break;
-                case ConditionOperator.IfNot:
-                    inverted.op = ConditionOperator.If;
-                    break;
-            }
-
-            return inverted;
-        }
-
+        /// <summary>
+        /// Returns the exact complement of <paramref name="condition"/>. Compiled with
+        /// <see cref="AddAnimatorCondition"/>, entry and exit then hold for disjoint values: Int thresholds are
+        /// whole numbers, and each Float operator pair shares one boundary at threshold ± <see cref="FloatEpsilon"/>,
+        /// a value that real parameters practically never take.
+        /// </summary>
         public static ParameterConditionData InvertForAutoContextExit(ParameterConditionData condition)
         {
             if (condition == null)
@@ -76,18 +47,16 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Conditions
                     inverted.op = ConditionOperator.Equals;
                     break;
                 case ConditionOperator.Greater:
-                    inverted.op = ConditionOperator.Less;
+                    inverted.op = ConditionOperator.LessOrEqual;
                     break;
                 case ConditionOperator.GreaterOrEqual:
                     inverted.op = ConditionOperator.Less;
-                    AdjustFloatThreshold(inverted, -FloatEpsilon);
                     break;
                 case ConditionOperator.Less:
-                    inverted.op = ConditionOperator.Greater;
+                    inverted.op = ConditionOperator.GreaterOrEqual;
                     break;
                 case ConditionOperator.LessOrEqual:
                     inverted.op = ConditionOperator.Greater;
-                    AdjustFloatThreshold(inverted, FloatEpsilon);
                     break;
                 case ConditionOperator.If:
                     inverted.op = ConditionOperator.IfNot;
@@ -145,24 +114,26 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Conditions
             switch (condition.op)
             {
                 case ConditionOperator.Equals:
-                    transition.AddCondition(AnimatorConditionMode.Equals, AnimatorThreshold(condition), condition.parameter);
+                    transition.AddCondition(AnimatorConditionMode.Equals, Threshold(condition), condition.parameter);
                     break;
                 case ConditionOperator.NotEquals:
-                    transition.AddCondition(AnimatorConditionMode.NotEqual, AnimatorThreshold(condition), condition.parameter);
+                    transition.AddCondition(AnimatorConditionMode.NotEqual, Threshold(condition), condition.parameter);
                     break;
                 case ConditionOperator.Greater:
-                    transition.AddCondition(AnimatorConditionMode.Greater, AnimatorThreshold(condition), condition.parameter);
+                    transition.AddCondition(AnimatorConditionMode.Greater,
+                        OrderedThreshold(condition, 0, FloatEpsilon), condition.parameter);
                     break;
                 case ConditionOperator.GreaterOrEqual:
                     transition.AddCondition(AnimatorConditionMode.Greater,
-                        AnimatorThreshold(condition) - FloatEpsilon, condition.parameter);
+                        OrderedThreshold(condition, -1, -FloatEpsilon), condition.parameter);
                     break;
                 case ConditionOperator.Less:
-                    transition.AddCondition(AnimatorConditionMode.Less, AnimatorThreshold(condition), condition.parameter);
+                    transition.AddCondition(AnimatorConditionMode.Less,
+                        OrderedThreshold(condition, 0, -FloatEpsilon), condition.parameter);
                     break;
                 case ConditionOperator.LessOrEqual:
                     transition.AddCondition(AnimatorConditionMode.Less,
-                        AnimatorThreshold(condition) + FloatEpsilon, condition.parameter);
+                        OrderedThreshold(condition, 1, FloatEpsilon), condition.parameter);
                     break;
                 case ConditionOperator.If:
                     transition.AddCondition(AnimatorConditionMode.If, 0, condition.parameter);
@@ -173,12 +144,11 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Conditions
             }
         }
 
-        private static void AdjustFloatThreshold(ParameterConditionData condition, float delta)
+        private static float OrderedThreshold(ParameterConditionData condition, int intOffset, float floatOffset)
         {
-            if (condition.valueType == ParameterValueType.Float)
-            {
-                condition.floatValue += delta;
-            }
+            return condition.valueType == ParameterValueType.Int
+                ? condition.intValue + intOffset
+                : condition.floatValue + floatOffset;
         }
 
         private static float Value(ParameterConditionData condition, PoseTuneParameterSnapshot snapshot)
@@ -193,17 +163,6 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Conditions
         }
 
         private static float Threshold(ParameterConditionData condition)
-        {
-            switch (condition.valueType)
-            {
-                case ParameterValueType.Int:
-                    return condition.intValue;
-                default:
-                    return condition.floatValue;
-            }
-        }
-
-        private static float AnimatorThreshold(ParameterConditionData condition)
         {
             return condition.valueType == ParameterValueType.Int ? condition.intValue : condition.floatValue;
         }

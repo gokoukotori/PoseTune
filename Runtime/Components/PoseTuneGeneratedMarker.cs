@@ -12,7 +12,5 @@ namespace Gokoukotori.PoseTune
         public string generatedVersion = "";
         [InspectorName("グラフハッシュ")]
         public string graphHash = "";
-        [InspectorName("生成日時")]
-        public string generatedAt = "";
     }
 }

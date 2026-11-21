@@ -9,32 +9,6 @@ namespace Gokoukotori.PoseTune.Editor
         private readonly Dictionary<string, int> ints = new();
         private readonly Dictionary<string, bool> bools = new();
 
-        public static PoseTuneParameterSnapshot Desktop()
-        {
-            var snapshot = new PoseTuneParameterSnapshot();
-            snapshot.SetInt("VRMode", 0);
-            snapshot.SetInt("TrackingType", 3);
-            snapshot.SetFloat("Upright", 1f);
-            snapshot.SetBool("Grounded", true);
-            snapshot.SetBool("Seated", false);
-            return snapshot;
-        }
-
-        public static PoseTuneParameterSnapshot ThreePointVr()
-        {
-            var snapshot = Desktop();
-            snapshot.SetInt("VRMode", 1);
-            snapshot.SetInt("TrackingType", 3);
-            return snapshot;
-        }
-
-        public static PoseTuneParameterSnapshot FullBodyTracking()
-        {
-            var snapshot = ThreePointVr();
-            snapshot.SetInt("TrackingType", 6);
-            return snapshot;
-        }
-
         public void SetFloat(string parameter, float value)
         {
             floats[parameter] = value;

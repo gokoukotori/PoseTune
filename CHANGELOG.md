@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-11-21
+
+### Fixed
+
+- ポーズ中にジャンプすると、Locomotion layerのjump／fall／landing stateが`VRCAnimatorTrackingControl`を上書きし、着地後もポーズを選び直すまで頭・手・腰・足の姿勢が崩れたままになる問題を修正
+- ポーズ中にエモートを再生するかAFKから復帰すると、既定Action layerの`BlendOut`がAction weightを0、trackingを`Tracking`へ戻し、ポーズを選び直すまでポーズが消えるか崩れたままになる問題を修正
+- 上記2件のため、`PT_PoseRefresh` layerが内部parameter`PTI/PoseRefresh`を立てる。対象は空中と着地後2秒、`VRCEmote`が0以外の間と0へ戻ってから12秒、AFK中と復帰後2秒。その間はtracking arbiterの`VoteAnimation`／`VoteTracking`／`LockedAnimation`と`PT_ActionWeight`の`ActionWeightActive`が0.1秒ごとに入り直し、現在のtrackingとAction weightを再適用する。既定Action layerの`BlendOut`は他プレイヤー側のアバター複製でもAction weightを0にするため、`PTI/PoseRefresh`のdriverはlocal onlyにせず、他プレイヤーから見てもポーズが戻るようにする。ポーズが無効な間とPoseTuneが制御しない部位（`NoChange`）には触れず、同期parameterも増やさない
+- 条件の`>`／`<`で、値がちょうど閾値（例：`Int > 5`で5、`Float > 0.5`で0.5）に戻ると入る条件も抜ける条件も成り立たず、ポーズが解除されない問題を修正。Intの閾値を整数（`>= n`は`> n-1`、`<= n`は`< n+1`）に揃え、Floatの境界を`閾値 ± 0.0001`に置くことで、抜ける条件が入る条件の正確な補集合になるように変更。自動コンテキスト切替のUpright境界（Standingの`> 0.75`とFloorの`<= 0.75`）で2グループが同時に有効になる重なりも解消。なお`>`と`<`同士で隣り合う範囲（例：`> 0.75`と`< 0.75`）の間には、どちらにも入らない幅約0.0002の範囲が残る
+- Pose Spaceの適用スコープを「VR のみ」にすると、ポーズ自体のentryに`VRMode > 0`が付き、デスクトップではポーズが再生されず、VRからデスクトップへ切り替えても抜けない問題を修正。「VR のみ」のポーズにはPose Spaceへ入らない`_Desktop` variantを生成し、`VRMode`の切替で反対側のvariantへ移るように変更。デスクトップ下半身ロックが有効な場合は`_Desktop` variantにも適用する
+- Pose Spaceを使わないポーズの終了でも`VRCAnimatorTemporaryPoseSpace`の退出が出力され、別グループのポーズや他ギミックのPose Spaceを解除する問題を修正。終了時の退出は、そのstateが実際にPose Spaceへ入る場合（有効かつ「ポーズ空間に入る」、`DesktopOnly`の`_VR`と`VR のみ`の`_Desktop`を除く）だけに限定
+- 「Root XZ を first key 基準で再中心化」を有効にすると`rootOffset`のX／Zが再中心化で打ち消される問題を修正。`rootOffset`を再中心化の後に適用するよう変更。調整クリップは従来どおり再中心化の前に適用し、移行時のKawaii bakeと同じ結果を保つ
+- Pose BlendTreeのblend parameterとMotion Time「AnimatorStateTime」のparameterがModular Avatarのinternal parameterとして宣言され、自動リネームによりアバター側の同名parameterから切り離される問題を修正。これらはPoseTuneのcontrollerには追加するが、MA Parametersには宣言せず、アバター全体で名前を共有する（Expression Parametersには従来どおり追加しない）
+- BlendTreeが生成heightやCustom Float Motion Timeと同名のparameterを参照すると、pose順によってNDMF build時に重複例外になる、またはparameterが同期されないinternalへ変わる問題を修正。生成parameterを先に登録し、motionが参照するだけのparameterは未登録の場合のみ追加する
+- Pose Menuの「寝姿勢メニュー配置」（`lyingMenuLayout`）がインスペクターに表示されず、KawaiiPosingからの移行以外では変更できなかった問題を修正
+- Assistantで変更した設定をUndoで戻せない問題を修正。対象は「詳細設定」と、トラッキング／高さタブのPoseTuneRootの設定項目。PoseTuneRootがPrefabインスタンスの一部の場合、これらの変更がPrefabのオーバーライドとして記録されず、保存されないことがある問題も同時に修正
+- KawaiiPosingからの移行を実行すると、無効なポーズを読み飛ばした警告（PT-K004）が同じポーズについて2回表示される問題を修正（ドライランは従来どおり1回）
+
+### Removed
+
+- **破壊的変更:** `PoseTuneRoot.displayName`（「表示名」）を削除。生成されるmenu・parameter・Animatorのいずれにも使われず、graph hashにだけ含まれていた。menuの表示名は従来どおり`PoseMenu.rootMenuName`で指定する
+- **破壊的変更:** Inspectorに表示されず、値が1つしかなかった`PoseTuneRoot.buildMode`と`PoseTuneBuildMode`を削除
+- **破壊的変更:** `PoseTuneGeneratedMarker.generatedAt`（「生成日時」）を削除。build時に書き込むだけで、どこからも読まれていなかった
+- **破壊的変更:** layerが1つも追加されず、Modular Avatarへ出力されることがなかったFX用Animator Controllerの生成と`AnimatorBuildResult.FxController`を削除
+- **破壊的変更:** 未使用の`PoseTuneLog`を削除
+- **破壊的変更:** `Tools > Gokoukotori > PoseTune > Pose Preview Window`（`PosePreviewWindow`）を削除。ポーズの確認はAssistantの「プレビュー」タブ、またはPoseClip選択時の自動プレビュー（`Tools > Gokoukotori > PoseTune > Settings > Selected Pose Preview`）を使用する
+- **破壊的変更:** `Tools > Gokoukotori > PoseTune > Parameter Simulator`（`PoseTuneParameterSimulatorWindow`）と、このwindowだけが使っていた`PoseTuneEntrySimulationService`／`PoseTuneConditionEvaluator`／`PoseTuneParameterSimulatorModel`／`TrackingGuardCompiler.AllowsEntry`／`PoseTuneParameterSnapshot`のprofile生成メソッドを削除
+- **破壊的変更:** `PoseTuneRoot.questLowMemoryMode`（「Quest / 低メモリモード」）を削除。効果は高さparameterを同期しないことだけだったため、同じ結果は`PoseHeightAdjust`の「同期」をオフにして得る。このオプションをオンにし、`PoseHeightAdjust`の「同期」もオンのままだったアバターは、更新後に高さparameterが同期（8 bits）される
+- Assistantの検証タブから「明示指定されたグループパラメータをクリア」ボタンを削除。parameter名の衝突（`PT-G002`／`PT-G005`）は、該当issueの修正ボタンでgroupごとにクリアする
+- 未使用の`ParameterPlanBuilder.AddBoolIfMissing`、`PoseTuneAutoFixRegistry.Fixes`、`TrackingPolicyUtility.WasCustomizedFromPoseDefault`を削除
+- どこからも発行されないdiagnostic `PT-C010`／`PT-T002`／`PT-KT002`／`PT-KU001`の定義を削除
+- `PoseTuneRoot`が見つからないときにAssistantのInspectorへ表示していた、内部状態（「最後に選択したタブ」「詳細設定を表示」）の編集欄を削除
+- 未使用の`PoseTuneNdmfAssetSaver.SaveGeneratedAnimatorAssets`（`BuildContext`版と`IAssetSaver`版）を削除。`TrySaveGeneratedAnimatorAssets`を使用する
+- 未使用の`PoseTuneAnimatorValidator.Validate(PoseGraph, VirtualAnimatorController)`を削除。`ParameterPlan`を渡す3引数版を使用する
+- 未使用の`ParameterPlan.SyncedParameters`を削除
+- 常に`null`または未使用だった`PosePreviewController.CurrentRoot`／`CurrentClone`／`CurrentAvatar`／`IsPreviewActive`を削除
+
 ## [0.4.2] - 2026-09-26
 
 ### Changed

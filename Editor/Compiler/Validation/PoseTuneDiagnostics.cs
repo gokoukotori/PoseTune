@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 
 namespace Gokoukotori.PoseTune.Editor
 {
@@ -45,7 +47,6 @@ namespace Gokoukotori.PoseTune.Editor
             "PT-C007",
             "PoseClip の Loop と AnimationClip の Loop Time を同じ設定にしてください。");
         public static readonly PoseTuneDiagnosticDescriptor AdditivePoseOutputOffset = new("PT-C009");
-        public static readonly PoseTuneDiagnosticDescriptor AutoPosePriorityAmbiguous = new("PT-C010");
         public static readonly PoseTuneDiagnosticDescriptor ClipConfigurationInvalid = new("PT-C006");
         public static readonly PoseTuneDiagnosticDescriptor MotionTimeInvalid = ClipConfigurationInvalid;
         public static readonly PoseTuneDiagnosticDescriptor ClipMenuValueInvalid = ClipConfigurationInvalid;
@@ -105,7 +106,6 @@ namespace Gokoukotori.PoseTune.Editor
         public static readonly PoseTuneDiagnosticDescriptor MotionTimeAnimatorStateMenuUnavailable = new("PT-M002");
         public static readonly PoseTuneDiagnosticDescriptor ManualControlMenuMissing = new("PT-M003");
         public static readonly PoseTuneDiagnosticDescriptor DuplicateRootTrackingPolicies = new("PT-T001");
-        public static readonly PoseTuneDiagnosticDescriptor TrackingResetDisabledForFbt = new("PT-T002");
         public static readonly PoseTuneDiagnosticDescriptor UnsupportedTrackingPolicyOwner = new(
             "PT-T004",
             "PoseTrackingPolicy を PoseTuneRoot 直下または PoseGroup と同じ GameObject へ移してください。");
@@ -127,9 +127,7 @@ namespace Gokoukotori.PoseTune.Editor
         public static readonly PoseTuneDiagnosticDescriptor KawaiiDisabledPoseSkipped = new("PT-K004");
         public static readonly PoseTuneDiagnosticDescriptor KawaiiThumbnailPackNotMigrated = new("PT-KI001");
         public static readonly PoseTuneDiagnosticDescriptor KawaiiMigrationOptionsInfo = new("PT-KOPT");
-        public static readonly PoseTuneDiagnosticDescriptor KawaiiSourceMergeTrackingControlDisabled = new("PT-KT002");
         public static readonly PoseTuneDiagnosticDescriptor KawaiiControllerTrackingMergeNotStrictlyMigrated = new("PT-KT003");
-        public static readonly PoseTuneDiagnosticDescriptor KawaiiUnsupportedMigrationOption = new("PT-KU001");
         public static readonly PoseTuneDiagnosticDescriptor KawaiiActionLayerApproximation = new("PT-KL001");
         public static readonly PoseTuneDiagnosticDescriptor KawaiiSyncedParameterDirectGroupApproximation = new("PT-KS002");
         public static readonly PoseTuneDiagnosticDescriptor KawaiiPoseThresholdApproximation = new("PT-KT001");
@@ -152,116 +150,18 @@ namespace Gokoukotori.PoseTune.Editor
         public static readonly PoseTuneDiagnosticDescriptor KawaiiActiveSourceSystemRisk = new("PT-KS001");
         public static readonly PoseTuneDiagnosticDescriptor KawaiiHeightProfileApproximation = new("PT-KH001");
 
-        private static readonly PoseTuneDiagnosticDescriptor[] All =
-        {
-            RootMissing,
-            RootOutsideAvatarDescriptor,
-            AvatarAnimatorMissing,
-            AvatarAnimatorAvatarMissing,
-            AvatarAnimatorNonHumanoid,
-            MultipleRootComponents,
-            RootNamespaceTooLong,
-            GroupHasNoPose,
-            GroupHasNoEnabledPose,
-            GroupSyncedParameterBudgetExceeded,
-            GroupParameterConflict,
-            GroupGeneratedParameterConflict,
-            GroupNonExclusiveOverridePose,
-            ClipMotionMissing,
-            ClipZeroLength,
-            ClipRootTransformCurves,
-            ClipUnsupportedCurves,
-            ClipMultipleInitial,
-            ClipLoopMismatch,
-            AdditivePoseOutputOffset,
-            AutoPosePriorityAmbiguous,
-            ClipConfigurationInvalid,
-            MotionTimeGeneratedHeightConflict,
-            HeightRuntimeAutoCorrectionRequiresVerification,
-            HeightMaxAutoOffsetLarge,
-            MultipleHeightAdjust,
-            ParameterNameConflict,
-            ParameterSyncedBudgetExceeded,
-            ParameterNameEmpty,
-            ParameterReservedName,
-            ExistingExpressionParameterTypeConflict,
-            ExistingAnimatorParameterTypeConflict,
-            ExpressionParameterCountExceeded,
-            ExpressionParameterCountNearLimit,
-            ParameterConditionInvalid,
-            SharedPoseSelectionSummary,
-            SharedPoseSelectionCapacityExceeded,
-            SharedPoseSelectionInitialConflict,
-            SharedPoseSelectionMetadataConflict,
-            UnsupportedTargetLayer,
-            AnimatorMissingResetExitTransition,
-            AnimatorTrackingResetStateMissing,
-            AnimatorFbtPoseEntryRisk,
-            ActionLayerWeightControlConflictRisk,
-            ActionLayerWeightControlDisabled,
-            BaseLayerLowerBodyPoseRisk,
-            BuildGraphContextMissing,
-            BuildGeneratedMarkerMissing,
-            BuildGeneratedVersionMissing,
-            BuildGraphHashMissing,
-            BuildGraphHashMismatch,
-            BuildExpressionParameterMissing,
-            BuildMenuControlMissing,
-            BuildPlayableLayerMissing,
-            BuildGeneratedAnimatorAssetsSaveFailed,
-            BuildExpressionParameterMetadataMismatch,
-            MenuControlLimitExceeded,
-            MotionTimeAnimatorStateMenuUnavailable,
-            ManualControlMenuMissing,
-            DuplicateRootTrackingPolicies,
-            TrackingResetDisabledForFbt,
-            UnsupportedTrackingPolicyOwner,
-            FullBodyTrackingDisabled,
-            FbtOverrideRequiresCompatibilityMode,
-            FbtOverrideLowerBodyAnimationRisk,
-            GoroneSystemExMissing,
-            ClassicSupineDetected,
-            MultipleGoroneSystemExCompatibility,
-            VrcSupineParameterTypeInvalid,
-            GoroneSystemExBaseLayerConflictRisk,
-            VrcSupineParameterMissing,
-            KawaiiMigrationSummaryInfo,
-            KawaiiMigrationSourceMissing,
-            KawaiiSerializedReadWarning,
-            KawaiiPoseSourceMotionMissing,
-            KawaiiDisabledPoseSkipped,
-            KawaiiThumbnailPackNotMigrated,
-            KawaiiMigrationOptionsInfo,
-            KawaiiSourceMergeTrackingControlDisabled,
-            KawaiiControllerTrackingMergeNotStrictlyMigrated,
-            KawaiiUnsupportedMigrationOption,
-            KawaiiActionLayerApproximation,
-            KawaiiSyncedParameterDirectGroupApproximation,
-            KawaiiPoseThresholdApproximation,
-            KawaiiFootHeightParameterMetadataApplied,
-            KawaiiBlendTreePoseSkipped,
-            KawaiiMotionTimeParameterMissing,
-            KawaiiOverrideUnsupported,
-            KawaiiOverrideTrackingNotStrictlyMigrated,
-            KawaiiSourceMotionMissing,
-            KawaiiSourceMotionAbsent,
-            KawaiiBlendTreeFlattenFallback,
-            KawaiiRootRecenterRequiresHumanoidVerification,
-            KawaiiRootYawOffsetSourceMotionMissing,
-            KawaiiRootRecenterApproximation,
-            KawaiiHumanoidOrientationOffsetSourceMotionMissing,
-            KawaiiAdditiveAdjustmentObjectCurveFallback,
-            KawaiiAdditiveAdjustmentHumanoidCurveRequiresRebake,
-            KawaiiActiveSourceSystemRisk,
-            KawaiiHeightProfileApproximation
-        };
-        private static readonly Dictionary<string, string> FixHints = All
+        // Built on first use so every descriptor field above is initialised; aliases share an instance.
+        private static readonly Lazy<Dictionary<string, string>> FixHints = new(() => typeof(PoseTuneDiagnostics)
+            .GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Where(field => field.FieldType == typeof(PoseTuneDiagnosticDescriptor))
+            .Select(field => (PoseTuneDiagnosticDescriptor)field.GetValue(null))
+            .Distinct()
             .Where(descriptor => !string.IsNullOrWhiteSpace(descriptor.FixHint))
-            .ToDictionary(descriptor => descriptor.Code, descriptor => descriptor.FixHint);
+            .ToDictionary(descriptor => descriptor.Code, descriptor => descriptor.FixHint));
 
         public static string FixHint(string code)
         {
-            return !string.IsNullOrWhiteSpace(code) && FixHints.TryGetValue(code, out var hint)
+            return !string.IsNullOrWhiteSpace(code) && FixHints.Value.TryGetValue(code, out var hint)
                 ? hint
                 : "";
         }

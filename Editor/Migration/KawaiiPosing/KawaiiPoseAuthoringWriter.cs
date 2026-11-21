@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Linq;
 using Gokoukotori.PoseTune;
 using UnityEditor;
@@ -18,9 +17,10 @@ namespace Gokoukotori.PoseTune.Editor
             string undoName,
             IKawaiiMigrationAssetStore assetStore = null)
         {
-            var poseObject = new GameObject(SafeName(KawaiiPosingMapper.DisplayName(source), "Pose " + source.Index));
-            Undo.RegisterCreatedObjectUndo(poseObject, undoName);
-            Undo.SetTransformParent(poseObject.transform, group.transform, undoName);
+            var poseObject = KawaiiAuthoringObjectUtility.CreateChild(
+                group.transform,
+                KawaiiAuthoringObjectUtility.SafeName(KawaiiPosingMapper.DisplayName(source), "Pose " + source.Index),
+                undoName);
             var pose = Undo.AddComponent<PoseClip>(poseObject);
             ConfigurePose(pose, group, source, options, report, iconsDisabled, assetStore);
             report.Created(poseObject, "Pose");
@@ -94,6 +94,7 @@ namespace Gokoukotori.PoseTune.Editor
             return source.PreviewImage;
         }
 
+        // report may be null (preflight validation resolves motions without emitting warnings).
         internal static Motion ResolveSourceMotion(
             Motion motion,
             AnimationClip clip,
@@ -105,10 +106,10 @@ namespace Gokoukotori.PoseTune.Editor
                 switch (options.blendTreeMode)
                 {
                     case KawaiiBlendTreeMode.Skip:
-                        report.Warning(PoseTuneDiagnostics.KawaiiBlendTreePoseSkipped.Code, "BlendTree pose は Skip により build 対象外にしました。", motion);
+                        report?.Warning(PoseTuneDiagnostics.KawaiiBlendTreePoseSkipped.Code, "BlendTree pose は Skip により build 対象外にしました。", motion);
                         return null;
                     case KawaiiBlendTreeMode.FlattenLeaves:
-                        report.Warning(PoseTuneDiagnostics.KawaiiBlendTreeFlattenFallback.Code, "BlendTree flatten 対象に leaf clip がないため fallback motion を保持します。", motion);
+                        report?.Warning(PoseTuneDiagnostics.KawaiiBlendTreeFlattenFallback.Code, "BlendTree flatten 対象に leaf clip がないため fallback motion を保持します。", motion);
                         return clip != null ? clip : motion;
                     default:
                         return motion;
@@ -210,7 +211,7 @@ namespace Gokoukotori.PoseTune.Editor
                 Source = pose
             };
 
-            var prepared = KawaiiRootMotionCompatibilityBaker.Prepare(
+            var prepared = PoseMotionPreparationService.PrepareMotion(
                 definition,
                 pose.displayName + "_KawaiiBaked",
                 PoseMotionPreparationContext.Empty());
@@ -248,36 +249,9 @@ namespace Gokoukotori.PoseTune.Editor
 
         public static bool ResolveSourceLoop(Motion sourceMotion, AnimationClip fallbackClip)
         {
-            var leafClips = LeafClips(sourceMotion != null ? sourceMotion : fallbackClip).ToList();
+            var leafClips = KawaiiBlendTreeCompatibilityConverter.LeafClips(sourceMotion != null ? sourceMotion : fallbackClip).ToList();
             return leafClips.Count > 0 &&
                    leafClips.All(clip => AnimationUtility.GetAnimationClipSettings(clip).loopTime);
-        }
-
-        private static IEnumerable<AnimationClip> LeafClips(Motion motion)
-        {
-            if (motion is AnimationClip clip)
-            {
-                yield return clip;
-                yield break;
-            }
-
-            if (motion is not BlendTree tree)
-            {
-                yield break;
-            }
-
-            foreach (var child in tree.children)
-            {
-                foreach (var leaf in LeafClips(child.motion))
-                {
-                    yield return leaf;
-                }
-            }
-        }
-
-        private static string SafeName(string value, string fallback)
-        {
-            return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
         }
     }
 }

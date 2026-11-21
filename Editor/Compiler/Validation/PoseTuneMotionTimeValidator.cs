@@ -20,9 +20,7 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
                     report.Error(PoseTuneDiagnostics.MotionTimeInvalid.Code, "MotionTime には有効な高さパラメータが必要です。", pose.Source);
                 }
 
-                if (graph.RootComponent.enableHeightAdjust &&
-                    PoseTuneAuthoringInclusion.Includes(graph.HeightAdjust) &&
-                    graph.HeightAdjust.applyMode != HeightApplyMode.Disabled)
+                if (PoseTuneCompilerRules.AppliesHeightOffset(graph))
                 {
                     report.Error(PoseTuneDiagnostics.MotionTimeGeneratedHeightConflict.Code,
                         "MotionTime の UseGeneratedHeightParameter では、高さパラメータがポーズの高さ調整にも使われないように Height Apply Mode を Disabled にしてください。",

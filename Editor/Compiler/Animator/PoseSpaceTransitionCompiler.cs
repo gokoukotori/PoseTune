@@ -3,9 +3,9 @@ using UnityEditor.Animations;
 
 namespace Gokoukotori.PoseTune.Editor
 {
-    public sealed partial class AnimatorCompiler
+    internal static class PoseSpaceTransitionCompiler
     {
-        private static void AddPoseSpaceScopeCondition(
+        internal static void AddPoseSpaceScopeCondition(
             AnimatorStateTransition transition,
             PoseDefinition pose,
             bool vrNormalVariant = false)
@@ -17,17 +17,17 @@ namespace Gokoukotori.PoseTune.Editor
 
             if (PoseStateVariantRules.NeedsPoseSpaceVrVariant(pose) && vrNormalVariant)
             {
-                transition.AddCondition(AnimatorConditionMode.Greater, 0f, "VRMode");
+                ModeTransitionCompiler.AddVrModeCondition(transition);
                 return;
             }
 
             switch (pose.PoseSpace.scope)
             {
                 case PoseSpaceScope.DesktopOnly:
-                    transition.AddCondition(AnimatorConditionMode.Less, 1f, "VRMode");
+                    ModeTransitionCompiler.AddDesktopModeCondition(transition);
                     break;
                 case PoseSpaceScope.VROnly:
-                    transition.AddCondition(AnimatorConditionMode.Greater, 0f, "VRMode");
+                    ModeTransitionCompiler.AddVrModeCondition(transition);
                     break;
             }
         }

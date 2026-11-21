@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -74,5 +75,18 @@ namespace Gokoukotori.PoseTune.Editor
         Info,
         Warning,
         Error
+    }
+
+    internal static class KawaiiMigrationSeverityExtensions
+    {
+        public static MessageType ToMessageType(this KawaiiMigrationSeverity severity)
+        {
+            return severity switch
+            {
+                KawaiiMigrationSeverity.Error => MessageType.Error,
+                KawaiiMigrationSeverity.Warning => MessageType.Warning,
+                _ => MessageType.Info
+            };
+        }
     }
 }

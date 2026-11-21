@@ -30,12 +30,6 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
             }
         }
 
-        public static void ValidatePose(PoseGraph graph, PoseDefinition pose, ValidationReport report)
-        {
-            // generateResetOnExit=false is a supported sticky-policy contract. It must not
-            // be reported as an FBT warning merely because no reset request is generated.
-        }
-
         private static void ValidateDuplicateOwner(Component owner, ValidationReport report, string ownerName)
         {
             if (owner.GetComponents<PoseTrackingPolicy>()

@@ -50,13 +50,7 @@ namespace Gokoukotori.PoseTune.Editor
 
             foreach (var root in context.AvatarRootObject.GetComponentsInChildren<PoseTuneRoot>(true))
             {
-                var graph = new PoseGraphCollector().Collect(root);
-                new PoseTuneIconResolver().Apply(graph);
-                var report = new PoseValidator().Validate(graph);
-                graph.Validation = report;
-                state.Graphs.Add(graph);
-                state.Reports.Add(report);
-                LogReport(root, report);
+                LogReport(root, CollectAndValidateRoot(root, state));
             }
         }
 
@@ -140,14 +134,19 @@ namespace Gokoukotori.PoseTune.Editor
 
             foreach (var root in context.AvatarRootObject.GetComponentsInChildren<PoseTuneRoot>(true))
             {
-                var graph = new PoseGraphCollector().Collect(root);
-                new PoseTuneIconResolver().Apply(graph);
-                var report = new PoseValidator().Validate(graph);
-                graph.Validation = report;
-                state.Graphs.Add(graph);
-                state.Reports.Add(report);
-                LogNewReportIssues(root, report, alreadyReported);
+                LogNewReportIssues(root, CollectAndValidateRoot(root, state), alreadyReported);
             }
+        }
+
+        private static ValidationReport CollectAndValidateRoot(PoseTuneRoot root, PoseTuneBuildState state)
+        {
+            var graph = new PoseGraphCollector().Collect(root);
+            new PoseTuneIconResolver().Apply(graph);
+            var report = new PoseValidator().Validate(graph);
+            graph.Validation = report;
+            state.Graphs.Add(graph);
+            state.Reports.Add(report);
+            return report;
         }
 
         private static void LogNewReportIssues(Object context, ValidationReport report, HashSet<string> alreadyReported)
@@ -181,10 +180,7 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
-            foreach (var issue in source.Issues)
-            {
-                destination.Add(issue);
-            }
+            destination.AddRange(source.Issues);
         }
 
         private static void LogReport(Object context, ValidationReport report)

@@ -75,20 +75,5 @@ namespace Gokoukotori.PoseTune.Editor
 
             return null;
         }
-
-        public static bool RequiresPreparedClip(PoseDefinition pose)
-        {
-            return PosePreparedClipBuilder.RequiresPreparedMotion(pose);
-        }
-
-        public static AnimationClip ClonePreparedClip(PoseDefinition pose, string name)
-        {
-            return PosePreparedClipBuilder.ClonePreparedClip(pose, name);
-        }
-
-        public static AnimationCurve OffsetCurve(AnimationCurve source, float offset)
-        {
-            return PoseRootMotionCurveUtility.OffsetCurve(source, offset);
-        }
     }
 }

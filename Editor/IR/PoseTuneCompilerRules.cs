@@ -1,3 +1,4 @@
+using System.Linq;
 using Gokoukotori.PoseTune;
 
 namespace Gokoukotori.PoseTune.Editor
@@ -36,6 +37,40 @@ namespace Gokoukotori.PoseTune.Editor
             return root != null &&
                    root.targetLayer == PoseTuneTargetLayer.Action &&
                    root.advancedSettings.actionWeightControlMode != ActionWeightControlMode.Disabled;
+        }
+
+        /// <summary>Pose motions are built with the generated height offset applied.</summary>
+        public static bool AppliesHeightOffset(PoseGraph graph)
+        {
+            return graph.RootComponent.enableHeightAdjust &&
+                   PoseTuneAuthoringInclusion.Includes(graph.HeightAdjust) &&
+                   graph.HeightAdjust.applyMode != HeightApplyMode.Disabled;
+        }
+
+        /// <summary>Kinds whose poses drive the lower body (sitting and lying).</summary>
+        public static bool IsLowerBodyKind(PoseGroupKind kind)
+        {
+            return kind == PoseGroupKind.Chair ||
+                   kind == PoseGroupKind.Floor ||
+                   kind == PoseGroupKind.Prone ||
+                   kind == PoseGroupKind.Supine;
+        }
+
+        public static bool IsLyingKind(PoseGroupKind kind)
+        {
+            return kind == PoseGroupKind.Prone || kind == PoseGroupKind.Supine;
+        }
+
+        public static bool IsLyingGroup(PoseGroupDefinition group)
+        {
+            return IsLyingKind(group.Kind);
+        }
+
+        /// <summary>Auto context switching tells prone from supine through the generated SupineFlag.</summary>
+        public static bool NeedsSupineFlag(PoseGraph graph)
+        {
+            return graph.RootComponent.enableAutoContextSwitch &&
+                   PoseGraphBuildFilter.BuildableGroups(graph).Any(IsLyingGroup);
         }
     }
 }

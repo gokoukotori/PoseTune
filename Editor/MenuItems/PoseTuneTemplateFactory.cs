@@ -10,14 +10,20 @@ namespace Gokoukotori.PoseTune.Editor
     {
         private const string PoseGroupsRootName = "ポーズグループ";
 
+        private static readonly PoseGroupKind[] DefaultGroupKinds =
+        {
+            PoseGroupKind.Standing,
+            PoseGroupKind.Chair,
+            PoseGroupKind.Floor,
+            PoseGroupKind.Prone,
+            PoseGroupKind.Supine
+        };
+
         [MenuItem("GameObject/Gokoukotori/PoseTune/テンプレート", false, 30)]
         private static void AddTemplateMenuItem()
         {
-            var selected = Selection.activeGameObject;
-            var avatar = ResolveAvatar(selected);
-            if (avatar == null)
+            if (!TryResolveSelectedAvatarOrWarn(out var avatar))
             {
-                EditorUtility.DisplayDialog("PoseTune", "VRCAvatarDescriptor を持つ Avatar を選択してください。", "OK");
                 return;
             }
 
@@ -27,42 +33,46 @@ namespace Gokoukotori.PoseTune.Editor
         [MenuItem("GameObject/Gokoukotori/PoseTune/テンプレート", true)]
         private static bool ValidateAddTemplateMenuItem()
         {
-            return ResolveAvatar(Selection.activeGameObject) != null;
+            return PoseTuneHierarchyUtility.ResolveAvatar(Selection.activeGameObject) != null;
+        }
+
+        internal static bool TryResolveSelectedAvatarOrWarn(out VRCAvatarDescriptor avatar)
+        {
+            avatar = PoseTuneHierarchyUtility.ResolveAvatar(Selection.activeGameObject);
+            if (avatar == null)
+            {
+                EditorUtility.DisplayDialog("PoseTune", "VRCAvatarDescriptor を持つ Avatar を選択してください。", "OK");
+                return false;
+            }
+
+            return true;
         }
 
         public static GameObject CreateTemplate(GameObject avatarRoot)
         {
-            var avatar = ResolveAvatar(avatarRoot);
+            var avatar = PoseTuneHierarchyUtility.ResolveAvatar(avatarRoot);
             if (avatar == null)
             {
                 throw new System.ArgumentException("Avatar root は VRCAvatarDescriptor を含むか、その配下にある必要があります。", nameof(avatarRoot));
             }
 
-            var root = new GameObject("PoseTune テンプレート");
-            Undo.RegisterCreatedObjectUndo(root, "PoseTune テンプレートを追加");
-            root.transform.SetParent(avatar.transform, false);
-            root.AddComponent<PoseTuneRoot>();
+            var root = PoseTuneAuthoringFactory.CreateChild<PoseTuneRoot>(
+                avatar.transform,
+                "PoseTune テンプレート",
+                "PoseTune テンプレートを追加").gameObject;
             root.AddComponent<PoseTuneAssistant>();
 
-            var menu = new GameObject("メニュー");
-            menu.transform.SetParent(root.transform, false);
-            menu.AddComponent<PoseMenu>();
+            PoseTuneAuthoringFactory.CreateChild<PoseMenu>(root.transform, "メニュー");
 
             var groups = new GameObject(PoseGroupsRootName);
             groups.transform.SetParent(root.transform, false);
-            CreateDefaultGroup(groups.transform, PoseGroupKind.Standing, DefaultDisplayName(PoseGroupKind.Standing), 0);
-            CreateDefaultGroup(groups.transform, PoseGroupKind.Chair, DefaultDisplayName(PoseGroupKind.Chair), 10);
-            CreateDefaultGroup(groups.transform, PoseGroupKind.Floor, DefaultDisplayName(PoseGroupKind.Floor), 20);
-            CreateDefaultGroup(groups.transform, PoseGroupKind.Prone, DefaultDisplayName(PoseGroupKind.Prone), 30);
-            CreateDefaultGroup(groups.transform, PoseGroupKind.Supine, DefaultDisplayName(PoseGroupKind.Supine), 40);
+            foreach (var kind in DefaultGroupKinds)
+            {
+                CreateDefaultGroup(groups.transform, kind, DefaultDisplayName(kind), (int)kind * 10);
+            }
 
-            var tracking = new GameObject("トラッキングポリシー");
-            tracking.transform.SetParent(root.transform, false);
-            tracking.AddComponent<PoseTrackingPolicy>();
-
-            var height = new GameObject("高さ調整");
-            height.transform.SetParent(root.transform, false);
-            height.AddComponent<PoseHeightAdjust>();
+            PoseTuneAuthoringFactory.CreateChild<PoseTrackingPolicy>(root.transform, "トラッキングポリシー");
+            PoseTuneAuthoringFactory.CreateChild<PoseHeightAdjust>(root.transform, "高さ調整");
 
             EditorUtility.SetDirty(root);
             return root;
@@ -96,27 +106,12 @@ namespace Gokoukotori.PoseTune.Editor
 
         public static PoseGroup CreateDefaultGroup(Transform parent, PoseGroupKind kind, string displayName, int menuOrder = 0)
         {
-            var go = new GameObject(displayName);
-            Undo.RegisterCreatedObjectUndo(go, "ポーズグループを追加");
-            go.transform.SetParent(parent, false);
-            var group = go.AddComponent<PoseGroup>();
+            var group = PoseTuneAuthoringFactory.CreateChild<PoseGroup>(parent, displayName, "ポーズグループを追加");
             group.kind = kind;
             group.displayName = displayName;
             group.parameterName = "";
             group.menuOrder = menuOrder;
             return group;
-        }
-
-        private static VRCAvatarDescriptor ResolveAvatar(GameObject selected)
-        {
-            if (selected == null)
-            {
-                return null;
-            }
-
-            return selected.GetComponent<VRCAvatarDescriptor>()
-                   ?? selected.GetComponentInParent<VRCAvatarDescriptor>(true)
-                   ?? selected.GetComponentInChildren<VRCAvatarDescriptor>(true);
         }
     }
 
@@ -134,14 +129,23 @@ namespace Gokoukotori.PoseTune.Editor
 
         public static PoseClip AddPoseClip(PoseGroup group, AnimationClip clip)
         {
-            var go = new GameObject(clip != null ? clip.name : "新規ポーズ");
-            Undo.RegisterCreatedObjectUndo(go, "PoseClip を追加");
-            go.transform.SetParent(group.transform, false);
-            var pose = go.AddComponent<PoseClip>();
+            var pose = CreateChild<PoseClip>(group.transform, clip != null ? clip.name : "新規ポーズ", "PoseClip を追加");
             pose.clip = clip;
             pose.displayName = clip != null ? ObjectNames.NicifyVariableName(clip.name) : "新規ポーズ";
             EditorUtility.SetDirty(group);
             return pose;
+        }
+
+        internal static T CreateChild<T>(Transform parent, string name, string undoName = null) where T : Component
+        {
+            var go = new GameObject(name);
+            if (undoName != null)
+            {
+                Undo.RegisterCreatedObjectUndo(go, undoName);
+            }
+
+            go.transform.SetParent(parent, false);
+            return go.AddComponent<T>();
         }
     }
 }

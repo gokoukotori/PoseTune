@@ -41,20 +41,12 @@ namespace Gokoukotori.PoseTune.Editor
         public Object Context;
     }
 
-    internal sealed class KawaiiPresetAdjustmentSyncIssue
-    {
-        public KawaiiMigrationSeverity Severity;
-        public string Code = "";
-        public string Message = "";
-        public Object Context;
-    }
-
     internal sealed class KawaiiPresetAdjustmentSyncPlan
     {
         public PoseTuneRoot Root;
         public Preset Preset;
         public readonly List<KawaiiPresetAdjustmentSyncEntry> Entries = new();
-        public readonly List<KawaiiPresetAdjustmentSyncIssue> Issues = new();
+        public readonly List<KawaiiMigrationIssue> Issues = new();
         public string Fingerprint = "";
 
         public bool HasErrors => Issues.Any(issue => issue.Severity == KawaiiMigrationSeverity.Error);
@@ -68,24 +60,12 @@ namespace Gokoukotori.PoseTune.Editor
 
         public void Error(string code, string message, Object context = null)
         {
-            Issues.Add(new KawaiiPresetAdjustmentSyncIssue
-            {
-                Severity = KawaiiMigrationSeverity.Error,
-                Code = code,
-                Message = message,
-                Context = context
-            });
+            Issues.Add(new KawaiiMigrationIssue(KawaiiMigrationSeverity.Error, code, message, context));
         }
 
         public void Warning(string code, string message, Object context = null)
         {
-            Issues.Add(new KawaiiPresetAdjustmentSyncIssue
-            {
-                Severity = KawaiiMigrationSeverity.Warning,
-                Code = code,
-                Message = message,
-                Context = context
-            });
+            Issues.Add(new KawaiiMigrationIssue(KawaiiMigrationSeverity.Warning, code, message, context));
         }
     }
 
@@ -108,6 +88,9 @@ namespace Gokoukotori.PoseTune.Editor
         internal const string TargetIncompatibleCode = "PT-KAS010";
         internal const string StalePlanCode = "PT-KAS011";
         internal const string RollbackCode = "PT-KAS012";
+        internal const string StalePlanMessage = "入力またはPoseTuneの状態が変わりました。最新のドライラン結果を確認してください。";
+        internal const string StaleResultMessage = "状態変更を検出したため同期しませんでした。";
+        internal const string NoChangesMessage = "同期が必要な調整クリップはありません。";
         private const string UndoName = "KawaiiPosing 調整クリップを同期";
 
         private readonly Func<PoseTuneRoot, ValidationReport> validator;
@@ -168,12 +151,12 @@ namespace Gokoukotori.PoseTune.Editor
             var currentPlan = CreatePlan(expectedPlan.Root, expectedPlan.Preset);
             if (!string.Equals(expectedPlan.Fingerprint, currentPlan.Fingerprint, StringComparison.Ordinal))
             {
-                currentPlan.Warning(StalePlanCode, "入力またはPoseTuneの状態が変わりました。最新のドライラン結果を確認してください。", currentPlan.Root);
+                currentPlan.Warning(StalePlanCode, StalePlanMessage, currentPlan.Root);
                 return new KawaiiPresetAdjustmentExecutionResult
                 {
                     Status = KawaiiPresetAdjustmentExecutionStatus.Stale,
                     Plan = currentPlan,
-                    Message = "状態変更を検出したため同期しませんでした。"
+                    Message = StaleResultMessage
                 };
             }
 
@@ -193,7 +176,7 @@ namespace Gokoukotori.PoseTune.Editor
                 {
                     Status = KawaiiPresetAdjustmentExecutionStatus.NoChanges,
                     Plan = currentPlan,
-                    Message = "同期が必要な調整クリップはありません。"
+                    Message = NoChangesMessage
                 };
             }
 
@@ -327,9 +310,7 @@ namespace Gokoukotori.PoseTune.Editor
                 });
             }
 
-            var targets = plan.Root.GetComponentsInChildren<PoseClip>(true)
-                .Where(pose => pose != null && pose.GetComponentInParent<PoseTuneRoot>(true) == plan.Root)
-                .ToArray();
+            var targets = KawaiiAuthoringObjectUtility.OwnedComponents<PoseClip>(plan.Root).ToArray();
             var sourceCounts = sources
                 .Where(source => source.Motion != null)
                 .GroupBy(source => source.Motion)
@@ -435,8 +416,7 @@ namespace Gokoukotori.PoseTune.Editor
 
             if (plan.Root != null)
             {
-                foreach (var pose in plan.Root.GetComponentsInChildren<PoseClip>(true)
-                             .Where(pose => pose != null && pose.GetComponentInParent<PoseTuneRoot>(true) == plan.Root)
+                foreach (var pose in KawaiiAuthoringObjectUtility.OwnedComponents<PoseClip>(plan.Root)
                              .OrderBy(pose => pose.GetInstanceID()))
                 {
                     builder.Append("|pose:").Append(pose.GetInstanceID());

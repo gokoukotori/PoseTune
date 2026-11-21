@@ -3,6 +3,7 @@ using System.Linq;
 using Gokoukotori.PoseTune;
 using Gokoukotori.PoseTune.Editor;
 using VRC.SDK3.Avatars.ScriptableObjects;
+using Object = UnityEngine.Object;
 
 namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
 {
@@ -37,6 +38,7 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
 
             var menu = context.Menu;
             var existingRootControlCount = ExistingRootMenuControlCount(graph);
+            Object issueContext = graph.Menu != null ? graph.Menu : graph.RootComponent;
             if (installMode == MenuInstallMode.InlineAtRoot)
             {
                 var generatedInlineControlCount = menu.Root.Children.Count;
@@ -44,7 +46,7 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
                 {
                     report.Error(PoseTuneDiagnostics.MenuControlLimitExceeded.Code,
                         $"InlineAtRoot では既存 Avatar root menu の {existingRootControlCount} controls と PoseTune の {generatedInlineControlCount} controls の合計が 8 を超えます。",
-                        graph.Menu != null ? graph.Menu : graph.RootComponent);
+                        issueContext);
                     return;
                 }
             }
@@ -52,12 +54,11 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
             {
                 report.Error(PoseTuneDiagnostics.MenuControlLimitExceeded.Code,
                     $"AppendToRoot では既存 Avatar root menu の {existingRootControlCount} controls に PoseTune submenu 1 つを追加するため、合計が 8 を超えます。",
-                    graph.Menu != null ? graph.Menu : graph.RootComponent);
+                    issueContext);
                 return;
             }
 
-            var autoSplitMenu = graph.Menu == null || graph.Menu.autoSplitMenu;
-            if (autoSplitMenu)
+            if (PoseTuneMenuControlBuilder.AutoSplit(graph))
             {
                 return;
             }
@@ -68,7 +69,7 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
                 {
                     report.Error(PoseTuneDiagnostics.MenuControlLimitExceeded.Code,
                         "autoSplitMenu が無効な状態で、PoseTune メニューが 8 コントロールを超えています。",
-                        graph.Menu != null ? graph.Menu : graph.RootComponent);
+                        issueContext);
                     return;
                 }
             }

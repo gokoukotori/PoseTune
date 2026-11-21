@@ -15,6 +15,17 @@ namespace Gokoukotori.PoseTune.Editor
             };
         }
 
+        public static AnimatorState AddState(
+            AnimatorStateMachine stateMachine,
+            string name,
+            Vector3 position,
+            Motion motion)
+        {
+            var state = stateMachine.AddState(name, position);
+            state.motion = motion;
+            return state;
+        }
+
         public static AnimationClip EmptyClip(string name)
         {
             return new AnimationClip { name = name };

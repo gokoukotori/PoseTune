@@ -26,7 +26,7 @@ namespace Gokoukotori.PoseTune.Editor
             }
 
             var useSubMenusPerGroup = graph.Menu == null || graph.Menu.useSubMenusPerGroup;
-            var autoSplitMenu = graph.Menu == null || graph.Menu.autoSplitMenu;
+            var autoSplitMenu = PoseTuneMenuControlBuilder.AutoSplit(graph);
             var buildableGroups = PoseGraphBuildFilter.BuildableGroups(graph).ToList();
             if (useSubMenusPerGroup)
             {
@@ -34,7 +34,7 @@ namespace Gokoukotori.PoseTune.Editor
                                           graph.Menu.lyingMenuLayout == LyingMenuLayout.SeparateGroups;
                 foreach (var group in buildableGroups)
                 {
-                    if (PoseTuneMenuControlBuilder.IsLyingGroup(group) && !separateLyingGroups)
+                    if (PoseTuneCompilerRules.IsLyingGroup(group) && !separateLyingGroups)
                     {
                         continue;
                     }
@@ -47,12 +47,12 @@ namespace Gokoukotori.PoseTune.Editor
                     controls.Add(PoseTuneMenuControlBuilder.BuildGroupMenu(group, autoSplitMenu, poseSelection));
                 }
 
-                var lyingGroups = buildableGroups.FindAll(PoseTuneMenuControlBuilder.IsLyingGroup);
+                var lyingGroups = buildableGroups.FindAll(PoseTuneCompilerRules.IsLyingGroup);
                 if (!separateLyingGroups && lyingGroups.Count > 0)
                 {
                     controls.Add(PoseTuneMenuControlBuilder.BuildLyingMenu(graph, lyingGroups, poseSelection));
                 }
-                else if (separateLyingGroups && PoseTuneMenuControlBuilder.NeedsSupineToggle(graph))
+                else if (separateLyingGroups && PoseTuneCompilerRules.NeedsSupineFlag(graph))
                 {
                     controls.Add(PoseTuneMenuControlBuilder.BuildSupineToggle(graph));
                 }
@@ -69,7 +69,7 @@ namespace Gokoukotori.PoseTune.Editor
                     controls.AddRange(PoseTuneMenuControlBuilder.BuildFlatGroupControls(group, poseSelection));
                 }
 
-                if (PoseTuneMenuControlBuilder.NeedsSupineToggle(graph))
+                if (PoseTuneCompilerRules.NeedsSupineFlag(graph))
                 {
                     controls.Add(PoseTuneMenuControlBuilder.BuildSupineToggle(graph));
                 }
@@ -81,18 +81,17 @@ namespace Gokoukotori.PoseTune.Editor
                 controls.Add(motionTimeMenu);
             }
 
-            if (ParameterAllocator.NeedsGeneratedHeightParameter(graph) && graph.HeightAdjust.generateRadialMenu)
+            if (PoseTuneMenuControlBuilder.GeneratesHeightRadial(graph))
             {
-                controls.Add(new MenuControlPlan
-                {
-                    Label = "高さ",
-                    Type = PoseTuneMenuControlType.RadialPuppet,
-                    Parameter = "",
-                    SubParameters = new List<string> { PoseTuneNames.HeightParameter(graph.RootComponent, graph.HeightAdjust) }
-                });
+                controls.Add(PoseTuneMenuControlBuilder.Radial(
+                    "高さ",
+                    PoseTuneNames.HeightParameter(graph.RootComponent, graph.HeightAdjust)));
             }
 
-            root.Children.AddRange(PoseTuneMenuControlBuilder.PaginateControls(controls, "ページ", autoSplitMenu));
+            root.Children.AddRange(PoseTuneMenuControlBuilder.PaginateControls(
+                controls,
+                PoseTuneMenuControlBuilder.PageLabel,
+                autoSplitMenu));
 
             return new MenuPlan { Root = root };
         }

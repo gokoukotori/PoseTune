@@ -6,9 +6,9 @@ using UnityEditor.Animations;
 
 namespace Gokoukotori.PoseTune.Editor
 {
-    public sealed partial class AnimatorCompiler
+    internal static class AutoContextTransitionCompiler
     {
-        private static bool ShouldResetManualPoseOnAutoMode(
+        internal static bool ShouldResetManualPoseOnAutoMode(
             PoseTuneRoot root,
             PoseGroupDefinition group,
             bool hasAutoEntry)
@@ -18,12 +18,12 @@ namespace Gokoukotori.PoseTune.Editor
                    !hasAutoEntry;
         }
 
-        private static bool AllowsManualEntry(PoseTuneRoot root, PoseGroupDefinition group)
+        internal static bool AllowsManualEntry(PoseTuneRoot root, PoseGroupDefinition group)
         {
             return !root.enableAutoContextSwitch || group.ActivationMode != PoseGroupActivationMode.Auto;
         }
 
-        private static bool AllowsAutoEntry(
+        internal static bool AllowsAutoEntry(
             PoseTuneRoot root,
             PoseGroupDefinition group,
             PoseDefinition pose,
@@ -43,7 +43,7 @@ namespace Gokoukotori.PoseTune.Editor
             return group != null && group.AutoPoseSelectionMode == AutoPoseSelectionMode.SelectedPosePerGroup;
         }
 
-        private static void AddSelectedPoseAutoEntryCondition(
+        internal static void AddSelectedPoseAutoEntryCondition(
             AnimatorStateTransition transition,
             PoseTuneRoot root,
             PoseGroupDefinition group,
@@ -59,7 +59,7 @@ namespace Gokoukotori.PoseTune.Editor
             transition.AddCondition(AnimatorConditionMode.Equals, binding.Value, binding.ParameterName);
         }
 
-        private static void AddSelectedPoseAutoExitTransition(
+        internal static void AddSelectedPoseAutoExitTransition(
             AnimatorState state,
             AnimatorState cleanup,
             PoseTuneRoot root,
@@ -72,20 +72,18 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
-            var transition = state.AddTransition(cleanup);
-            transition.hasExitTime = false;
-            transition.duration = 0f;
-            transition.AddCondition(AnimatorConditionMode.Equals, 1, root.Parameter(PoseTuneNames.Mode));
+            var transition = AnimatorTransitionFactory.Immediate(state, cleanup);
+            ModeTransitionCompiler.AddAutoModeCondition(transition, root);
             var binding = poseSelection.Find(pose);
             transition.AddCondition(AnimatorConditionMode.NotEqual, binding.Value, binding.ParameterName);
         }
 
-        private static List<ParameterConditionData> AutoContextConditions(PoseTuneRoot root, PoseGroupDefinition group)
+        internal static List<ParameterConditionData> AutoContextConditions(PoseTuneRoot root, PoseGroupDefinition group)
         {
             return PoseTuneAutoContextConditionService.AutoContextConditions(root, group);
         }
 
-        private static void AddAutoContextExitTransitions(
+        internal static void AddAutoContextExitTransitions(
             AnimatorState state,
             AnimatorState reset,
             PoseTuneRoot root,
@@ -94,11 +92,9 @@ namespace Gokoukotori.PoseTune.Editor
             foreach (var condition in AutoContextConditions(root, group))
             {
                 var inverted = InvertAutoContextExitCondition(condition);
-                var transition = state.AddTransition(reset);
-                transition.hasExitTime = false;
-                transition.duration = 0f;
-                transition.AddCondition(AnimatorConditionMode.Equals, 1, root.Parameter(PoseTuneNames.Mode));
-                AddConditions(transition, new[] { inverted });
+                var transition = AnimatorTransitionFactory.Immediate(state, reset);
+                ModeTransitionCompiler.AddAutoModeCondition(transition, root);
+                ConditionTransitionCompiler.AddConditions(transition, new[] { inverted });
             }
         }
 

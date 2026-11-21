@@ -94,7 +94,7 @@ namespace Gokoukotori.PoseTune.Editor
 
         private static string SupineFlag(PoseTuneRoot root)
         {
-            return root != null ? root.Parameter(PoseTuneNames.SupineFlag) : "PT/SupineFlag";
+            return PoseTuneNames.ParameterOf(root, PoseTuneNames.SupineFlag);
         }
 
         private static ParameterConditionData FloatCondition(string parameter, ConditionOperator op, float value)

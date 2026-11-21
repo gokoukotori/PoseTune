@@ -43,7 +43,7 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
             }
 
             var hasLowerBodyPose = PoseGraphBuildFilter.BuildableGroups(graph)
-                .Any(group => group.Poses.Count > 0 && IsLocomotionSensitiveGroup(group.Kind));
+                .Any(group => group.Poses.Count > 0 && PoseTuneCompilerRules.IsLowerBodyKind(group.Kind));
             if (!hasLowerBodyPose)
             {
                 return;
@@ -53,14 +53,6 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
                 PoseTuneDiagnostics.BaseLayerLowerBodyPoseRisk.Code,
                 "Base layer は VRChat の locomotion/idle と同じ Transform を更新します。Chair/Floor/Prone/Supine の下半身 pose は静止時に上書き競合しやすいため、Action layer 出力を推奨します。",
                 graph.RootComponent);
-        }
-
-        private static bool IsLocomotionSensitiveGroup(PoseGroupKind kind)
-        {
-            return kind == PoseGroupKind.Chair ||
-                   kind == PoseGroupKind.Floor ||
-                   kind == PoseGroupKind.Prone ||
-                   kind == PoseGroupKind.Supine;
         }
     }
 }

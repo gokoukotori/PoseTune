@@ -2,12 +2,6 @@ using UnityEngine;
 
 namespace Gokoukotori.PoseTune
 {
-    public enum PoseTuneBuildMode
-    {
-        [InspectorName("Modular Avatar")]
-        ModularAvatar
-    }
-
     public enum PoseTuneTargetLayer
     {
         [InspectorName("Action レイヤー")]

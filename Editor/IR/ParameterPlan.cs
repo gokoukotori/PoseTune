@@ -13,9 +13,6 @@ namespace Gokoukotori.PoseTune.Editor
         public int SyncedCost => Parameters.Where(p => !p.LocalOnly && p.SyncType != PoseTuneParameterSyncType.NotSynced)
             .Sum(p => p.SyncType == PoseTuneParameterSyncType.Bool ? 1 : 8);
 
-        public IEnumerable<ParameterDefinition> SyncedParameters =>
-            Parameters.Where(p => !p.LocalOnly && p.SyncType != PoseTuneParameterSyncType.NotSynced);
-
         public ParameterDefinition Find(string name)
         {
             return Parameters.FirstOrDefault(p => p.Name == name);
@@ -30,6 +27,14 @@ namespace Gokoukotori.PoseTune.Editor
         public bool Saved;
         public bool LocalOnly;
         public bool AnimatorOnly;
+
+        /// <summary>
+        /// The name refers to a parameter the avatar owns (read by a pose's own motion). It is added to the
+        /// PoseTune controller but not declared to Modular Avatar, so it is neither auto-renamed nor added to
+        /// Expression Parameters.
+        /// </summary>
+        public bool SharedWithAvatar;
+
         public float DefaultValue;
     }
 

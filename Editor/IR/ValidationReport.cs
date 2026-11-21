@@ -48,6 +48,14 @@ namespace Gokoukotori.PoseTune.Editor
                     break;
             }
         }
+
+        internal void AddRange(IEnumerable<ValidationIssue> issues)
+        {
+            foreach (var issue in issues)
+            {
+                Add(issue);
+            }
+        }
     }
 
     public enum ValidationSeverity

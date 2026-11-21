@@ -118,7 +118,7 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
                     return;
                 }
 
-                if (reserved.Contains(name) || name.StartsWith("PTI/"))
+                if (reserved.Contains(name) || name.StartsWith(PoseTuneNames.InternalParameterPrefix))
                 {
                     report.Error(PoseTuneDiagnostics.ParameterReservedName.Code, "予約済みのパラメータ名です: " + name, context);
                 }
@@ -185,7 +185,7 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
                     continue;
                 }
 
-                if (reserved.Contains(name) || name.StartsWith("PTI/"))
+                if (reserved.Contains(name) || name.StartsWith(PoseTuneNames.InternalParameterPrefix))
                 {
                     report.Error(PoseTuneDiagnostics.ParameterReservedName.Code, "予約済みの BlendTree parameter 名です: " + name, pose?.Source);
                     continue;

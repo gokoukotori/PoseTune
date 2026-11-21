@@ -24,14 +24,10 @@ namespace Gokoukotori.PoseTune.Editor
                     continue;
                 }
 
-                var type = behaviour.GetType();
                 result.Add(new KawaiiSystemHandle
                 {
                     Component = behaviour,
-                    GameObject = behaviour.gameObject,
-                    TypeName = type.FullName ?? type.Name,
-                    SettingName = ReadSettingName(behaviour),
-                    IsKawaiiPosing = IsTypeOrBase(type, KawaiiPosingTypeName)
+                    SettingName = ReadSettingName(behaviour)
                 });
             }
 

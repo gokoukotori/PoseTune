@@ -19,8 +19,7 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
-            var height = root.GetComponentsInChildren<PoseHeightAdjust>(true)
-                .FirstOrDefault(candidate => candidate.GetComponentInParent<PoseTuneRoot>(true) == root);
+            var height = KawaiiAuthoringObjectUtility.OwnedComponents<PoseHeightAdjust>(root).FirstOrDefault();
             if (height == null)
             {
                 var heightObject = KawaiiAuthoringObjectUtility.EnsureChild(
@@ -79,7 +78,7 @@ namespace Gokoukotori.PoseTune.Editor
                 return false;
             }
 
-            var avatar = KawaiiAuthoringObjectUtility.ResolveAvatar(root.gameObject);
+            var avatar = PoseTuneHierarchyUtility.ResolveAvatar(root.gameObject);
             if (avatar == null)
             {
                 return false;

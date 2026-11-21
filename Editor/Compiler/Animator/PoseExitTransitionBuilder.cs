@@ -3,97 +3,116 @@ using UnityEditor.Animations;
 
 namespace Gokoukotori.PoseTune.Editor
 {
-    public sealed partial class AnimatorCompiler
+    internal static class PoseExitTransitionBuilder
     {
-        private static void AddPoseExitTransitions(
-            PoseStateVariants variants,
-            PoseGraph graph,
-            PoseGroupDefinition group,
+        /// <summary>Exit transitions are added in this order, not in state creation order.</summary>
+        private static readonly PoseStateVariantKind[] ExitOrder =
+        {
+            PoseStateVariantKind.Base,
+            PoseStateVariantKind.FullBody,
+            PoseStateVariantKind.Desktop,
+            PoseStateVariantKind.Vr
+        };
+
+        internal static void AddPoseExitTransitions(
+            PoseLayerBuildContext context,
             PoseDefinition pose,
-            PoseSelectionPlan poseSelection,
+            PoseStateVariants variants,
             bool hasAutoEntry)
         {
-            AddPoseExitTransitions(variants.BaseState, variants.BaseHandoff, graph, group, pose, poseSelection, hasAutoEntry, false);
-            if (variants.NeedsDesktopLowerBodyLockVariant)
+            foreach (var kind in ExitOrder)
             {
-                AddVrModeInvalidExitTransition(variants.BaseState, variants.BaseHandoff);
-            }
-            else if (variants.NeedsPoseSpaceVrVariant)
-            {
-                AddDesktopModeInvalidExitTransition(variants.BaseState, variants.BaseHandoff);
-            }
-
-            if (variants.FullBodyState != null)
-            {
-                AddPoseExitTransitions(variants.FullBodyState, variants.FullBodyHandoff, graph, group, pose, poseSelection, hasAutoEntry, true);
-            }
-
-            if (variants.DesktopLowerBodyState != null)
-            {
-                AddPoseExitTransitions(variants.DesktopLowerBodyState, variants.DesktopLowerBodyHandoff, graph, group, pose, poseSelection, hasAutoEntry, false);
-                AddDesktopModeInvalidExitTransition(variants.DesktopLowerBodyState, variants.DesktopLowerBodyHandoff);
-            }
-
-            if (variants.VrState != null)
-            {
-                AddPoseExitTransitions(variants.VrState, variants.VrHandoff, graph, group, pose, poseSelection, hasAutoEntry, false);
-                if (variants.NeedsPoseSpaceVrVariant)
+                var variant = variants.Get(kind);
+                if (variant == null)
                 {
-                    AddVrModeInvalidExitTransition(variants.VrState, variants.VrHandoff);
+                    continue;
                 }
+
+                AddPoseExitTransitions(context, pose, variant, hasAutoEntry);
+                AddModeInvalidExitTransition(variants, variant);
+            }
+        }
+
+        /// <summary>Leaves a variant when the mode it plays in no longer applies.</summary>
+        private static void AddModeInvalidExitTransition(PoseStateVariants variants, PoseStateVariant variant)
+        {
+            switch (variant.Kind)
+            {
+                case PoseStateVariantKind.Base:
+                    if (variants.NeedsDesktopVariant)
+                    {
+                        ModeTransitionCompiler.AddVrModeInvalidExitTransition(variant.State, variant.Handoff);
+                    }
+                    else if (variants.NeedsPoseSpaceVrVariant)
+                    {
+                        ModeTransitionCompiler.AddDesktopModeInvalidExitTransition(variant.State, variant.Handoff);
+                    }
+
+                    break;
+                case PoseStateVariantKind.Desktop:
+                    ModeTransitionCompiler.AddDesktopModeInvalidExitTransition(variant.State, variant.Handoff);
+                    break;
+                case PoseStateVariantKind.Vr:
+                    ModeTransitionCompiler.AddVrModeInvalidExitTransition(variant.State, variant.Handoff);
+                    break;
             }
         }
 
         private static void AddPoseExitTransitions(
-            AnimatorState state,
-            AnimatorState cleanup,
-            PoseGraph graph,
-            PoseGroupDefinition group,
+            PoseLayerBuildContext context,
             PoseDefinition pose,
-            PoseSelectionPlan poseSelection,
-            bool hasAutoEntry,
-            bool fullBodyVariant)
+            PoseStateVariant variant,
+            bool hasAutoEntry)
         {
-            if (AllowsManualEntry(graph.RootComponent, group))
+            var root = context.Root;
+            var group = context.Group;
+            var state = variant.State;
+            var cleanup = variant.Handoff;
+            if (AutoContextTransitionCompiler.AllowsManualEntry(root, group))
             {
-                var toResetByGroup = state.AddTransition(cleanup);
-                toResetByGroup.hasExitTime = false;
-                toResetByGroup.duration = 0f;
-                AddManualModeEntryCondition(toResetByGroup, graph.RootComponent);
-                AddManualGroupDeselectedCondition(toResetByGroup, poseSelection, pose);
+                var toResetByGroup = AnimatorTransitionFactory.Immediate(state, cleanup);
+                ModeTransitionCompiler.AddManualModeEntryCondition(toResetByGroup, root);
+                AddManualGroupDeselectedCondition(toResetByGroup, context.PoseSelection, pose);
             }
 
-            var toResetByMode = state.AddTransition(cleanup);
-            toResetByMode.hasExitTime = false;
-            toResetByMode.duration = 0f;
-            AddModeExitCondition(toResetByMode, graph.RootComponent, group);
+            var toResetByMode = AnimatorTransitionFactory.Immediate(state, cleanup);
+            ModeTransitionCompiler.AddModeExitCondition(toResetByMode, root, group);
 
-            if (ShouldResetManualPoseOnAutoMode(graph.RootComponent, group, hasAutoEntry))
+            if (AutoContextTransitionCompiler.ShouldResetManualPoseOnAutoMode(root, group, hasAutoEntry))
             {
-                var toResetByAutoMode = state.AddTransition(cleanup);
-                toResetByAutoMode.hasExitTime = false;
-                toResetByAutoMode.duration = 0f;
-                toResetByAutoMode.AddCondition(AnimatorConditionMode.Equals, 1,
-                    graph.RootComponent.Parameter(PoseTuneNames.Mode));
+                var toResetByAutoMode = AnimatorTransitionFactory.Immediate(state, cleanup);
+                ModeTransitionCompiler.AddAutoModeCondition(toResetByAutoMode, root);
             }
 
             TrackingGuardCompiler.AddInvalidExitTransitions(
                 state,
                 cleanup,
-                TrackingGuardCompiler.PoseEntryProfile(graph.RootComponent, pose, fullBodyVariant));
+                TrackingGuardCompiler.PoseEntryProfile(root, pose, variant.IsFullBody));
 
-            AddConditionExitTransitions(state, cleanup, pose);
+            ConditionTransitionCompiler.AddConditionExitTransitions(state, cleanup, pose);
             if (hasAutoEntry)
             {
-                AddAutoContextExitTransitions(state, cleanup, graph.RootComponent, group);
-                AddSelectedPoseAutoExitTransition(
+                AutoContextTransitionCompiler.AddAutoContextExitTransitions(state, cleanup, root, group);
+                AutoContextTransitionCompiler.AddSelectedPoseAutoExitTransition(
                     state,
                     cleanup,
-                    graph.RootComponent,
+                    root,
                     group,
                     pose,
-                    poseSelection);
+                    context.PoseSelection);
             }
+        }
+
+        private static void AddManualGroupDeselectedCondition(
+            AnimatorStateTransition transition,
+            PoseSelectionPlan poseSelection,
+            PoseDefinition pose)
+        {
+            var binding = poseSelection?.Find(pose);
+            transition.AddCondition(
+                AnimatorConditionMode.NotEqual,
+                binding?.Value ?? 0,
+                binding?.ParameterName ?? "");
         }
     }
 }

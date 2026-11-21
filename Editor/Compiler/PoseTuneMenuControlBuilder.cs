@@ -1,19 +1,43 @@
 using System.Collections.Generic;
 using System.Linq;
 using Gokoukotori.PoseTune;
+using UnityEngine;
 using VRC.SDK3.Avatars.ScriptableObjects;
 
 namespace Gokoukotori.PoseTune.Editor
 {
     internal static class PoseTuneMenuControlBuilder
     {
+        internal const string PageLabel = "ページ";
+
+        internal static bool AutoSplit(PoseGraph graph)
+        {
+            return graph.Menu == null || graph.Menu.autoSplitMenu;
+        }
+
+        internal static bool GeneratesHeightRadial(PoseGraph graph)
+        {
+            return ParameterAllocator.NeedsGeneratedHeightParameter(graph) &&
+                   graph.HeightAdjust != null &&
+                   graph.HeightAdjust.generateRadialMenu;
+        }
+
+        internal static MenuControlPlan Radial(string label, string parameter)
+        {
+            return new MenuControlPlan
+            {
+                Label = label,
+                Type = PoseTuneMenuControlType.RadialPuppet,
+                Parameter = "",
+                SubParameters = new List<string> { parameter }
+            };
+        }
+
         public static MenuControlPlan BuildMotionTimeMenu(PoseGraph graph)
         {
             var controls = new List<MenuControlPlan>();
             var seenParameters = new HashSet<string>();
-            var heightParameterAlreadyControlled = ParameterAllocator.NeedsGeneratedHeightParameter(graph) &&
-                                                   graph.HeightAdjust != null &&
-                                                   graph.HeightAdjust.generateRadialMenu
+            var heightParameterAlreadyControlled = GeneratesHeightRadial(graph)
                 ? PoseTuneNames.HeightParameter(graph.RootComponent, graph.HeightAdjust)
                 : "";
             foreach (var pose in graph.Poses
@@ -37,13 +61,7 @@ namespace Gokoukotori.PoseTune.Editor
                     continue;
                 }
 
-                controls.Add(new MenuControlPlan
-                {
-                    Label = pose.DisplayName + " 時間",
-                    Type = PoseTuneMenuControlType.RadialPuppet,
-                    Parameter = "",
-                    SubParameters = new List<string> { resolution.ParameterName }
-                });
+                controls.Add(Radial(pose.DisplayName + " 時間", resolution.ParameterName));
             }
 
             if (controls.Count == 0)
@@ -73,48 +91,12 @@ namespace Gokoukotori.PoseTune.Editor
                 Type = PoseTuneMenuControlType.SubMenu,
                 Children = new List<MenuControlPlan>
                 {
-                    new()
-                    {
-                        Label = "頭をロック",
-                        Type = PoseTuneMenuControlType.Toggle,
-                        Parameter = root.Parameter(PoseTuneNames.LockHead),
-                        Value = 1
-                    },
-                    new()
-                    {
-                        Label = "手をロック",
-                        Type = PoseTuneMenuControlType.Toggle,
-                        Parameter = root.Parameter(PoseTuneNames.LockHands),
-                        Value = 1
-                    },
-                    new()
-                    {
-                        Label = "足をロック",
-                        Type = PoseTuneMenuControlType.Toggle,
-                        Parameter = root.Parameter(PoseTuneNames.LockFeet),
-                        Value = 1
-                    },
-                    new()
-                    {
-                        Label = "移動ロック",
-                        Type = PoseTuneMenuControlType.Toggle,
-                        Parameter = root.Parameter(PoseTuneNames.LocomotionLock),
-                        Value = 1
-                    }
+                    Toggle("頭をロック", root.Parameter(PoseTuneNames.LockHead), 1),
+                    Toggle("手をロック", root.Parameter(PoseTuneNames.LockHands), 1),
+                    Toggle("足をロック", root.Parameter(PoseTuneNames.LockFeet), 1),
+                    Toggle("移動ロック", root.Parameter(PoseTuneNames.LocomotionLock), 1)
                 }
             };
-        }
-
-        public static bool NeedsSupineToggle(PoseGraph graph)
-        {
-            return graph.RootComponent.enableAutoContextSwitch &&
-                   PoseGraphBuildFilter.BuildableGroups(graph)
-                       .Any(g => g.Kind == PoseGroupKind.Prone || g.Kind == PoseGroupKind.Supine);
-        }
-
-        public static bool IsLyingGroup(PoseGroupDefinition group)
-        {
-            return group.Kind == PoseGroupKind.Prone || group.Kind == PoseGroupKind.Supine;
         }
 
         public static MenuControlPlan BuildLyingMenu(
@@ -135,43 +117,34 @@ namespace Gokoukotori.PoseTune.Editor
                     continue;
                 }
 
-                controls.Add(BuildGroupMenu(
-                    group,
-                    graph.Menu == null || graph.Menu.autoSplitMenu,
-                    poseSelection));
+                controls.Add(BuildGroupMenu(group, AutoSplit(graph), poseSelection));
             }
 
-            if (NeedsSupineToggle(graph))
+            if (PoseTuneCompilerRules.NeedsSupineFlag(graph))
             {
                 controls.Add(BuildSupineToggle(graph));
             }
 
-            menu.Children.AddRange(PaginateControls(controls, "ページ", graph.Menu == null || graph.Menu.autoSplitMenu));
+            menu.Children.AddRange(PaginateControls(controls, PageLabel, AutoSplit(graph)));
             return menu;
         }
 
         public static MenuControlPlan BuildSupineToggle(PoseGraph graph)
         {
-            return new MenuControlPlan
-            {
-                Label = "仰向け切替",
-                Type = PoseTuneMenuControlType.Toggle,
-                Parameter = graph.RootComponent.Parameter(PoseTuneNames.SupineFlag),
-                Value = 1
-            };
+            return Toggle("仰向け切替", graph.RootComponent.Parameter(PoseTuneNames.SupineFlag), 1);
         }
 
         public static MenuControlPlan BuildModeMenu(PoseGraph graph)
         {
             var parameter = graph.RootComponent.Parameter(PoseTuneNames.Mode);
             var mode = new MenuControlPlan { Label = "モード", Type = PoseTuneMenuControlType.SubMenu };
-            mode.Children.Add(new MenuControlPlan { Label = "オフ", Type = PoseTuneMenuControlType.Toggle, Parameter = parameter, Value = 0 });
+            mode.Children.Add(Toggle("オフ", parameter, PoseTuneModeValues.Off));
             if (graph.RootComponent.enableAutoContextSwitch)
             {
-                mode.Children.Add(new MenuControlPlan { Label = "自動", Type = PoseTuneMenuControlType.Toggle, Parameter = parameter, Value = 1 });
+                mode.Children.Add(Toggle("自動", parameter, PoseTuneModeValues.Auto));
             }
 
-            mode.Children.Add(new MenuControlPlan { Label = "手動", Type = PoseTuneMenuControlType.Toggle, Parameter = parameter, Value = 2 });
+            mode.Children.Add(Toggle("手動", parameter, PoseTuneModeValues.Manual));
             return mode;
         }
 
@@ -182,27 +155,9 @@ namespace Gokoukotori.PoseTune.Editor
             var groupBinding = poseSelection?.Find(group);
             var controls = new List<MenuControlPlan>
             {
-                new MenuControlPlan
-                {
-                    Label = group.DisplayName + " オフ",
-                    Type = PoseTuneMenuControlType.Toggle,
-                    Parameter = groupBinding?.ParameterName ?? group.ParameterName,
-                    Value = 0,
-                    Icon = group.Icon
-                }
+                Toggle(group.DisplayName + " オフ", groupBinding?.ParameterName ?? group.ParameterName, 0, group.Icon)
             };
-            foreach (var pose in group.Poses)
-            {
-                controls.Add(new MenuControlPlan
-                {
-                    Label = pose.DisplayName,
-                    Type = PoseTuneMenuControlType.Toggle,
-                    Parameter = poseSelection?.Find(pose)?.ParameterName ?? group.ParameterName,
-                    Value = poseSelection?.Find(pose)?.Value ?? SelectionValue(group, pose),
-                    Icon = pose.Icon
-                });
-            }
-
+            controls.AddRange(PoseToggles(group, poseSelection));
             return controls;
         }
 
@@ -221,27 +176,10 @@ namespace Gokoukotori.PoseTune.Editor
 
             var controls = new List<MenuControlPlan>
             {
-                new MenuControlPlan
-                {
-                    Label = "オフ",
-                    Type = PoseTuneMenuControlType.Toggle,
-                    Parameter = groupBinding?.ParameterName ?? group.ParameterName,
-                    Value = 0
-                }
+                Toggle("オフ", groupBinding?.ParameterName ?? group.ParameterName, 0)
             };
-            foreach (var pose in group.Poses)
-            {
-                controls.Add(new MenuControlPlan
-                {
-                    Label = pose.DisplayName,
-                    Type = PoseTuneMenuControlType.Toggle,
-                    Parameter = poseSelection?.Find(pose)?.ParameterName ?? group.ParameterName,
-                    Value = poseSelection?.Find(pose)?.Value ?? SelectionValue(group, pose),
-                    Icon = pose.Icon
-                });
-            }
-
-            menu.Children.AddRange(PaginateControls(controls, "ページ", split));
+            controls.AddRange(PoseToggles(group, poseSelection));
+            menu.Children.AddRange(PaginateControls(controls, PageLabel, split));
 
             return menu;
         }
@@ -269,6 +207,33 @@ namespace Gokoukotori.PoseTune.Editor
             return pages.Count <= VRCExpressionsMenu.MAX_CONTROLS
                 ? pages
                 : PaginateControls(pages, labelPrefix, true);
+        }
+
+        private static IEnumerable<MenuControlPlan> PoseToggles(
+            PoseGroupDefinition group,
+            PoseSelectionPlan poseSelection)
+        {
+            foreach (var pose in group.Poses)
+            {
+                var binding = poseSelection?.Find(pose);
+                yield return Toggle(
+                    pose.DisplayName,
+                    binding?.ParameterName ?? group.ParameterName,
+                    binding?.Value ?? SelectionValue(group, pose),
+                    pose.Icon);
+            }
+        }
+
+        private static MenuControlPlan Toggle(string label, string parameter, float value, Texture2D icon = null)
+        {
+            return new MenuControlPlan
+            {
+                Label = label,
+                Type = PoseTuneMenuControlType.Toggle,
+                Parameter = parameter,
+                Value = value,
+                Icon = icon
+            };
         }
 
         private static int SelectionValue(PoseGroupDefinition group, PoseDefinition pose)

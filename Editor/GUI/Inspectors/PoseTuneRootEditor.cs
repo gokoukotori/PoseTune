@@ -10,7 +10,6 @@ namespace Gokoukotori.PoseTune.Editor
     {
         private static readonly PoseTuneFieldLabel[] FieldLabels =
         {
-            new("displayName", "表示名"),
             new("parameterNamespace", "パラメータ名前空間"),
             new("targetLayer", "対象レイヤー"),
             new("enableAutoContextSwitch", "自動コンテキスト切替"),
@@ -18,7 +17,6 @@ namespace Gokoukotori.PoseTune.Editor
             new("poseSelectionSyncMode", "ポーズ同期方式"),
             new("poseWriteDefaultsMode", "Write Defaults"),
             new("enableHeightAdjust", "高さ調整を有効化"),
-            new("questLowMemoryMode", "Quest / 低メモリモード"),
             new("disableWhenFullBodyTracking", "FBT 時に無効化"),
             new("advancedSettings", "詳細設定")
         };

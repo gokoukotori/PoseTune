@@ -42,9 +42,7 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
                 var rootCurves = CollectRootCurveSets(clip, bindings);
                 HasTimeVariation = rootCurves.Any(set => set.HasTimeVariation());
                 HasNonIdentityValue = !HasTimeVariation && rootCurves.Any(set => set.HasNonIdentityValue());
-                HasUnsupportedCurves = bindings.Any(binding => !PoseTuneCurveBindingPolicy.IsAllowedFloatCurve(binding)) ||
-                    AnimationUtility.GetObjectReferenceCurveBindings(clip)
-                        .Any(binding => !PoseTuneCurveBindingPolicy.IsAllowedObjectReferenceCurve(binding));
+                HasUnsupportedCurves = PoseTuneCurveBindingPolicy.HasUnsupportedCurves(clip, bindings);
                 LoopTime = AnimationUtility.GetAnimationClipSettings(clip).loopTime;
             }
         }
@@ -348,53 +346,6 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
                 return Mathf.Abs(Mathf.DeltaAngle(first.x, second.x)) > RotationToleranceDegrees ||
                        Mathf.Abs(Mathf.DeltaAngle(first.y, second.y)) > RotationToleranceDegrees ||
                        Mathf.Abs(Mathf.DeltaAngle(first.z, second.z)) > RotationToleranceDegrees;
-            }
-        }
-    }
-
-    internal static class PoseTuneCurveBindingPolicy
-    {
-        public static bool HasUnsupportedCurves(AnimationClip clip)
-        {
-            return clip != null &&
-                   (AnimationUtility.GetCurveBindings(clip).Any(binding => !IsAllowedFloatCurve(binding)) ||
-                    AnimationUtility.GetObjectReferenceCurveBindings(clip)
-                        .Any(binding => !IsAllowedObjectReferenceCurve(binding)));
-        }
-
-        public static bool IsAllowedFloatCurve(EditorCurveBinding binding)
-        {
-            if (binding.type == typeof(Transform) || binding.type == typeof(Animator))
-            {
-                return true;
-            }
-
-            return binding.type == typeof(SkinnedMeshRenderer) &&
-                   binding.propertyName.StartsWith("blendShape.");
-        }
-
-        public static bool IsAllowedObjectReferenceCurve(EditorCurveBinding binding)
-        {
-            return binding.type == typeof(Transform);
-        }
-
-        public static void RemoveUnsupportedCurves(AnimationClip generatedClip)
-        {
-            if (generatedClip == null)
-            {
-                return;
-            }
-
-            foreach (var binding in AnimationUtility.GetCurveBindings(generatedClip)
-                         .Where(binding => !IsAllowedFloatCurve(binding)))
-            {
-                AnimationUtility.SetEditorCurve(generatedClip, binding, null);
-            }
-
-            foreach (var binding in AnimationUtility.GetObjectReferenceCurveBindings(generatedClip)
-                         .Where(binding => !IsAllowedObjectReferenceCurve(binding)))
-            {
-                AnimationUtility.SetObjectReferenceCurve(generatedClip, binding, null);
             }
         }
     }

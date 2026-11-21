@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using Gokoukotori.PoseTune;
 using UnityEditor.Animations;
 using UnityEngine;
@@ -8,160 +7,89 @@ namespace Gokoukotori.PoseTune.Editor
     internal static class PoseStateFactory
     {
         public static PoseStateVariants CreateVariants(
-            AnimatorBuildResult result,
-            AnimatorControllerLayer layer,
-            PoseGraph graph,
-            PoseGroupDefinition group,
+            PoseLayerBuildContext context,
             PoseDefinition pose,
-            HashSet<string> duplicateStateBaseNames,
-            Vector3 position,
-            bool controlsActionPlayable,
-            string activeParameter,
-            string poseActiveParameter)
+            string poseActiveParameter,
+            int x,
+            int y)
         {
-            var needsPoseSpaceVrVariant = PoseStateVariantRules.NeedsPoseSpaceVrVariant(pose);
-            var needsDesktopLowerBodyLockVariant =
-                PoseStateVariantRules.NeedsDesktopLowerBodyLockVariant(graph.RootComponent, group, pose);
-            var baseTrackingPolicy = PoseStateVariantRules.LocksExistingDesktopPoseState(
-                graph.RootComponent,
-                group,
-                pose)
-                ? PoseStateVariantRules.DesktopLowerBodyTrackingPolicy(group.TrackingPolicy)
-                : group.TrackingPolicy;
-            var desktopLowerBodyTrackingPolicy =
-                PoseStateVariantRules.DesktopLowerBodyTrackingPolicy(group.TrackingPolicy);
-            var motionResult = BuildMotion(result, graph, pose);
-            result.GeneratedAssets.AddRange(motionResult.GeneratedAssets);
-            var hasFullBodyTrackingVariant = group.HasFullBodyTrackingOverride &&
-                                             graph.RootComponent.advancedSettings.allowFullBodyTracking;
-            baseTrackingPolicy = EffectiveTrackingPolicy(group, baseTrackingPolicy);
-            desktopLowerBodyTrackingPolicy = EffectiveTrackingPolicy(group, desktopLowerBodyTrackingPolicy);
-            var vrTrackingPolicy = EffectiveTrackingPolicy(group, group.TrackingPolicy);
-            var fullBodyTrackingPolicy = EffectiveTrackingPolicy(group, group.FullBodyTrackingPolicy);
-
-            var variants = new PoseStateVariants
+            var group = context.Group;
+            var variants = PoseStateVariantRules.Plan(context.Root, group, pose);
+            var motionResult = BuildMotion(context.Result, context.Graph, pose);
+            context.Result.GeneratedAssets.AddRange(motionResult.GeneratedAssets);
+            // Tracking votes are allocated in variant order, before any state is created.
+            foreach (var variant in variants.All)
             {
-                NeedsPoseSpaceVrVariant = needsPoseSpaceVrVariant,
-                NeedsDesktopLowerBodyLockVariant = needsDesktopLowerBodyLockVariant,
-                BaseTrackingPolicy = baseTrackingPolicy,
-                DesktopLowerBodyTrackingPolicy = desktopLowerBodyTrackingPolicy,
-                VrTrackingPolicy = vrTrackingPolicy,
-                FullBodyTrackingPolicy = fullBodyTrackingPolicy,
-                BaseTrackingVoteId = TrackingVoteId(graph, group, baseTrackingPolicy),
-                DesktopLowerBodyTrackingVoteId = needsDesktopLowerBodyLockVariant
-                    ? TrackingVoteId(graph, group, desktopLowerBodyTrackingPolicy)
-                    : 0,
-                VrTrackingVoteId = needsPoseSpaceVrVariant
-                    ? TrackingVoteId(graph, group, vrTrackingPolicy)
-                    : 0,
-                FullBodyTrackingVoteId = hasFullBodyTrackingVariant
-                    ? TrackingVoteId(graph, group, fullBodyTrackingPolicy)
-                    : 0
-            };
-
-            variants.BaseState = CreateState(
-                layer,
-                graph,
-                pose,
-                PoseStateNaming.Name(pose, duplicateStateBaseNames),
-                position,
-                motionResult,
-                true,
-                controlsActionPlayable,
-                activeParameter,
-                poseActiveParameter,
-                group,
-                variants.BaseTrackingVoteId);
-
-            if (needsDesktopLowerBodyLockVariant)
-            {
-                variants.DesktopLowerBodyState = CreateState(
-                    layer,
-                    graph,
-                    pose,
-                    PoseStateNaming.Name(pose, duplicateStateBaseNames, "_Desktop"),
-                    new Vector3(position.x + 280, position.y),
-                    motionResult,
-                    true,
-                    controlsActionPlayable,
-                    activeParameter,
-                    poseActiveParameter,
+                variant.Policy = EffectiveTrackingPolicy(
                     group,
-                    variants.DesktopLowerBodyTrackingVoteId);
+                    VariantTrackingPolicy(context.Root, group, pose, variant.Kind));
+                variant.VoteId = TrackingVoteId(context.Graph, group, variant.Policy);
             }
 
-            if (needsPoseSpaceVrVariant)
+            foreach (var variant in variants.All)
             {
-                variants.VrState = CreateState(
-                    layer,
-                    graph,
+                variant.State = CreateState(
+                    context,
                     pose,
-                    PoseStateNaming.Name(pose, duplicateStateBaseNames, "_VR"),
-                    new Vector3(position.x + (needsDesktopLowerBodyLockVariant ? 560 : 280), position.y),
+                    variant,
+                    new Vector3(x + variant.StateX, y),
                     motionResult,
-                    false,
-                    controlsActionPlayable,
-                    activeParameter,
-                    poseActiveParameter,
-                    group,
-                    variants.VrTrackingVoteId);
-            }
-
-            if (hasFullBodyTrackingVariant)
-            {
-                variants.FullBodyState = CreateState(
-                    layer,
-                    graph,
-                    pose,
-                    PoseStateNaming.Name(pose, duplicateStateBaseNames, "_FBT"),
-                    new Vector3(position.x + (needsDesktopLowerBodyLockVariant ? 840 : 560), position.y),
-                    motionResult,
-                    !needsPoseSpaceVrVariant,
-                    controlsActionPlayable,
-                    activeParameter,
-                    poseActiveParameter,
-                    group,
-                    variants.FullBodyTrackingVoteId);
+                    poseActiveParameter);
             }
 
             return variants;
         }
 
         private static AnimatorState CreateState(
-            AnimatorControllerLayer layer,
-            PoseGraph graph,
+            PoseLayerBuildContext context,
             PoseDefinition pose,
-            string stateName,
+            PoseStateVariant variant,
             Vector3 position,
             HeightBuildResult motionResult,
-            bool enterPoseSpace,
-            bool controlsActionPlayable,
-            string activeParameter,
-            string poseActiveParameter,
-            PoseGroupDefinition group,
-            int trackingVoteId)
+            string poseActiveParameter)
         {
-            var state = layer.stateMachine.AddState(stateName, position);
-            state.motion = motionResult.Motion;
-            ApplyMotionTime(state, graph, pose);
-            state.writeDefaultValues = WriteDefaultsForPose(graph.RootComponent);
-            if (enterPoseSpace)
+            var state = AnimatorLayerFactory.AddState(
+                context.Layer.stateMachine,
+                PoseStateNaming.Name(pose, context.DuplicateStateBaseNames, variant.Suffix),
+                position,
+                motionResult.Motion);
+            ApplyMotionTime(state, context.Graph, pose);
+            state.writeDefaultValues = WriteDefaultsForPose(context.Root);
+            if (variant.AppliesPoseSpace)
             {
                 PoseSpaceCompiler.AddEnterPoseSpaceBehavior(state, pose.PoseSpace);
             }
 
-            if (controlsActionPlayable)
-            {
-                ParameterDriverCompiler.SetGroupActive(state, activeParameter, 1f);
-            }
+            ParameterDriverCompiler.SetGroupActive(state, context.ActiveParameter, 1f);
 
-            if (trackingVoteId > 0)
+            if (variant.VoteId > 0)
             {
-                ParameterDriverCompiler.SetTrackingVote(state, group, trackingVoteId);
+                ParameterDriverCompiler.SetTrackingVote(state, context.Group, variant.VoteId);
             }
 
             ParameterDriverCompiler.SetPoseActive(state, poseActiveParameter, 1f);
             return state;
+        }
+
+        private static TrackingPolicyData VariantTrackingPolicy(
+            PoseTuneRoot root,
+            PoseGroupDefinition group,
+            PoseDefinition pose,
+            PoseStateVariantKind kind)
+        {
+            switch (kind)
+            {
+                case PoseStateVariantKind.Base:
+                    return PoseStateVariantRules.LocksExistingDesktopPoseState(root, group, pose)
+                        ? PoseStateVariantRules.DesktopLowerBodyTrackingPolicy(group.TrackingPolicy)
+                        : group.TrackingPolicy;
+                case PoseStateVariantKind.Desktop:
+                    return PoseStateVariantRules.DesktopVariantTrackingPolicy(root, group, pose);
+                case PoseStateVariantKind.Vr:
+                    return group.TrackingPolicy;
+                default:
+                    return group.FullBodyTrackingPolicy;
+            }
         }
 
         private static int TrackingVoteId(
@@ -196,10 +124,7 @@ namespace Gokoukotori.PoseTune.Editor
             PoseGraph graph,
             PoseDefinition pose)
         {
-            var heightEnabled = graph.RootComponent.enableHeightAdjust &&
-                                PoseTuneAuthoringInclusion.Includes(graph.HeightAdjust) &&
-                                graph.HeightAdjust.applyMode != HeightApplyMode.Disabled;
-            if (heightEnabled)
+            if (PoseTuneCompilerRules.AppliesHeightOffset(graph))
             {
                 return new HeightCompiler().BuildMotionWithAssets(
                     pose,

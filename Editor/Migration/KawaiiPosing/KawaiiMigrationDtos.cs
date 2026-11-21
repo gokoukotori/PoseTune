@@ -8,10 +8,7 @@ namespace Gokoukotori.PoseTune.Editor
     internal sealed class KawaiiSystemHandle
     {
         public MonoBehaviour Component;
-        public GameObject GameObject;
-        public string TypeName = "";
         public string SettingName = "";
-        public bool IsKawaiiPosing;
     }
 
     internal sealed class KawaiiPosingSystemDto
@@ -41,7 +38,7 @@ namespace Gokoukotori.PoseTune.Editor
         public List<KawaiiAnimationDto> Animations = new();
     }
 
-    internal sealed class KawaiiAnimationDto
+    internal abstract class KawaiiMotionEntryDto
     {
         public int Index;
         public bool Enabled = true;
@@ -54,6 +51,25 @@ namespace Gokoukotori.PoseTune.Editor
         public BlendTree BlendTree;
         public Texture2D PreviewImage;
         public AnimationClip AdjustmentClip;
+
+        public void CopyMotionEntryTo(KawaiiMotionEntryDto target)
+        {
+            target.Index = Index;
+            target.Enabled = Enabled;
+            target.IsRotate = IsRotate;
+            target.Rotate = Rotate;
+            target.IsMotionTime = IsMotionTime;
+            target.MotionTimeParameterName = MotionTimeParameterName;
+            target.Motion = Motion;
+            target.Clip = Clip;
+            target.BlendTree = BlendTree;
+            target.PreviewImage = PreviewImage;
+            target.AdjustmentClip = AdjustmentClip;
+        }
+    }
+
+    internal sealed class KawaiiAnimationDto : KawaiiMotionEntryDto
+    {
         public string DisplayName = "";
         public bool Initial;
         public bool InitialSet;
@@ -63,19 +79,8 @@ namespace Gokoukotori.PoseTune.Editor
         public int SyncedParameterValue;
     }
 
-    internal sealed class KawaiiOverrideDto
+    internal sealed class KawaiiOverrideDto : KawaiiMotionEntryDto
     {
-        public int Index;
-        public bool Enabled = true;
-        public bool IsRotate;
-        public int Rotate;
-        public bool IsMotionTime;
-        public string MotionTimeParameterName = "";
-        public Motion Motion;
-        public AnimationClip Clip;
-        public BlendTree BlendTree;
-        public Texture2D PreviewImage;
-        public AnimationClip AdjustmentClip;
         public string StateType = "";
     }
 

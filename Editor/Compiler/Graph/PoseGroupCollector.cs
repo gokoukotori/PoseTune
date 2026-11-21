@@ -16,11 +16,10 @@ namespace Gokoukotori.PoseTune.Editor
             HashSet<string> usedLayerNames)
         {
             var tracking = PoseTuneTrackingPolicyResolver.ResolveGroupPolicy(root, group);
+            var avatarRootTransform = graph.AvatarRoot != null ? graph.AvatarRoot.transform : root.transform.root;
             var definition = new PoseGroupDefinition
             {
-                Id = PoseTuneObjectIdentity.BuildKey(
-                    group,
-                    graph.AvatarRoot != null ? graph.AvatarRoot.transform : root.transform.root),
+                Id = PoseTuneObjectIdentity.BuildKey(group, avatarRootTransform),
                 DisplayName = string.IsNullOrWhiteSpace(group.displayName) ? group.name : group.displayName,
                 Kind = group.kind,
                 MenuOrder = group.menuOrder,
@@ -55,9 +54,7 @@ namespace Gokoukotori.PoseTune.Editor
                 var conditionBranches = PoseTuneConditionBranchCollector.Collect(graph, group, clip);
                 var pose = new PoseDefinition
                 {
-                    Id = PoseTuneObjectIdentity.BuildKey(
-                        clip,
-                        graph.AvatarRoot != null ? graph.AvatarRoot.transform : root.transform.root),
+                    Id = PoseTuneObjectIdentity.BuildKey(clip, avatarRootTransform),
                     DisplayName = string.IsNullOrWhiteSpace(clip.displayName)
                         ? (effectiveMotion != null ? effectiveMotion.name : clip.name)
                         : clip.displayName,

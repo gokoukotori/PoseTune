@@ -72,6 +72,13 @@ namespace Gokoukotori.PoseTune.Editor
             return source;
         }
 
+        internal static AnimationClip CloneClip(AnimationClip source, string name)
+        {
+            var clip = Object.Instantiate(source);
+            clip.name = name;
+            return clip;
+        }
+
         internal static IEnumerable<Motion> EnumerateMotions(Motion motion)
         {
             if (motion == null)

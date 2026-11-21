@@ -42,9 +42,10 @@ namespace Gokoukotori.PoseTune.Editor
                 return options.existingRoot;
             }
 
-            var rootObject = new GameObject("PoseTune Kawaii Migration");
-            Undo.RegisterCreatedObjectUndo(rootObject, undoName);
-            Undo.SetTransformParent(rootObject.transform, KawaiiAuthoringObjectUtility.ResolveAvatar(avatarRoot).transform, undoName);
+            var rootObject = KawaiiAuthoringObjectUtility.CreateChild(
+                PoseTuneHierarchyUtility.ResolveAvatar(avatarRoot).transform,
+                "PoseTune Kawaii Migration",
+                undoName);
             var root = Undo.AddComponent<PoseTuneRoot>(rootObject);
             Undo.AddComponent<PoseTuneAssistant>(rootObject);
             report.Created(rootObject, "Root");
@@ -92,8 +93,7 @@ namespace Gokoukotori.PoseTune.Editor
 
         private static void EnsureMenu(PoseTuneRoot root, KawaiiMigrationReport report, string undoName)
         {
-            var existing = root.GetComponentsInChildren<PoseMenu>(true)
-                .FirstOrDefault(menu => menu.GetComponentInParent<PoseTuneRoot>(true) == root);
+            var existing = KawaiiAuthoringObjectUtility.OwnedComponents<PoseMenu>(root).FirstOrDefault();
             if (existing != null)
             {
                 Undo.RecordObject(existing, undoName);
@@ -129,8 +129,7 @@ namespace Gokoukotori.PoseTune.Editor
 
         private static void EnsurePoseOptions(PoseTuneRoot root, KawaiiMigrationReport report, string undoName)
         {
-            var existing = root.GetComponentsInChildren<PoseOption>(true)
-                .FirstOrDefault(options => options.GetComponentInParent<PoseTuneRoot>(true) == root);
+            var existing = KawaiiAuthoringObjectUtility.OwnedComponents<PoseOption>(root).FirstOrDefault();
             if (existing != null)
             {
                 Undo.RecordObject(existing, undoName);

@@ -15,7 +15,7 @@ namespace Gokoukotori.PoseTune.Editor
 
             var assets = result.GeneratedAssets
                 .Cast<Object>()
-                .Concat(new Object[] { result.TargetController, result.FxController })
+                .Concat(new Object[] { result.TargetController })
                 .Where(asset => asset != null && !EditorUtility.IsPersistent(asset))
                 .Distinct(ReferenceEqualityComparer<Object>.Instance)
                 .Reverse()
@@ -31,7 +31,6 @@ namespace Gokoukotori.PoseTune.Editor
 
             result.GeneratedAssets.Clear();
             result.TargetController = null;
-            result.FxController = null;
         }
     }
 }

@@ -7,10 +7,14 @@ namespace Gokoukotori.PoseTune.Editor
 {
     internal static class PoseStateNaming
     {
-        public static string Name(PoseDefinition pose)
-        {
-            return Name(pose, null, "");
-        }
+        /// <summary>Suffix of the desktop-only variant of a VR base state.</summary>
+        public const string DesktopSuffix = "_Desktop";
+        /// <summary>Suffix of the VR variant of a desktop-only pose space base state.</summary>
+        public const string VrSuffix = "_VR";
+        /// <summary>Suffix of the full body tracking variant.</summary>
+        public const string FullBodySuffix = "_FBT";
+        public const string HandoffPrefix = "Handoff_";
+        public const string CommitExclusivePrefix = "CommitExclusive_";
 
         public static string Name(PoseDefinition pose, HashSet<string> duplicateBaseNames, string suffix = "")
         {
@@ -37,7 +41,7 @@ namespace Gokoukotori.PoseTune.Editor
             HashSet<string> duplicateBaseNames,
             string suffix = "")
         {
-            return "Handoff_" + Name(pose, duplicateBaseNames, suffix);
+            return HandoffPrefix + Name(pose, duplicateBaseNames, suffix);
         }
 
         private static string BaseName(PoseDefinition pose)

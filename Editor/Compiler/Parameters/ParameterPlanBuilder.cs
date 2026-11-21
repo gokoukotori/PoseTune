@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Gokoukotori.PoseTune;
 
@@ -45,11 +46,6 @@ namespace Gokoukotori.PoseTune.Editor
         public ParameterPlanEntryBuilder AddNotSyncedFloat(string name)
         {
             return Add(name, PoseTuneParameterSyncType.NotSynced, PoseTuneParameterValueType.Float, recordDuplicate: true);
-        }
-
-        public ParameterPlanEntryBuilder AddBoolIfMissing(string name)
-        {
-            return Add(name, PoseTuneParameterSyncType.Bool, PoseTuneParameterValueType.Bool, recordDuplicate: false);
         }
 
         public ParameterPlanEntryBuilder AddFloatIfMissing(string name)
@@ -102,39 +98,34 @@ namespace Gokoukotori.PoseTune.Editor
 
         public ParameterPlanEntryBuilder Saved(bool value = true)
         {
-            if (definition != null)
-            {
-                definition.Saved = value;
-            }
-
-            return this;
+            return Set(target => target.Saved = value);
         }
 
         public ParameterPlanEntryBuilder LocalOnly(bool value = true)
         {
-            if (definition != null)
-            {
-                definition.LocalOnly = value;
-            }
-
-            return this;
+            return Set(target => target.LocalOnly = value);
         }
 
         public ParameterPlanEntryBuilder AnimatorOnly(bool value = true)
         {
-            if (definition != null)
-            {
-                definition.AnimatorOnly = value;
-            }
+            return Set(target => target.AnimatorOnly = value);
+        }
 
-            return this;
+        public ParameterPlanEntryBuilder SharedWithAvatar(bool value = true)
+        {
+            return Set(target => target.SharedWithAvatar = value);
         }
 
         public ParameterPlanEntryBuilder DefaultValue(float value)
         {
+            return Set(target => target.DefaultValue = value);
+        }
+
+        private ParameterPlanEntryBuilder Set(Action<ParameterDefinition> apply)
+        {
             if (definition != null)
             {
-                definition.DefaultValue = value;
+                apply(definition);
             }
 
             return this;

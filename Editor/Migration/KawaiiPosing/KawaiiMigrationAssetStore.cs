@@ -174,7 +174,7 @@ namespace Gokoukotori.PoseTune.Editor
                 manifest.sources.Add(new KawaiiMigrationSourceManifestEntry
                 {
                     globalObjectId = PersistentIdOrThrow(source),
-                    hierarchyPath = HierarchyPath(source.transform),
+                    hierarchyPath = PoseTuneHierarchyUtility.HierarchyPath(source.transform),
                     previousTag = source.gameObject.tag,
                     previousActive = source.gameObject.activeSelf,
                     disposition = options.sourceDisposition.ToString()
@@ -326,17 +326,6 @@ namespace Gokoukotori.PoseTune.Editor
 
             throw new InvalidOperationException(
                 "Kawaii migration requires saved Scene or Prefab objects with valid GlobalObjectIds.");
-        }
-
-        private static string HierarchyPath(Transform transform)
-        {
-            var names = new Stack<string>();
-            for (var current = transform; current != null; current = current.parent)
-            {
-                names.Push(current.name);
-            }
-
-            return string.Join("/", names);
         }
 
         private readonly struct ExpectedAsset

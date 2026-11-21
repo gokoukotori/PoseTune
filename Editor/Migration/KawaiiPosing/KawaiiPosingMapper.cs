@@ -80,17 +80,18 @@ namespace Gokoukotori.PoseTune.Editor
             return "Pose " + animation.Index;
         }
 
+        // Pass a report only once per run (the planner does); a null report skips silently.
         public static IReadOnlyList<KawaiiAnimationDto> ImportableAnimations(
             KawaiiLayerDto layer,
             KawaiiMigrationOptions options,
-            KawaiiMigrationReport report)
+            KawaiiMigrationReport report = null)
         {
             var result = new List<KawaiiAnimationDto>();
             foreach (var animation in layer.Animations.OrderBy(a => a.Index))
             {
                 if (!animation.Enabled && !options.preserveDisabledPosesAsDisabled)
                 {
-                    report.Warning(
+                    report?.Warning(
                         PoseTuneDiagnostics.KawaiiDisabledPoseSkipped.Code,
                         "disabled pose を skip しました: " + DisplayName(animation),
                         animation.Motion);

@@ -1,7 +1,5 @@
 using System.Linq;
 using UnityEditor;
-using UnityEngine;
-using VRC.SDK3.Avatars.Components;
 
 namespace Gokoukotori.PoseTune.Editor
 {
@@ -10,10 +8,8 @@ namespace Gokoukotori.PoseTune.Editor
         [MenuItem("GameObject/Gokoukotori/PoseTune/KawaiiPosing から移行", false, 40)]
         private static void MigrateFromKawaiiPosing()
         {
-            var avatar = ResolveAvatar(Selection.activeGameObject);
-            if (avatar == null)
+            if (!PoseTuneTemplateFactory.TryResolveSelectedAvatarOrWarn(out var avatar))
             {
-                EditorUtility.DisplayDialog("PoseTune", "VRCAvatarDescriptor を持つ Avatar を選択してください。", "OK");
                 return;
             }
 
@@ -23,17 +19,8 @@ namespace Gokoukotori.PoseTune.Editor
         [MenuItem("GameObject/Gokoukotori/PoseTune/KawaiiPosing から移行", true)]
         private static bool ValidateMigrateFromKawaiiPosing()
         {
-            var avatar = ResolveAvatar(Selection.activeGameObject);
+            var avatar = PoseTuneHierarchyUtility.ResolveAvatar(Selection.activeGameObject);
             return avatar != null && KawaiiPosingDetector.FindSystems(avatar.gameObject).Any();
-        }
-
-        private static VRCAvatarDescriptor ResolveAvatar(GameObject selected)
-        {
-            return selected != null
-                ? selected.GetComponent<VRCAvatarDescriptor>()
-                  ?? selected.GetComponentInParent<VRCAvatarDescriptor>(true)
-                  ?? selected.GetComponentInChildren<VRCAvatarDescriptor>(true)
-                : null;
         }
     }
 }

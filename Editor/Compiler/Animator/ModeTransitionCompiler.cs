@@ -3,40 +3,43 @@ using UnityEditor.Animations;
 
 namespace Gokoukotori.PoseTune.Editor
 {
-    public sealed partial class AnimatorCompiler
+    internal static class ModeTransitionCompiler
     {
-        private static void AddManualModeEntryCondition(AnimatorStateTransition transition, PoseTuneRoot root)
+        internal static void AddManualModeEntryCondition(AnimatorStateTransition transition, PoseTuneRoot root)
         {
-            transition.AddCondition(AnimatorConditionMode.Equals, 2, root.Parameter(PoseTuneNames.Mode));
+            transition.AddCondition(AnimatorConditionMode.Equals, PoseTuneModeValues.Manual, root.Parameter(PoseTuneNames.Mode));
         }
 
-        private static void AddDesktopModeCondition(AnimatorStateTransition transition)
+        internal static void AddAutoModeCondition(AnimatorStateTransition transition, PoseTuneRoot root)
+        {
+            transition.AddCondition(AnimatorConditionMode.Equals, PoseTuneModeValues.Auto, root.Parameter(PoseTuneNames.Mode));
+        }
+
+        internal static void AddDesktopModeCondition(AnimatorStateTransition transition)
         {
             transition.AddCondition(AnimatorConditionMode.Less, 1f, "VRMode");
         }
 
-        private static void AddVrModeCondition(AnimatorStateTransition transition)
+        internal static void AddVrModeCondition(AnimatorStateTransition transition)
         {
             transition.AddCondition(AnimatorConditionMode.Greater, 0f, "VRMode");
         }
 
-        private static void AddDesktopModeInvalidExitTransition(AnimatorState state, AnimatorState destination)
+        /// <summary>Leaves a desktop-only state once the user is in VR.</summary>
+        internal static void AddDesktopModeInvalidExitTransition(AnimatorState state, AnimatorState destination)
         {
-            var transition = state.AddTransition(destination);
-            transition.hasExitTime = false;
-            transition.duration = 0f;
-            transition.AddCondition(AnimatorConditionMode.Greater, 0f, "VRMode");
+            var transition = AnimatorTransitionFactory.Immediate(state, destination);
+            AddVrModeCondition(transition);
         }
 
-        private static void AddVrModeInvalidExitTransition(AnimatorState state, AnimatorState destination)
+        /// <summary>Leaves a VR-only state once the user is on desktop.</summary>
+        internal static void AddVrModeInvalidExitTransition(AnimatorState state, AnimatorState destination)
         {
-            var transition = state.AddTransition(destination);
-            transition.hasExitTime = false;
-            transition.duration = 0f;
-            transition.AddCondition(AnimatorConditionMode.Less, 1f, "VRMode");
+            var transition = AnimatorTransitionFactory.Immediate(state, destination);
+            AddDesktopModeCondition(transition);
         }
 
-        private static void AddModeExitCondition(
+        internal static void AddModeExitCondition(
             AnimatorStateTransition transition,
             PoseTuneRoot root,
             PoseGroupDefinition group)
@@ -44,20 +47,20 @@ namespace Gokoukotori.PoseTune.Editor
             var modeParameter = root.Parameter(PoseTuneNames.Mode);
             if (!root.enableAutoContextSwitch)
             {
-                transition.AddCondition(AnimatorConditionMode.NotEqual, 2, modeParameter);
+                transition.AddCondition(AnimatorConditionMode.NotEqual, PoseTuneModeValues.Manual, modeParameter);
                 return;
             }
 
             switch (group.ActivationMode)
             {
                 case PoseGroupActivationMode.Manual:
-                    transition.AddCondition(AnimatorConditionMode.NotEqual, 2, modeParameter);
+                    transition.AddCondition(AnimatorConditionMode.NotEqual, PoseTuneModeValues.Manual, modeParameter);
                     break;
                 case PoseGroupActivationMode.Auto:
-                    transition.AddCondition(AnimatorConditionMode.NotEqual, 1, modeParameter);
+                    transition.AddCondition(AnimatorConditionMode.NotEqual, PoseTuneModeValues.Auto, modeParameter);
                     break;
                 default:
-                    transition.AddCondition(AnimatorConditionMode.Equals, 0, modeParameter);
+                    transition.AddCondition(AnimatorConditionMode.Equals, PoseTuneModeValues.Off, modeParameter);
                     break;
             }
         }

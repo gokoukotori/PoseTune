@@ -16,21 +16,7 @@ namespace Gokoukotori.PoseTune.Editor
 
         public static string AddPoseGroupLabel(PoseGroupKind kind)
         {
-            switch (kind)
-            {
-                case PoseGroupKind.Standing:
-                    return "立ち姿勢を追加";
-                case PoseGroupKind.Chair:
-                    return "椅子を追加";
-                case PoseGroupKind.Floor:
-                    return "床を追加";
-                case PoseGroupKind.Prone:
-                    return "うつ伏せを追加";
-                case PoseGroupKind.Supine:
-                    return "仰向けを追加";
-                default:
-                    return "カスタムを追加";
-            }
+            return PoseTuneTemplateFactory.DefaultDisplayName(kind) + "を追加";
         }
     }
 }

@@ -7,13 +7,19 @@ namespace Gokoukotori.PoseTune.Editor
     [CanEditMultipleObjects]
     public sealed class PoseMenuEditor : PoseTuneLocalizedEditor
     {
+        private static readonly PoseTuneFieldLabel[] FieldLabels =
+        {
+            new("installMode", "インストールモード", "Expression Menu への追加方法を選びます。"),
+            new("rootMenuName", "ルートメニュー名"),
+            new("autoSplitMenu", "メニューを自動分割"),
+            new("useSubMenusPerGroup", "グループごとにサブメニューを使用"),
+            new("lyingMenuLayout", "寝姿勢メニュー配置",
+                "寝姿勢のグループを1つのメニューにまとめるか、グループごとに表示するかを選びます。「グループごとにサブメニューを使用」がオンのときだけ反映されます。")
+        };
+
         public override void OnInspectorGUI()
         {
-            DrawFields(
-                new PoseTuneFieldLabel("installMode", "インストールモード", "Expression Menu への追加方法を選びます。"),
-                new PoseTuneFieldLabel("rootMenuName", "ルートメニュー名"),
-                new PoseTuneFieldLabel("autoSplitMenu", "メニューを自動分割"),
-                new PoseTuneFieldLabel("useSubMenusPerGroup", "グループごとにサブメニューを使用"));
+            DrawFields(FieldLabels);
         }
     }
 }

@@ -11,7 +11,7 @@ PoseTune は、VRChat アバター向けの非破壊ポーズ authoring / compil
 - Pose menu、height radial、Motion Time radial、option menu の自動生成
 - VRChat Expression Menu の 8 controls 制限に合わせた自動ページ分割
 - 高さ調整、接地補正、avatar scale / EyeHeight 補正
-- Pose preview、手動指定のmenu icon、Quest / 低メモリモード
+- Pose preview、手動指定のmenu icon
 - KawaiiPosing からの移行、Gorone System EX との併用 guard
 - build 前後の validation と safe auto-fix
 
@@ -56,7 +56,6 @@ PoseTune 全体のルートです。原則として 1 avatar につき 1 つ配�
 - `poseSelectionSyncMode`: `DirectGroupParameter` / `CompressedPoseId` / `SharedExclusivePoseId`
 - `poseWriteDefaultsMode`: 生成 Animator の Write Defaults 方針
 - `enableHeightAdjust`: 高さ調整
-- `questLowMemoryMode`: Quest / 低メモリ向け設定
 - `disableWhenFullBodyTracking`: FBT 時に PoseTune を無効化
 
 ### PoseGroup
@@ -122,11 +121,11 @@ Gorone System EX marker と Int 型の `VRCSupine` parameter を検出し、対�
 | タブ | 用途 |
 | --- | --- |
 | ポーズ | group / PoseClip の追加と編集 |
-| メニュー | PoseMenu 設定と生成予定 menu preview |
+| メニュー | PoseMenu 設定と使用予定 Expression Parameters の一覧 |
 | トラッキング | FBT 設定と effective tracking policy |
 | 高さ | HeightAdjust 設定、接地補正候補計算、Pose への適用 |
 | プレビュー | Pose preview、preview reset |
-| 検証 | validation report、safe auto-fix、parameter clear |
+| 検証 | validation report、safe auto-fix |
 
 ## 識別子とKawaii生成Asset
 

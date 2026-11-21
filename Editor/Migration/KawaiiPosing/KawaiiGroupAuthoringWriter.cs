@@ -15,12 +15,13 @@ namespace Gokoukotori.PoseTune.Editor
             string undoName,
             IKawaiiMigrationAssetStore assetStore = null)
         {
-            var groupObject = new GameObject(SafeName(layer.MenuName, "Kawaii Group " + layer.Index));
-            Undo.RegisterCreatedObjectUndo(groupObject, undoName);
-            Undo.SetTransformParent(groupObject.transform, parent, undoName);
+            var groupObject = KawaiiAuthoringObjectUtility.CreateChild(
+                parent,
+                KawaiiAuthoringObjectUtility.SafeName(layer.MenuName, "Kawaii Group " + layer.Index),
+                undoName);
             var group = Undo.AddComponent<PoseGroup>(groupObject);
             group.kind = KawaiiPosingMapper.MapGroupKind(layer);
-            group.displayName = SafeName(layer.MenuName, PoseTuneTemplateFactory.DefaultDisplayName(group.kind));
+            group.displayName = KawaiiAuthoringObjectUtility.SafeName(layer.MenuName, PoseTuneTemplateFactory.DefaultDisplayName(group.kind));
             group.parameterName = options.preserveSourceParameterNames ? layer.ParameterName : "";
             group.menuOrder = layer.Index * 10;
             group.icon = dto != null && dto.IsIconDisabled ? null : layer.Icon;
@@ -30,18 +31,10 @@ namespace Gokoukotori.PoseTune.Editor
             group.emitTrackingControl = options.addTrackingPolicy;
             report.Created(groupObject, "Group");
 
-            if (options.addTrackingPolicy)
-            {
-                var policy = Undo.AddComponent<PoseTrackingPolicy>(groupObject);
-                policy.tracking = KawaiiPosingMapper.DefaultTracking(group.kind);
-                if (options.disableWhenFullBodyTracking)
-                {
-                    policy.useFullBodyTrackingOverride = true;
-                    policy.fullBodyTracking = TrackingPolicyData.ResetToTracking();
-                }
-            }
+            AddGroupTrackingPolicy(groupObject, group.kind, options);
 
-            foreach (var animation in KawaiiPosingMapper.ImportableAnimations(layer, options, report))
+            // KawaiiMigrationPlanner already reported the skipped disabled poses (PT-K004).
+            foreach (var animation in KawaiiPosingMapper.ImportableAnimations(layer, options))
             {
                 KawaiiPoseAuthoringWriter.CreatePose(
                     group,
@@ -54,9 +47,23 @@ namespace Gokoukotori.PoseTune.Editor
             }
         }
 
-        private static string SafeName(string value, string fallback)
+        internal static void AddGroupTrackingPolicy(
+            GameObject groupObject,
+            PoseGroupKind kind,
+            KawaiiMigrationOptions options)
         {
-            return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+            if (!options.addTrackingPolicy)
+            {
+                return;
+            }
+
+            var policy = Undo.AddComponent<PoseTrackingPolicy>(groupObject);
+            policy.tracking = KawaiiPosingMapper.DefaultTracking(kind);
+            if (options.disableWhenFullBodyTracking)
+            {
+                policy.useFullBodyTrackingOverride = true;
+                policy.fullBodyTracking = TrackingPolicyData.ResetToTracking();
+            }
         }
     }
 }

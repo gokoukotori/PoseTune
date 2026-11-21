@@ -36,7 +36,7 @@ namespace Gokoukotori.PoseTune.Editor
                 PoseTuneClipValidator.ValidateMotion(pose, report, clipAnalysis);
 
                 PoseTuneMotionTimeValidator.Validate(graph, pose, report);
-                PoseTuneTrackingValidator.ValidatePose(graph, pose, report);
+                // generateResetOnExit=false is a supported sticky-policy contract, not an FBT warning.
                 PoseTunePoseOutputValidator.Validate(graph, pose, report);
             }
 

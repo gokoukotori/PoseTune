@@ -3,6 +3,7 @@ using System.Linq;
 using Gokoukotori.PoseTune;
 using UnityEditor.Animations;
 using VRC.SDK3.Avatars.Components;
+using VRC.SDK3.Avatars.ScriptableObjects;
 
 namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
 {
@@ -28,30 +29,16 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
                 return;
             }
 
-            var expressionParameters = descriptor.GetType().GetField("expressionParameters")?.GetValue(descriptor);
-            var parameters = expressionParameters?.GetType().GetField("parameters")?.GetValue(expressionParameters)
-                as System.Collections.IEnumerable;
-            if (parameters == null)
+            foreach (var parameter in ExistingParameters(descriptor))
             {
-                return;
-            }
-
-            foreach (var parameter in parameters)
-            {
-                if (parameter == null)
-                {
-                    continue;
-                }
-
-                var parameterType = parameter.GetType();
-                var name = parameterType.GetField("name")?.GetValue(parameter)?.ToString();
+                var name = parameter.name;
                 if (string.IsNullOrWhiteSpace(name) ||
                     !context.ExpectedExpressionParameterTypes.TryGetValue(name, out var expectedType))
                 {
                     continue;
                 }
 
-                var actualType = parameterType.GetField("valueType")?.GetValue(parameter)?.ToString();
+                var actualType = parameter.valueType.ToString();
                 if (actualType != expectedType)
                 {
                     report.Error(PoseTuneDiagnostics.ExistingExpressionParameterTypeConflict.Code,
@@ -159,49 +146,19 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
                 yield break;
             }
 
-            var expressionParameters = descriptor.GetType().GetField("expressionParameters")?.GetValue(descriptor);
-            var parameters = expressionParameters?.GetType().GetField("parameters")?.GetValue(expressionParameters)
-                as System.Collections.IEnumerable;
-            if (parameters == null)
+            foreach (var parameter in ExistingParameters(descriptor))
             {
-                yield break;
-            }
-
-            foreach (var parameter in parameters)
-            {
-                if (parameter == null)
-                {
-                    continue;
-                }
-
-                var parameterType = parameter.GetType();
-                var name = parameterType.GetField("name")?.GetValue(parameter)?.ToString() ?? "";
-                var valueType = ToPoseTuneValueType(
-                    parameterType.GetField("valueType")?.GetValue(parameter)?.ToString());
                 yield return new ExistingExpressionParameterSnapshot(
-                    name,
-                    valueType,
-                    ReadBoolField(parameter, "networkSynced", true));
+                    parameter.name ?? "",
+                    PoseTuneParameterTypeMapper.FromVrcValueType(parameter.valueType),
+                    parameter.networkSynced);
             }
         }
 
-        private static PoseTuneParameterValueType ToPoseTuneValueType(string valueType)
+        private static IEnumerable<VRCExpressionParameters.Parameter> ExistingParameters(VRCAvatarDescriptor descriptor)
         {
-            switch (valueType)
-            {
-                case "Bool":
-                    return PoseTuneParameterValueType.Bool;
-                case "Int":
-                    return PoseTuneParameterValueType.Int;
-                default:
-                    return PoseTuneParameterValueType.Float;
-            }
-        }
-
-        private static bool ReadBoolField(object target, string fieldName, bool fallback)
-        {
-            var field = target.GetType().GetField(fieldName);
-            return field != null ? (bool)field.GetValue(target) : fallback;
+            return descriptor.expressionParameters?.parameters?.Where(parameter => parameter != null) ??
+                   Enumerable.Empty<VRCExpressionParameters.Parameter>();
         }
     }
 }

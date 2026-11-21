@@ -5,23 +5,32 @@ namespace Gokoukotori.PoseTune.Editor
 {
     internal static class PoseTuneAssistantRootSettingsPanel
     {
-        public static void Draw(PoseTuneRoot root)
+        internal static readonly PoseTuneFieldLabel[] SelectionFields =
         {
-            root.displayName = EditorGUILayout.TextField("表示名", root.displayName);
-            root.parameterNamespace = EditorGUILayout.TextField("パラメータ名前空間", root.parameterNamespace);
-            root.targetLayer = (PoseTuneTargetLayer)EditorGUILayout.EnumPopup("対象レイヤー", root.targetLayer);
-            root.enableAutoContextSwitch = EditorGUILayout.Toggle("自動コンテキスト切替", root.enableAutoContextSwitch);
-            root.defaultMode = (PoseTuneDefaultMode)EditorGUILayout.EnumPopup("既定モード", root.defaultMode);
-            root.poseSelectionSyncMode = (PoseSelectionSyncMode)EditorGUILayout.EnumPopup("ポーズ同期方式", root.poseSelectionSyncMode);
-            if (root.poseSelectionSyncMode == PoseSelectionSyncMode.SharedExclusivePoseId)
+            new("parameterNamespace", "パラメータ名前空間"),
+            new("targetLayer", "対象レイヤー"),
+            new("enableAutoContextSwitch", "自動コンテキスト切替"),
+            new("defaultMode", "既定モード"),
+            new("poseSelectionSyncMode", "ポーズ同期方式")
+        };
+
+        internal static readonly PoseTuneFieldLabel[] OutputFields =
+        {
+            new("poseWriteDefaultsMode", "Write Defaults"),
+            new("advancedSettings.keepGeneratedObjectsInBuild", "生成オブジェクトを Build に残す")
+        };
+
+        public static void Draw(SerializedObject rootObject)
+        {
+            PoseTuneInspectorGui.DrawFields(rootObject, SelectionFields);
+            if (((PoseTuneRoot)rootObject.targetObject).poseSelectionSyncMode == PoseSelectionSyncMode.SharedExclusivePoseId)
             {
                 EditorGUILayout.HelpBox(
                     "対象exclusiveグループをSaved属性ごとの共有Intへ圧縮します。Auto SelectedPosePerGroup、明示parameter名、非同期、non-exclusiveは専用Intへフォールバックします。",
                     MessageType.Info);
             }
-            root.poseWriteDefaultsMode = (PoseWriteDefaultsMode)EditorGUILayout.EnumPopup("Write Defaults", root.poseWriteDefaultsMode);
-            root.advancedSettings.keepGeneratedObjectsInBuild =
-                EditorGUILayout.Toggle("生成オブジェクトを Build に残す", root.advancedSettings.keepGeneratedObjectsInBuild);
+
+            PoseTuneInspectorGui.DrawFields(rootObject, OutputFields);
         }
     }
 }

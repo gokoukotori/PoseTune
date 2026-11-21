@@ -10,16 +10,18 @@ namespace Gokoukotori.PoseTune.Editor
         private static readonly Dictionary<int, PoseClip> GroundingPoseSelections = new();
         private static readonly Dictionary<int, PoseGroundingSuggestion> GroundingSuggestions = new();
 
-        public static void Draw(PoseTuneRoot root)
+        internal static readonly PoseTuneFieldLabel[] RootFields =
         {
-            root.enableHeightAdjust = EditorGUILayout.Toggle("高さ調整を有効化", root.enableHeightAdjust);
+            new("enableHeightAdjust", "高さ調整を有効化")
+        };
+
+        public static void Draw(PoseTuneRoot root, SerializedObject rootObject)
+        {
+            PoseTuneInspectorGui.DrawFields(rootObject, RootFields);
             var height = root.GetComponentInChildren<PoseHeightAdjust>(true);
             if (height == null && GUILayout.Button("高さ調整を追加"))
             {
-                var go = new GameObject("高さ調整");
-                Undo.RegisterCreatedObjectUndo(go, "PoseTune 高さ調整を追加");
-                go.transform.SetParent(root.transform, false);
-                height = go.AddComponent<PoseHeightAdjust>();
+                height = PoseTuneAuthoringFactory.CreateChild<PoseHeightAdjust>(root.transform, "高さ調整", "PoseTune 高さ調整を追加");
             }
 
             if (height != null)

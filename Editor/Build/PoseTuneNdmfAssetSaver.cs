@@ -10,24 +10,6 @@ namespace Gokoukotori.PoseTune.Editor
 {
     public static class PoseTuneNdmfAssetSaver
     {
-        public static void SaveGeneratedAnimatorAssets(BuildContext context, AnimatorBuildResult result)
-        {
-            if (context == null)
-            {
-                throw new ArgumentNullException(nameof(context));
-            }
-
-            if (result == null)
-            {
-                throw new ArgumentNullException(nameof(result));
-            }
-
-            if (!TrySaveGeneratedAnimatorAssets(context, result))
-            {
-                throw new InvalidOperationException("NDMF AssetSaver が利用できません。");
-            }
-        }
-
         public static bool TrySaveGeneratedAnimatorAssets(BuildContext context, AnimatorBuildResult result)
         {
             if (context == null)
@@ -56,24 +38,6 @@ namespace Gokoukotori.PoseTune.Editor
                 assetSaver.GetPersistedAssets().Where(asset => asset != null),
                 ReferenceEqualityComparer<Object>.Instance);
             return assets.All(asset => EditorUtility.IsPersistent(asset) || persisted.Contains(asset));
-        }
-
-        public static void SaveGeneratedAnimatorAssets(IAssetSaver assetSaver, AnimatorBuildResult result)
-        {
-            if (assetSaver == null)
-            {
-                throw new ArgumentNullException(nameof(assetSaver));
-            }
-
-            if (result == null)
-            {
-                throw new ArgumentNullException(nameof(result));
-            }
-
-            if (!TrySaveGeneratedAnimatorAssets(assetSaver, result))
-            {
-                throw new InvalidOperationException("NDMF AssetSaver が PoseTune の生成 animator assets を保存しませんでした。");
-            }
         }
 
         private static Object[] EnumerateSaveTargets(AnimatorBuildResult result)

@@ -23,37 +23,28 @@ namespace Gokoukotori.PoseTune.Editor
             result.GeneratedAssets.Add(empty);
             var activePoseParameters = PoseTuneLayerNaming.GroupActiveParameters(graph).ToList();
 
-            var enable = layer.stateMachine.AddState("LocomotionEnable", new Vector3(240, 80));
-            enable.motion = empty;
+            var enable = AnimatorLayerFactory.AddState(layer.stateMachine, "LocomotionEnable",
+                new Vector3(240, 80), empty);
             LocomotionCompiler.AddLocomotionBehavior(enable, false);
             layer.stateMachine.defaultState = enable;
 
-            var disable = layer.stateMachine.AddState("LocomotionDisable", new Vector3(520, 80));
-            disable.motion = empty;
+            var disable = AnimatorLayerFactory.AddState(layer.stateMachine, "LocomotionDisable",
+                new Vector3(520, 80), empty);
             LocomotionCompiler.AddLocomotionBehavior(disable, true);
 
             var parameter = graph.RootComponent.Parameter(PoseTuneNames.LocomotionLock);
-            var enterEnable = layer.stateMachine.AddAnyStateTransition(enable);
-            enterEnable.hasExitTime = false;
-            enterEnable.duration = 0f;
-            enterEnable.canTransitionToSelf = false;
+            var enterEnable = AnimatorTransitionFactory.ImmediateFromAny(layer.stateMachine, enable);
             enterEnable.AddCondition(AnimatorConditionMode.IfNot, 0f, parameter);
 
             foreach (var activePoseParameter in activePoseParameters)
             {
-                var enterDisable = layer.stateMachine.AddAnyStateTransition(disable);
-                enterDisable.hasExitTime = false;
-                enterDisable.duration = 0f;
-                enterDisable.canTransitionToSelf = false;
+                var enterDisable = AnimatorTransitionFactory.ImmediateFromAny(layer.stateMachine, disable);
                 enterDisable.AddCondition(AnimatorConditionMode.If, 0f, parameter);
                 AddPoseTuneEnabledCondition(enterDisable, graph);
-                AddPoseSelectedCondition(enterDisable, activePoseParameter);
+                ActiveParameterConditions.AddActiveCondition(enterDisable, activePoseParameter);
             }
 
-            var enterEnableWhenPoseTuneOff = layer.stateMachine.AddAnyStateTransition(enable);
-            enterEnableWhenPoseTuneOff.hasExitTime = false;
-            enterEnableWhenPoseTuneOff.duration = 0f;
-            enterEnableWhenPoseTuneOff.canTransitionToSelf = false;
+            var enterEnableWhenPoseTuneOff = AnimatorTransitionFactory.ImmediateFromAny(layer.stateMachine, enable);
             AddPoseTuneOffCondition(enterEnableWhenPoseTuneOff, graph);
 
             AddNoPoseSelectedTransition(layer, enable, activePoseParameters);
@@ -71,31 +62,18 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
-            var enter = layer.stateMachine.AddAnyStateTransition(state);
-            enter.hasExitTime = false;
-            enter.duration = 0f;
-            enter.canTransitionToSelf = false;
+            var enter = AnimatorTransitionFactory.ImmediateFromAny(layer.stateMachine, state);
             foreach (var activePoseParameter in activePoseParameters)
             {
-                AddPoseDeselectedCondition(enter, activePoseParameter);
+                ActiveParameterConditions.AddInactiveCondition(enter, activePoseParameter);
             }
-        }
-
-        private static void AddPoseSelectedCondition(AnimatorStateTransition transition, string parameter)
-        {
-            transition.AddCondition(AnimatorConditionMode.Greater, 0.5f, parameter);
-        }
-
-        private static void AddPoseDeselectedCondition(AnimatorStateTransition transition, string parameter)
-        {
-            transition.AddCondition(AnimatorConditionMode.Less, 0.5f, parameter);
         }
 
         private static void AddPoseTuneEnabledCondition(AnimatorStateTransition transition, PoseGraph graph)
         {
             transition.AddCondition(
                 AnimatorConditionMode.NotEqual,
-                0f,
+                PoseTuneModeValues.Off,
                 graph.RootComponent.Parameter(PoseTuneNames.Mode));
         }
 
@@ -103,7 +81,7 @@ namespace Gokoukotori.PoseTune.Editor
         {
             transition.AddCondition(
                 AnimatorConditionMode.Equals,
-                0f,
+                PoseTuneModeValues.Off,
                 graph.RootComponent.Parameter(PoseTuneNames.Mode));
         }
 

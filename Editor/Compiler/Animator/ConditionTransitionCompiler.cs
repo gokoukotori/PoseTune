@@ -6,24 +6,31 @@ using UnityEditor.Animations;
 
 namespace Gokoukotori.PoseTune.Editor
 {
-    public sealed partial class AnimatorCompiler
+    internal static class ConditionTransitionCompiler
     {
-        private static void AddConditionExitTransitions(AnimatorState state, AnimatorState reset, PoseDefinition pose)
+        internal static void AddConditionExitTransitions(AnimatorState state, AnimatorState reset, PoseDefinition pose)
         {
             foreach (var conditionSet in InvertConditionBranches(pose))
             {
-                var transition = state.AddTransition(reset);
-                transition.hasExitTime = false;
-                transition.duration = 0f;
+                var transition = AnimatorTransitionFactory.Immediate(state, reset);
                 AddConditions(transition, conditionSet);
             }
         }
 
-        private static List<List<ParameterConditionData>> InvertConditionBranches(PoseDefinition pose)
+        /// <summary>
+        /// The pose's OR-ed condition branches; a pose without branches has its flat condition list as its only
+        /// branch.
+        /// </summary>
+        internal static List<List<ParameterConditionData>> EffectiveConditionBranches(PoseDefinition pose)
         {
-            var branches = pose.ConditionBranches.Count > 0
+            return pose.ConditionBranches.Count > 0
                 ? pose.ConditionBranches
                 : new List<List<ParameterConditionData>> { pose.Conditions };
+        }
+
+        private static List<List<ParameterConditionData>> InvertConditionBranches(PoseDefinition pose)
+        {
+            var branches = EffectiveConditionBranches(pose);
             branches = branches.Where(branch => branch != null).ToList();
             if (branches.Count == 0 || branches.Any(branch => branch.Count == 0))
             {
@@ -59,7 +66,7 @@ namespace Gokoukotori.PoseTune.Editor
             return result;
         }
 
-        private static void AddConditions(AnimatorStateTransition transition, IEnumerable<ParameterConditionData> conditions)
+        internal static void AddConditions(AnimatorStateTransition transition, IEnumerable<ParameterConditionData> conditions)
         {
             foreach (var condition in conditions ?? Enumerable.Empty<ParameterConditionData>())
             {

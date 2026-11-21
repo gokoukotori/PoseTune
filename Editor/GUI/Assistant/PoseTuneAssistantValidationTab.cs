@@ -28,11 +28,7 @@ namespace Gokoukotori.PoseTune.Editor
     {
         private static readonly Dictionary<string, bool> GroupFoldouts = new();
         private readonly PoseTuneAutoFixRegistry _registry = new PoseTuneAutoFixRegistry();
-        private readonly Func<PoseTuneRoot, PoseTuneAssistantValidationSnapshot> _createSnapshot;
-        private readonly PoseTuneAssistantScopedInvalidation _invalidation;
-        private PoseTuneRoot _cachedRoot;
-        private PoseTuneAssistantValidationSnapshot _snapshot;
-        private bool _cacheValid;
+        private readonly PoseTuneRootSnapshotCache<PoseTuneAssistantValidationSnapshot> _cache;
 
         public PoseTuneAssistantValidationTab()
             : this(CreateSnapshot)
@@ -42,8 +38,7 @@ namespace Gokoukotori.PoseTune.Editor
         internal PoseTuneAssistantValidationTab(
             Func<PoseTuneRoot, PoseTuneAssistantValidationSnapshot> createSnapshot)
         {
-            _createSnapshot = createSnapshot ?? throw new ArgumentNullException(nameof(createSnapshot));
-            _invalidation = new PoseTuneAssistantScopedInvalidation(Invalidate);
+            _cache = new PoseTuneRootSnapshotCache<PoseTuneAssistantValidationSnapshot>(createSnapshot);
         }
 
         public void Draw(PoseTuneRoot root)
@@ -125,44 +120,21 @@ namespace Gokoukotori.PoseTune.Editor
                     }
                 }
             }
-
-            if (GUILayout.Button("明示指定されたグループパラメータをクリア"))
-            {
-                foreach (var group in root.GetComponentsInChildren<PoseGroup>(true))
-                {
-                    if (!string.IsNullOrWhiteSpace(group.parameterName))
-                    {
-                        group.parameterName = "";
-                        EditorUtility.SetDirty(group);
-                    }
-                }
-
-                Invalidate();
-                GUI.changed = true;
-            }
         }
 
         public void Invalidate()
         {
-            _cacheValid = false;
+            _cache.Invalidate();
         }
 
         public void Dispose()
         {
-            _invalidation.Dispose();
+            _cache.Dispose();
         }
 
         internal PoseTuneAssistantValidationSnapshot GetSnapshot(PoseTuneRoot root)
         {
-            _invalidation.Track(root);
-            if (!_cacheValid || _cachedRoot != root)
-            {
-                _cachedRoot = root;
-                _snapshot = _createSnapshot(root);
-                _cacheValid = true;
-            }
-
-            return _snapshot;
+            return _cache.Get(root);
         }
 
         private static PoseTuneAssistantValidationSnapshot CreateSnapshot(PoseTuneRoot root)

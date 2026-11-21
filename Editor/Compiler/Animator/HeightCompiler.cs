@@ -13,27 +13,6 @@ namespace Gokoukotori.PoseTune.Editor
 {
     internal sealed class HeightCompiler
     {
-        public HeightBuildResult BuildMotionWithAssets(PoseDefinition pose, bool enabled, string parameterName)
-        {
-            return BuildMotionWithAssets(pose, enabled, parameterName, -1f, 1f);
-        }
-
-        public HeightBuildResult BuildMotionWithAssets(
-            PoseDefinition pose,
-            bool enabled,
-            string parameterName,
-            float minOffset,
-            float maxOffset)
-        {
-            return BuildMotionWithAssets(
-                pose,
-                enabled,
-                parameterName,
-                minOffset,
-                maxOffset,
-                PoseMotionPreparationContext.Empty());
-        }
-
         public HeightBuildResult BuildMotionWithAssets(
             PoseDefinition pose,
             bool enabled,
@@ -348,8 +327,7 @@ namespace Gokoukotori.PoseTune.Editor
             string name,
             float offset)
         {
-            var cloned = Object.Instantiate(clip);
-            cloned.name = name;
+            var cloned = MotionTreeCloneUtility.CloneClip(clip, name);
             var settings = AnimationUtility.GetAnimationClipSettings(cloned);
             settings.level += offset;
             AnimationUtility.SetAnimationClipSettings(cloned, settings);
@@ -361,20 +339,10 @@ namespace Gokoukotori.PoseTune.Editor
             string name,
             float offset)
         {
-            var cloned = Object.Instantiate(clip);
-            cloned.name = name;
-            ApplyRootYOffset(cloned, offset);
+            var cloned = MotionTreeCloneUtility.CloneClip(clip, name);
+            // Always written, even for a zero offset, so that every height variant carries a RootT.y curve.
+            PoseRootMotionCurveUtility.SetRootCurveOffset(cloned, "RootT.y", offset);
             return cloned;
-        }
-
-        private static void ApplyRootYOffset(AnimationClip clip, float offset)
-        {
-            var binding = EditorCurveBinding.FloatCurve("", typeof(Animator), "RootT.y");
-            var existing = AnimationUtility.GetEditorCurve(clip, binding);
-            var curve = existing != null
-                ? PoseRootMotionCurveUtility.OffsetCurve(existing, offset)
-                : AnimationCurve.Constant(0f, Mathf.Max(0f, clip.length), offset);
-            AnimationUtility.SetEditorCurve(clip, binding, curve);
         }
     }
 }

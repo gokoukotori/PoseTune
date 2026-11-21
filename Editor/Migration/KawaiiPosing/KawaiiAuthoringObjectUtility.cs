@@ -1,7 +1,7 @@
+using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
-using VRC.SDK3.Avatars.Components;
 
 namespace Gokoukotori.PoseTune.Editor
 {
@@ -20,11 +20,28 @@ namespace Gokoukotori.PoseTune.Editor
                 return existing.gameObject;
             }
 
+            var go = CreateChild(parent, name, undoName);
+            report.Created(go, kind);
+            return go;
+        }
+
+        public static GameObject CreateChild(Transform parent, string name, string undoName)
+        {
             var go = new GameObject(name);
             Undo.RegisterCreatedObjectUndo(go, undoName);
             Undo.SetTransformParent(go.transform, parent, undoName);
-            report.Created(go, kind);
             return go;
+        }
+
+        public static IEnumerable<T> OwnedComponents<T>(PoseTuneRoot root) where T : Component
+        {
+            return root.GetComponentsInChildren<T>(true)
+                .Where(component => component != null && component.GetComponentInParent<PoseTuneRoot>(true) == root);
+        }
+
+        public static string SafeName(string value, string fallback)
+        {
+            return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
         }
 
         public static void RecordPrefabModifications(Object target)
@@ -33,15 +50,6 @@ namespace Gokoukotori.PoseTune.Editor
             {
                 PrefabUtility.RecordPrefabInstancePropertyModifications(target);
             }
-        }
-
-        public static VRCAvatarDescriptor ResolveAvatar(GameObject selected)
-        {
-            return selected != null
-                ? selected.GetComponent<VRCAvatarDescriptor>()
-                  ?? selected.GetComponentInParent<VRCAvatarDescriptor>(true)
-                  ?? selected.GetComponentInChildren<VRCAvatarDescriptor>(true)
-                : null;
         }
     }
 }

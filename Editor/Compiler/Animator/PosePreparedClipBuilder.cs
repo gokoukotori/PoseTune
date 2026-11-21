@@ -4,7 +4,6 @@ using Gokoukotori.PoseTune;
 using Gokoukotori.PoseTune.Editor.Compiler.Validation;
 using UnityEditor;
 using UnityEngine;
-using Object = UnityEngine.Object;
 
 namespace Gokoukotori.PoseTune.Editor
 {
@@ -45,14 +44,14 @@ namespace Gokoukotori.PoseTune.Editor
             string name,
             bool sanitizeUnsupportedSourceCurves = false)
         {
-            var clip = CloneClip(source, name);
+            var clip = MotionTreeCloneUtility.CloneClip(source, name);
             if (sanitizeUnsupportedSourceCurves)
             {
                 PoseTuneCurveBindingPolicy.RemoveUnsupportedCurves(clip);
             }
 
+            // The adjustment clip is recentered with the source, matching the Kawaii bake at migration.
             ApplyAdjustmentClip(clip, pose.AdjustmentClip, pose.AdjustmentApplyMode);
-            ApplyRootOffset(clip, pose.RootOffset);
             ApplyHumanoidOrientationOffsetY(clip, pose.HumanoidOrientationOffsetYDegrees);
             ApplyRootYawOffset(clip, pose.RootYawOffsetDegrees);
             if (pose.RecenterRootXZToHead)
@@ -60,14 +59,9 @@ namespace Gokoukotori.PoseTune.Editor
                 RecenterRootXZ(clip);
             }
 
+            // The authored root offset is applied after recentering so that its X/Z is not cancelled.
+            ApplyRootOffset(clip, pose.RootOffset);
             ApplyLoopSetting(clip, pose.Loop);
-            return clip;
-        }
-
-        private static AnimationClip CloneClip(AnimationClip source, string name)
-        {
-            var clip = Object.Instantiate(source);
-            clip.name = name;
             return clip;
         }
 
@@ -201,7 +195,7 @@ namespace Gokoukotori.PoseTune.Editor
 
         private static void RecenterRootCurve(AnimationClip clip, string propertyName)
         {
-            var binding = EditorCurveBinding.FloatCurve("", typeof(Animator), propertyName);
+            var binding = PoseRootMotionCurveUtility.AnimatorFloatBinding(propertyName);
             var curve = AnimationUtility.GetEditorCurve(clip, binding);
             if (curve == null || curve.keys.Length == 0)
             {

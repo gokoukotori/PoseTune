@@ -69,7 +69,7 @@ namespace Gokoukotori.PoseTune.Editor
                             clip,
                             cloneName,
                             context.SanitizeUnsupportedSourceCurves)
-                        : CloneClip(clip, cloneName),
+                        : MotionTreeCloneUtility.CloneClip(clip, cloneName),
                     ChildMotionName);
                 var assets = MotionTreeCloneUtility.EnumerateMotions(cloned).Cast<Object>().ToList();
                 return new PoseMotionPreparationResult
@@ -102,36 +102,9 @@ namespace Gokoukotori.PoseTune.Editor
             };
         }
 
-        public static bool RequiresPreparedMotion(PoseDefinition pose)
-        {
-            return PosePreparedClipBuilder.RequiresPreparedMotion(pose);
-        }
-
-        public static AnimationClip ClonePreparedClip(PoseDefinition pose, string name)
-        {
-            return PosePreparedClipBuilder.ClonePreparedClip(pose, name);
-        }
-
-        public static BlendTree CloneBlendTree(BlendTree source, string name)
-        {
-            return (BlendTree)MotionTreeCloneUtility.Clone(
-                source,
-                name,
-                new List<Object>(),
-                CloneClip,
-                ChildMotionName);
-        }
-
         private static string ChildMotionName(Motion motion, string parentName, int index)
         {
             return motion != null ? motion.name : "Motion";
-        }
-
-        private static AnimationClip CloneClip(AnimationClip source, string name)
-        {
-            var clip = Object.Instantiate(source);
-            clip.name = name;
-            return clip;
         }
     }
 }

@@ -1,97 +1,9 @@
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using Gokoukotori.PoseTune;
 
 namespace Gokoukotori.PoseTune.Editor
 {
-    internal static class PoseTuneNames
-    {
-        public const string Mode = "Mode";
-        public const string LockHead = "LockHead";
-        public const string LockHands = "LockHands";
-        public const string LockFeet = "LockFeet";
-        public const string LocomotionLock = "LocomotionLock";
-        public const string SupineFlag = "SupineFlag";
-        public const string PoseId = "PoseId";
-        public const string PoseIdTransient = "PoseIdTransient";
-        public const string GeneratedRootName = "PoseTune Generated";
-
-        public static string PoseIdParameter(PoseTuneRoot root, bool saved, int bankNumber)
-        {
-            var localName = saved ? PoseId : PoseIdTransient;
-            if (bankNumber > 1)
-            {
-                localName += bankNumber.ToString(CultureInfo.InvariantCulture);
-            }
-
-            return root.Parameter(localName);
-        }
-
-        public static string ShortId(string id)
-        {
-            if (string.IsNullOrWhiteSpace(id))
-            {
-                return "unknown";
-            }
-
-            return id.Length <= 16 ? id : id.Substring(0, 16);
-        }
-
-        public static string HeightParameter(PoseTuneRoot root, PoseHeightAdjust height)
-        {
-            if (height != null && !string.IsNullOrWhiteSpace(height.parameterName))
-            {
-                return height.parameterName.Trim();
-            }
-
-            return root != null ? root.Parameter("Height") : "PT/Height";
-        }
-
-        public static string GroupActiveParameter(PoseGroupDefinition group)
-        {
-            return GroupActiveParameter(group, PoseClipBlendMode.Override);
-        }
-
-        public static string GroupActiveParameter(PoseGroupDefinition group, PoseClipBlendMode blendMode)
-        {
-            return "PTI/GroupActive/" + ShortId(group != null ? group.Id : "") + "/" + blendMode;
-        }
-
-        public static string PoseActiveParameter(PoseDefinition pose)
-        {
-            return "PTI/PoseActive/" + ShortId(pose != null ? pose.Id : "");
-        }
-
-        public static string TrackingVoteParameter(PoseGroupDefinition group)
-        {
-            return "PTI/TrackingVote/" + Sanitize(group != null ? group.Id : "");
-        }
-
-        public static string TrackingResetParameter(TrackingPart part)
-        {
-            return "PTI/TrackingReset/" + part;
-        }
-
-        public static string TrackingArbiterLayerName(TrackingPart part)
-        {
-            return "PT_TrackingArbiter_" + part;
-        }
-
-        private static string Sanitize(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return "unknown";
-            }
-
-            var characters = value.Select(character =>
-                char.IsLetterOrDigit(character) || character == '_' ? character : '_').ToArray();
-            return new string(characters);
-        }
-
-    }
-
     internal sealed class PoseLayerBucketDefinition
     {
         public string LayerName;

@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 
 namespace Gokoukotori.PoseTune.Editor
 {
@@ -109,14 +108,6 @@ namespace Gokoukotori.PoseTune.Editor
 
     internal static class KawaiiMigrationOptionSupport
     {
-        public static bool IsSelectable(Enum value)
-        {
-            return value switch
-            {
-                _ => true
-            };
-        }
-
         public static string DisplayName(Enum value)
         {
             return value switch
@@ -173,7 +164,7 @@ namespace Gokoukotori.PoseTune.Editor
                 $"自動コンテキスト={DisplayBool(options.enableAutoContextSwitch)}",
                 $"移行元={DisplayName(options.sourceDisposition)}"
             };
-            return string.Join(", ", pairs.Where(pair => !string.IsNullOrWhiteSpace(pair)));
+            return string.Join(", ", pairs);
         }
 
         public static string Summary(KawaiiMigrationOptions options)
@@ -194,7 +185,7 @@ namespace Gokoukotori.PoseTune.Editor
                 $"autoContext={options.enableAutoContextSwitch}",
                 $"sourceDisposition={options.sourceDisposition}"
             };
-            return string.Join(", ", pairs.Where(pair => !string.IsNullOrWhiteSpace(pair)));
+            return string.Join(", ", pairs);
         }
 
         private static string DisplayBool(bool value)

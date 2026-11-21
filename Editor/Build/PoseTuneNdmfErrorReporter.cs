@@ -166,31 +166,15 @@ namespace Gokoukotori.PoseTune.Editor
 
             if (context is Component component)
             {
-                return TransformPath(component.transform);
+                return PoseTuneHierarchyUtility.HierarchyPath(component.transform);
             }
 
             if (context is GameObject gameObject)
             {
-                return TransformPath(gameObject.transform);
+                return PoseTuneHierarchyUtility.HierarchyPath(gameObject.transform);
             }
 
             return string.IsNullOrWhiteSpace(context.name) ? context.GetType().Name : context.name;
-        }
-
-        private static string TransformPath(Transform transform)
-        {
-            if (transform == null)
-            {
-                return "";
-            }
-
-            var names = new Stack<string>();
-            for (var current = transform; current != null; current = current.parent)
-            {
-                names.Push(current.name);
-            }
-
-            return string.Join("/", names);
         }
     }
 }

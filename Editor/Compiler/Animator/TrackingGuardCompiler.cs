@@ -27,31 +27,12 @@ namespace Gokoukotori.PoseTune.Editor
 
         public static TrackingGuardProfile PoseEntryProfile(PoseTuneRoot root, PoseDefinition pose, bool fullBodyVariant)
         {
-            if (pose != null &&
-                pose.Group?.HasFullBodyTrackingOverride == true &&
-                root != null &&
-                root.advancedSettings.allowFullBodyTracking)
+            if (pose != null && PoseStateVariantRules.NeedsFullBodyVariant(root, pose.Group))
             {
                 return fullBodyVariant ? TrackingGuardProfile.FullBodyOnly : TrackingGuardProfile.ThreePointOnly;
             }
 
             return RootEntryProfile(root);
-        }
-
-        public static bool AllowsEntry(TrackingGuardProfile profile, PoseTuneParameterSnapshot snapshot)
-        {
-            var trackingType = snapshot?.Int("TrackingType") ?? 0;
-            switch (profile)
-            {
-                case TrackingGuardProfile.ThreePointOnly:
-                    return trackingType > 2 && trackingType < 4;
-                case TrackingGuardProfile.ThreeToSix:
-                    return trackingType > 2 && trackingType < 7;
-                case TrackingGuardProfile.FullBodyOnly:
-                    return trackingType > 3 && trackingType < 7;
-                default:
-                    return true;
-            }
         }
 
         public static void AddEntryConditions(AnimatorStateTransition transition, TrackingGuardProfile profile)
@@ -101,9 +82,7 @@ namespace Gokoukotori.PoseTune.Editor
             AnimatorConditionMode mode,
             float threshold)
         {
-            var transition = state.AddTransition(destination);
-            transition.hasExitTime = false;
-            transition.duration = 0f;
+            var transition = AnimatorTransitionFactory.Immediate(state, destination);
             transition.AddCondition(mode, threshold, "TrackingType");
         }
     }

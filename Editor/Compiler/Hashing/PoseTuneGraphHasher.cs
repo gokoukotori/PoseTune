@@ -41,16 +41,13 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Hashing
         {
             var root = graph?.RootComponent;
             Append(builder, "root.id", graph?.RootId ?? "");
-            Append(builder, "displayName", root != null ? root.displayName : "");
             Append(builder, "parameterNamespace", root != null ? root.parameterNamespace : "");
-            Append(builder, "buildMode", root != null ? root.buildMode.ToString() : "");
             Append(builder, "targetLayer", root != null ? root.targetLayer.ToString() : "");
             Append(builder, "enableAutoContextSwitch", root != null && root.enableAutoContextSwitch);
             Append(builder, "defaultMode", root != null ? root.defaultMode.ToString() : PoseTuneDefaultMode.Off.ToString());
             Append(builder, "poseSelectionSyncMode", root != null ? root.poseSelectionSyncMode.ToString() : PoseSelectionSyncMode.DirectGroupParameter.ToString());
             Append(builder, "poseWriteDefaultsMode", root != null ? root.poseWriteDefaultsMode.ToString() : PoseWriteDefaultsMode.PoseTuneDefault.ToString());
             Append(builder, "enableHeightAdjust", root != null && root.enableHeightAdjust);
-            Append(builder, "questLowMemoryMode", root != null && root.questLowMemoryMode);
             Append(builder, "disableWhenFullBodyTracking", root != null && root.disableWhenFullBodyTracking);
             Append(builder, "advanced.allowFullBodyTracking", root != null && root.advancedSettings.allowFullBodyTracking);
             Append(builder, "advanced.lockDesktopLowerBodyTracking", root != null && root.advancedSettings.lockDesktopLowerBodyTracking);

@@ -9,10 +9,7 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
         public static void Validate(PoseGraph graph, PoseDefinition pose, ValidationReport report)
         {
             if (pose.BlendMode == PoseClipBlendMode.Additive &&
-                (pose.RootOffset != Vector3.zero ||
-                 (graph.RootComponent.enableHeightAdjust &&
-                  PoseTuneAuthoringInclusion.Includes(graph.HeightAdjust) &&
-                  graph.HeightAdjust.applyMode != HeightApplyMode.Disabled)))
+                (pose.RootOffset != Vector3.zero || PoseTuneCompilerRules.AppliesHeightOffset(graph)))
             {
                 report.Warning(PoseTuneDiagnostics.AdditivePoseOutputOffset.Code, "additive pose に root/height offset が含まれます。", pose.Source);
             }

@@ -37,7 +37,7 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
             var menu = new MenuCompiler().Compile(graph, parameters);
             var expectedExpressionTypes = parameters.Parameters
                 .Where(CountsAsExpressionParameter)
-                .ToDictionary(parameter => parameter.Name, parameter => ToVrcValueTypeName(parameter.ValueType));
+                .ToDictionary(parameter => parameter.Name, parameter => PoseTuneParameterTypeMapper.ToVrcValueType(parameter.ValueType).ToString());
             var expectedAnimatorTypes = parameters.Parameters
                 .ToDictionary(parameter => parameter.Name, parameter => PoseTuneParameterTypeMapper.ToAnimatorType(parameter.ValueType));
 
@@ -48,19 +48,6 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Validation
         {
             return parameter != null &&
                    !parameter.AnimatorOnly;
-        }
-
-        private static string ToVrcValueTypeName(PoseTuneParameterValueType type)
-        {
-            switch (type)
-            {
-                case PoseTuneParameterValueType.Bool:
-                    return "Bool";
-                case PoseTuneParameterValueType.Int:
-                    return "Int";
-                default:
-                    return "Float";
-            }
         }
     }
 }

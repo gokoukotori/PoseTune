@@ -8,7 +8,6 @@ namespace Gokoukotori.PoseTune.Editor
     public sealed class AnimatorBuildResult
     {
         public AnimatorController TargetController;
-        public AnimatorController FxController;
         public ParameterPlan Parameters;
         public List<Object> GeneratedAssets = new();
 
@@ -27,16 +26,6 @@ namespace Gokoukotori.PoseTune.Editor
             {
                 yield return TargetController;
             }
-
-            if (HasAnimatorContent(FxController) && seen.Add(FxController))
-            {
-                yield return FxController;
-            }
-        }
-
-        private static bool HasAnimatorContent(AnimatorController controller)
-        {
-            return controller != null && controller.layers != null && controller.layers.Length > 0;
         }
     }
 

@@ -11,12 +11,10 @@ namespace Gokoukotori.PoseTune.Editor
             var result = new AnimatorBuildResult
             {
                 TargetController = CreateController(ControllerName(graph, "Target")),
-                FxController = CreateController(ControllerName(graph, "FX")),
                 Parameters = parameters
             };
 
             AddParameters(result.TargetController, parameters, graph);
-            AddParameters(result.FxController, parameters, graph);
             return result;
         }
 
@@ -62,6 +60,8 @@ namespace Gokoukotori.PoseTune.Editor
             EnsureParameter(controller, "Upright", AnimatorControllerParameterType.Float);
             EnsureParameter(controller, "Grounded", AnimatorControllerParameterType.Bool);
             EnsureParameter(controller, "Seated", AnimatorControllerParameterType.Bool);
+            EnsureParameter(controller, "AFK", AnimatorControllerParameterType.Bool);
+            EnsureParameter(controller, "VRCEmote", AnimatorControllerParameterType.Int);
             AvatarScaleCorrectionCompiler.EnsureBuiltInParameters(controller, graph?.HeightAdjust);
         }
 

@@ -15,10 +15,7 @@ namespace Gokoukotori.PoseTune.Editor
             var menu = root.GetComponentInChildren<PoseMenu>(true);
             if (menu == null && GUILayout.Button("ポーズメニューを追加"))
             {
-                var go = new GameObject("メニュー");
-                Undo.RegisterCreatedObjectUndo(go, "PoseTune メニューを追加");
-                go.transform.SetParent(root.transform, false);
-                menu = go.AddComponent<PoseMenu>();
+                menu = PoseTuneAuthoringFactory.CreateChild<PoseMenu>(root.transform, "メニュー", "PoseTune メニューを追加");
                 _parameterPlanPreview.Invalidate();
             }
 

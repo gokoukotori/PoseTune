@@ -38,6 +38,11 @@ namespace Gokoukotori.PoseTune.Editor
             };
         }
 
+        public static EditorCurveBinding AnimatorFloatBinding(string propertyName)
+        {
+            return EditorCurveBinding.FloatCurve("", typeof(Animator), propertyName);
+        }
+
         public static void ApplyRootCurveOffset(AnimationClip clip, string propertyName, float offset)
         {
             if (Mathf.Approximately(offset, 0f))
@@ -45,7 +50,16 @@ namespace Gokoukotori.PoseTune.Editor
                 return;
             }
 
-            var binding = EditorCurveBinding.FloatCurve("", typeof(Animator), propertyName);
+            SetRootCurveOffset(clip, propertyName, offset);
+        }
+
+        /// <summary>
+        /// Offsets the curve by <paramref name="offset"/>, or writes a constant curve when the clip has none.
+        /// Unlike <see cref="ApplyRootCurveOffset"/> this always writes the curve, even for a zero offset.
+        /// </summary>
+        public static void SetRootCurveOffset(AnimationClip clip, string propertyName, float offset)
+        {
+            var binding = AnimatorFloatBinding(propertyName);
             var existing = AnimationUtility.GetEditorCurve(clip, binding);
             var curve = existing != null
                 ? OffsetCurve(existing, offset)
@@ -191,10 +205,10 @@ namespace Gokoukotori.PoseTune.Editor
         {
             return new Dictionary<string, EditorCurveBinding>
             {
-                { "x", EditorCurveBinding.FloatCurve("", typeof(Animator), "RootQ.x") },
-                { "y", EditorCurveBinding.FloatCurve("", typeof(Animator), "RootQ.y") },
-                { "z", EditorCurveBinding.FloatCurve("", typeof(Animator), "RootQ.z") },
-                { "w", EditorCurveBinding.FloatCurve("", typeof(Animator), "RootQ.w") }
+                { "x", AnimatorFloatBinding("RootQ.x") },
+                { "y", AnimatorFloatBinding("RootQ.y") },
+                { "z", AnimatorFloatBinding("RootQ.z") },
+                { "w", AnimatorFloatBinding("RootQ.w") }
             };
         }
     }

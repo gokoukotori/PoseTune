@@ -43,12 +43,13 @@ namespace Gokoukotori.PoseTune.Editor
                     continue;
                 }
 
-                var group = new GameObject("Override " + SafeName(item.StateType, "Custom"));
-                Undo.RegisterCreatedObjectUndo(group, undoName);
-                Undo.SetTransformParent(group.transform, parent, undoName);
+                var group = KawaiiAuthoringObjectUtility.CreateChild(
+                    parent,
+                    OverrideName(item),
+                    undoName);
                 var poseGroup = Undo.AddComponent<PoseGroup>(group);
                 poseGroup.kind = ImportedKind(item, options);
-                poseGroup.displayName = "Override " + SafeName(item.StateType, "Custom");
+                poseGroup.displayName = OverrideName(item);
                 poseGroup.menuOrder = 1000 + item.Index;
                 poseGroup.includeInBuild =
                     options.overrideImportMode != KawaiiOverrideImportMode.ImportAllAsCustomDisabled;
@@ -56,16 +57,7 @@ namespace Gokoukotori.PoseTune.Editor
                 poseGroup.autoPoseSelectionMode = AutoPoseSelectionMode.InitialPoseOnly;
                 poseGroup.autoContextProfile = AutoContextProfile.KawaiiHeadHeightApproximation;
                 poseGroup.emitTrackingControl = options.addTrackingPolicy;
-                if (options.addTrackingPolicy)
-                {
-                    var policy = Undo.AddComponent<PoseTrackingPolicy>(group);
-                    policy.tracking = KawaiiPosingMapper.DefaultTracking(poseGroup.kind);
-                    if (options.disableWhenFullBodyTracking)
-                    {
-                        policy.useFullBodyTrackingOverride = true;
-                        policy.fullBodyTracking = TrackingPolicyData.ResetToTracking();
-                    }
-                }
+                KawaiiGroupAuthoringWriter.AddGroupTrackingPolicy(group, poseGroup.kind, options);
 
                 var animations = ExpandAnimations(item, options);
                 for (var index = 0; index < animations.Count; index++)
@@ -126,28 +118,16 @@ namespace Gokoukotori.PoseTune.Editor
                 return Array.Empty<KawaiiAnimationDto>();
             }
 
-            var animation = new KawaiiAnimationDto
-            {
-                Index = item.Index,
-                Enabled = item.Enabled &&
-                          options.overrideImportMode != KawaiiOverrideImportMode.ImportAllAsCustomDisabled,
-                IsRotate = item.IsRotate,
-                Rotate = item.Rotate,
-                IsMotionTime = item.IsMotionTime,
-                MotionTimeParameterName = item.MotionTimeParameterName,
-                Motion = item.Motion,
-                Clip = item.Clip,
-                BlendTree = item.BlendTree,
-                PreviewImage = item.PreviewImage,
-                AdjustmentClip = item.AdjustmentClip,
-                DisplayName = "Override " + SafeName(item.StateType, "Custom")
-            };
+            var animation = new KawaiiAnimationDto { DisplayName = OverrideName(item) };
+            item.CopyMotionEntryTo(animation);
+            animation.Enabled = item.Enabled &&
+                                options.overrideImportMode != KawaiiOverrideImportMode.ImportAllAsCustomDisabled;
             return KawaiiBlendTreeCompatibilityConverter.ExpandAnimation(animation, options);
         }
 
-        private static string SafeName(string value, string fallback)
+        private static string OverrideName(KawaiiOverrideDto item)
         {
-            return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+            return "Override " + KawaiiAuthoringObjectUtility.SafeName(item.StateType, "Custom");
         }
     }
 }

@@ -23,7 +23,7 @@ namespace Gokoukotori.PoseTune.Editor
             using var serialized = new SerializedObject(component);
             dto.SourceComponent = component;
             dto.ComponentTypeName = component.GetType().FullName ?? component.GetType().Name;
-            dto.GameObjectPath = TransformPath(component.transform);
+            dto.GameObjectPath = PoseTuneHierarchyUtility.HierarchyPath(component.transform);
             dto.SettingName = String(serialized, "settingName");
             dto.IsIconDisabled = Bool(serialized, "isIconDisabled");
             dto.MergeTrackingControl = Bool(serialized, "mergeTrackingControl", true);
@@ -95,20 +95,8 @@ namespace Gokoukotori.PoseTune.Editor
 
         private static KawaiiAnimationDto ReadAnimation(SerializedProperty property, int index)
         {
-            var motion = ObjectRef<Motion>(property, "animationClip");
-            return new KawaiiAnimationDto
+            return ReadMotionEntry(property, index, new KawaiiAnimationDto
             {
-                Index = index,
-                Enabled = Bool(property, "enabled", true),
-                IsRotate = Bool(property, "isRotate"),
-                Rotate = Int(property, "rotate"),
-                IsMotionTime = Bool(property, "isMotionTime"),
-                MotionTimeParameterName = String(property, "motionTimeParamName"),
-                Motion = motion,
-                Clip = motion as AnimationClip,
-                BlendTree = motion as BlendTree,
-                PreviewImage = ObjectRef<Texture2D>(property, "previewImage"),
-                AdjustmentClip = ObjectRef<AnimationClip>(property, "adjustmentClip"),
                 DisplayName = String(property, "displayName"),
                 Initial = Bool(property, "initial"),
                 InitialSet = Bool(property, "initialSet"),
@@ -116,27 +104,33 @@ namespace Gokoukotori.PoseTune.Editor
                 Icon = ObjectRef<Texture2D>(property, "icon"),
                 TypeParameterValue = Int(property, "typeParameterValue"),
                 SyncedParameterValue = Int(property, "syncdParameterValue")
-            };
+            });
         }
 
         private static KawaiiOverrideDto ReadOverride(SerializedProperty property, int index)
         {
-            var motion = ObjectRef<Motion>(property, "animationClip");
-            return new KawaiiOverrideDto
+            return ReadMotionEntry(property, index, new KawaiiOverrideDto
             {
-                Index = index,
-                Enabled = Bool(property, "enabled", true),
-                IsRotate = Bool(property, "isRotate"),
-                Rotate = Int(property, "rotate"),
-                IsMotionTime = Bool(property, "isMotionTime"),
-                MotionTimeParameterName = String(property, "motionTimeParamName"),
-                Motion = motion,
-                Clip = motion as AnimationClip,
-                BlendTree = motion as BlendTree,
-                PreviewImage = ObjectRef<Texture2D>(property, "previewImage"),
-                AdjustmentClip = ObjectRef<AnimationClip>(property, "adjustmentClip"),
                 StateType = StateType(property.FindPropertyRelative("stateType"))
-            };
+            });
+        }
+
+        private static T ReadMotionEntry<T>(SerializedProperty property, int index, T dto)
+            where T : KawaiiMotionEntryDto
+        {
+            var motion = ObjectRef<Motion>(property, "animationClip");
+            dto.Index = index;
+            dto.Enabled = Bool(property, "enabled", true);
+            dto.IsRotate = Bool(property, "isRotate");
+            dto.Rotate = Int(property, "rotate");
+            dto.IsMotionTime = Bool(property, "isMotionTime");
+            dto.MotionTimeParameterName = String(property, "motionTimeParamName");
+            dto.Motion = motion;
+            dto.Clip = motion as AnimationClip;
+            dto.BlendTree = motion as BlendTree;
+            dto.PreviewImage = ObjectRef<Texture2D>(property, "previewImage");
+            dto.AdjustmentClip = ObjectRef<AnimationClip>(property, "adjustmentClip");
+            return dto;
         }
 
         private static string StateType(SerializedProperty property)
@@ -198,22 +192,6 @@ namespace Gokoukotori.PoseTune.Editor
         {
             var property = obj.FindPropertyRelative(path);
             return property != null ? property.objectReferenceValue as T : null;
-        }
-
-        private static string TransformPath(Transform transform)
-        {
-            if (transform == null)
-            {
-                return "";
-            }
-
-            var path = transform.name;
-            for (var parent = transform.parent; parent != null; parent = parent.parent)
-            {
-                path = parent.name + "/" + path;
-            }
-
-            return path;
         }
     }
 }

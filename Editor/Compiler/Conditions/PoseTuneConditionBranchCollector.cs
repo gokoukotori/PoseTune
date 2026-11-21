@@ -79,10 +79,7 @@ namespace Gokoukotori.PoseTune.Editor.Compiler.Conditions
                 case GoroneSystemExGuardMode.AllPoseGroups:
                     return true;
                 case GoroneSystemExGuardMode.LowerBodyPoseGroups:
-                    return group.kind == PoseGroupKind.Chair ||
-                           group.kind == PoseGroupKind.Floor ||
-                           group.kind == PoseGroupKind.Prone ||
-                           group.kind == PoseGroupKind.Supine;
+                    return PoseTuneCompilerRules.IsLowerBodyKind(group.kind);
                 default:
                     return false;
             }

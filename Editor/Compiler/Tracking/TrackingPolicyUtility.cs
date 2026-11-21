@@ -1,23 +1,90 @@
+using System;
+
 namespace Gokoukotori.PoseTune.Editor
 {
     internal static class TrackingPolicyUtility
     {
+        /// <summary>Every <see cref="TrackingPart"/>; each maps to one <see cref="TrackingPolicyData"/> field.</summary>
+        private static readonly TrackingPart[] Parts = (TrackingPart[])Enum.GetValues(typeof(TrackingPart));
+
+        /// <summary>The mode <paramref name="policy"/> sets for <paramref name="part"/>; a null policy changes nothing.</summary>
+        public static TrackingMode Get(TrackingPolicyData policy, TrackingPart part)
+        {
+            policy ??= NoChange();
+            switch (part)
+            {
+                case TrackingPart.Head:
+                    return policy.head;
+                case TrackingPart.LeftHand:
+                    return policy.leftHand;
+                case TrackingPart.RightHand:
+                    return policy.rightHand;
+                case TrackingPart.Hip:
+                    return policy.hip;
+                case TrackingPart.LeftFoot:
+                    return policy.leftFoot;
+                case TrackingPart.RightFoot:
+                    return policy.rightFoot;
+                case TrackingPart.LeftFingers:
+                    return policy.leftFingers;
+                case TrackingPart.RightFingers:
+                    return policy.rightFingers;
+                case TrackingPart.Eyes:
+                    return policy.eyes;
+                case TrackingPart.Mouth:
+                    return policy.mouth;
+                default:
+                    return TrackingMode.NoChange;
+            }
+        }
+
+        public static void Set(TrackingPolicyData policy, TrackingPart part, TrackingMode mode)
+        {
+            switch (part)
+            {
+                case TrackingPart.Head:
+                    policy.head = mode;
+                    break;
+                case TrackingPart.LeftHand:
+                    policy.leftHand = mode;
+                    break;
+                case TrackingPart.RightHand:
+                    policy.rightHand = mode;
+                    break;
+                case TrackingPart.Hip:
+                    policy.hip = mode;
+                    break;
+                case TrackingPart.LeftFoot:
+                    policy.leftFoot = mode;
+                    break;
+                case TrackingPart.RightFoot:
+                    policy.rightFoot = mode;
+                    break;
+                case TrackingPart.LeftFingers:
+                    policy.leftFingers = mode;
+                    break;
+                case TrackingPart.RightFingers:
+                    policy.rightFingers = mode;
+                    break;
+                case TrackingPart.Eyes:
+                    policy.eyes = mode;
+                    break;
+                case TrackingPart.Mouth:
+                    policy.mouth = mode;
+                    break;
+            }
+        }
+
         public static TrackingPolicyData Copy(TrackingPolicyData source)
         {
             source ??= TrackingPolicyData.DefaultForPose();
-            return new TrackingPolicyData
+            var copy = new TrackingPolicyData();
+            foreach (var part in Parts)
             {
-                head = source.head,
-                leftHand = source.leftHand,
-                rightHand = source.rightHand,
-                hip = source.hip,
-                leftFoot = source.leftFoot,
-                rightFoot = source.rightFoot,
-                leftFingers = source.leftFingers,
-                rightFingers = source.rightFingers,
-                eyes = source.eyes,
-                mouth = source.mouth
-            };
+                Set(copy, part, Get(source, part));
+            }
+
+            return copy;
         }
 
         public static void ApplyResolved(
@@ -38,19 +105,13 @@ namespace Gokoukotori.PoseTune.Editor
 
         public static TrackingPolicyData NoChange()
         {
-            return new TrackingPolicyData
+            var policy = new TrackingPolicyData();
+            foreach (var part in Parts)
             {
-                head = TrackingMode.NoChange,
-                leftHand = TrackingMode.NoChange,
-                rightHand = TrackingMode.NoChange,
-                hip = TrackingMode.NoChange,
-                leftFoot = TrackingMode.NoChange,
-                rightFoot = TrackingMode.NoChange,
-                leftFingers = TrackingMode.NoChange,
-                rightFingers = TrackingMode.NoChange,
-                eyes = TrackingMode.NoChange,
-                mouth = TrackingMode.NoChange
-            };
+                Set(policy, part, TrackingMode.NoChange);
+            }
+
+            return policy;
         }
 
         public static TrackingPolicyData DefaultForGroup(PoseGroupKind kind)
@@ -98,26 +159,20 @@ namespace Gokoukotori.PoseTune.Editor
         {
             left ??= TrackingPolicyData.DefaultForPose();
             right ??= TrackingPolicyData.DefaultForPose();
-            return left.head == right.head &&
-                   left.leftHand == right.leftHand &&
-                   left.rightHand == right.rightHand &&
-                   left.hip == right.hip &&
-                   left.leftFoot == right.leftFoot &&
-                   left.rightFoot == right.rightFoot &&
-                   left.leftFingers == right.leftFingers &&
-                   left.rightFingers == right.rightFingers &&
-                   left.eyes == right.eyes &&
-                   left.mouth == right.mouth;
+            foreach (var part in Parts)
+            {
+                if (Get(left, part) != Get(right, part))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         public static bool IsNoChange(TrackingPolicyData value)
         {
             return value != null && AreEqual(value, NoChange());
-        }
-
-        public static bool WasCustomizedFromPoseDefault(TrackingPolicyData value)
-        {
-            return !AreEqual(value, TrackingPolicyData.DefaultForPose());
         }
     }
 }
